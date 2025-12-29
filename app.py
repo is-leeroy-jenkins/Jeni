@@ -337,7 +337,7 @@ st.divider( )
 if mode == "Text":
 	st.header( "" )
 
-	chat = Chat( use_ai=True, version=st.session_state.get( "gemini_version", "v1alpha" ) )
+	chat = Chat( use_ai=False, version=st.session_state.get( "gemini_version", "v1alpha" ) )
 
 	with st.sidebar:
 		st.header( "Text Settings" )
