@@ -921,7 +921,7 @@ class Translation( Gemini ):
 	source_language: Optional[ str ]
 	use_vertex: Optional[ bool ]
 	
-	def __init__( self, n: int=1, model: str = 'gemini-2.0-flash', version: str='v1alpha',
+	def __init__( self, n: int=1, model: str='gemini-2.0-flash', version: str='v1alpha',
 			use_ai: bool=False, temperature: float=0.8, top_p: float=0.9,
 			frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
 			instruct: str=None ):
