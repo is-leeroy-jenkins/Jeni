@@ -1,0 +1,640 @@
+###### Jeni
+<img src="https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/img/github/Boo.gif" width="800" height="200"/>
+
+
+
+A Python framework for building, deploying, and managing AI-powered assistants
+tailored for federal data analysis, budget execution, and data science. Jeni integrates OpenAI's GPT, 
+Google's Gemini API with multimodal support for text, image, audio, and file analysis 
+and is designed with extensibility and federal applications in mind, it enables secure, scalable, and intelligent
+automation of analytical tasks.
+
+## 🛠️ Features
+
+- Unified AI Framework: Integrates OpenAI APIs for text, image, audio, file analysis, transcription,
+  and translation.
+- Multimodal Capabilities: Supports text generation, image creation, image analysis, and document
+  summarization.
+- Vector Store Integration: Embedded vector store lookups for domain-specific knowledge retrieval.
+- Web & File Search: Built-in support for semantic document and web search.
+
+  
+## 🧠 LLMs 
+
+### ⚙️ [Leeroy](https://huggingface.co/leeroy-jankins/leeroy) 
+Leeroy is a LLM fine-tuned variant of Meta's Llama 3.2 1B Instruct, 
+quantized to Q4_K_M GGUF format for high-efficiency, low-latency inference. 
+Named after the legendary charge-forward ethos, Leeroy specializes in executing user 
+instructions with speed and accuracy — making it the ideal local LLM for 
+both professional tasks and experimental builds. With strong alignment
+capabilities, multilingual robustness, and support for complex multi-step 
+reasoning. Leeroy strikes a balance between performance, size, 
+and instruction quality. Designed for use on CPUs and modest GPUs, 
+Leeroy runs natively in llama.cpp, LM Studio, Ollama, and similar GGUF-compatible environments.  
+
+- [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://leeroy-py.streamlit.app/)
+- [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/leeroy) 
+
+
+
+### ⚙️  [Bro](https://huggingface.co/leeroy-jankins/bro) 
+Bro is a LLM fine-tuned variant of the gemma-3-1b-it transformer model, optimized for 
+enhanced contextual comprehension, instruction following, and domain-specific reasoning. 
+The fine-tuning process used supervised instruction tuning across multiple NLP domains, 
+with a focus on factual recall, multi-step reasoning, and document comprehension. 
+Built on the lightweight yet powerful Gemma 3 1B architecture, Bro provides a balance 
+between inference speed and linguistic depth — making it suitable for both production 
+deployment and academic research.
+
+- [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://bro-py.streamlit.app/)
+- [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/bro)
+
+
+### ⚙️  [Bubba](https://huggingface.co/leeroy-jankins/bubba) 
+Bubba is a fine-tuned LLM based on OpenAI’s Chat GPT-5. This release packages the 
+fine-tuned weights (or adapters) for practical, low-latency instruction following, 
+summarization, reasoning, and light code generation. It is intended for local or
+self-hosted environments and RAG (Retrieval-Augmented Generation) stacks that
+require predictable, fast outputs.
+
+- [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://gipity.streamlit.app/)
+- [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/bubba) 
+
+
+## 🧭 Table of Contents
+
+- 🧰 [Overview](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-overview)
+- ✨ [Features](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-features)
+- ⚡ [Quickstart](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-quickstart)
+- 🔧 [Configuration](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-configuration)
+- 🧩 [Design & Architecture](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-design--architecture)
+- 🧪 Usage Examples
+  - 📝 [Text generation](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-text-generation)
+  - 🌐 [Web Search](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-web-search-responses) (Responses)
+  - 📄 [Document Summarization](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-summarize-a-document-file-grounded) (file-grounded)
+  - 🗂️ [File search](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#%EF%B8%8F-file-search-vector-stores) (vector stores)
+  - 👀 [Vision](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-vision-analyze-an-image): analyze an image
+  - 🖼️ Images: [generate](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-image-generation) / [edit](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#%EF%B8%8F-images-generate--edit)
+  - 🧬 [Embeddings](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-embeddings)
+  - 🔊 [Text-to-Speech](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-text-to-speech-tts) (TTS)
+  - 🎙️ [Transcription/Translation](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#%EF%B8%8F-transcription--translation-whisper) (Whisper)
+
+
+## 📦 Installation
+
+#### 1. Clone the Repository
+
+
+```
+bash
+git clone https://github.com/your-username/Jeni.git
+cd Jeni
+```
+
+#### 2. Create and Activate a Virtual Environment
+
+```
+bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+#### 3. Install Dependencies
+
+```
+bash
+pip install -r requirements.txt
+```
+
+
+
+
+## ⚙️ Core Classes
+
+- `Gemini`: Base class that provides shared API setup, keys, and model configurations.
+- `Chat`, `Assistant`, `Bubba`, `Bro`: Extend `AI` to provide domain-specific implementations.
+- `Schemas`, `Header`, `EndPoint`: Configuration utilities for model selection, headers, and
+  endpoints.
+- `Prompt`, `Message`, `Response`, `File`, `Reasoning`: Pydantic models for structured data
+  exchange.
+
+
+
+## 💻 Capabilities
+
+| Capability        | Description                                                                 |
+|-------------------|-----------------------------------------------------------------------------|
+| Text Generation   | GPT-powered completions, instructions, and prompts                          |
+| Image Generation  | DALL·E 3-based prompt-to-image generation                                   |
+| Image Analysis    | Multimodal image+text inference using vision models                         |
+| Document Summary  | File upload + prompt-driven summarization via OpenAI file API               |
+| Web Search        | Integrated API call to perform web-based lookups                            |
+| File Search       | Vector store lookup with prompt-based semantic matching                     |
+| Model Registry    | Fine-tuned and base model tracking for GPT-4, GPT-4o, and others            |
+| Assistant List    | Query and list named assistant objects from the OpenAI API                  |
+
+
+
+## 🛠️ Requirements
+
+- Python 3.10+
+- OpenAI Python SDK
+- Pydantic
+- Numpy, Pandas
+- Tiktoken
+- Requests
+- Custom dependencies: `boogr`, `static`, `guro`
+
+## 📁 File Organization
+
+- [boo](https://github.com/is-leeroy-jenkins/Jeni/blob/main/boo.py) – Main application framework
+- [schema](https://github.com/is-leeroy-jenkins/Jeni/blob/main/models.py) – Models used for structured output
+- [boogr](https://github.com/is-leeroy-jenkins/Jeni/blob/main/boogr.py) – a GUI
+- [agents](https://github.com/is-leeroy-jenkins/Jeni/blob/main/guro.py) – a prompt library w/ over 100 agents.
+- [data](https://github.com/is-leeroy-jenkins/Jeni/tree/main/dbops.py) - Local persistance of embeddings for retreival augmentation base on SLQite. 
+
+## 🔐 Environment Variables
+
+Set the following in your environment or `.env` file:
+
+```
+  
+  bash
+  GOOGLE_API_KEY=<your_api_key>
+
+```
+
+
+## 🚀 Streamlit Application
+
+Jeni includes a **first-class, single-page Streamlit application** that exposes the framework’s
+core capabilities through a unified graphical interface.
+
+
+The Streamlit app is designed for:
+
+* Interactive analysis
+* Multimodal experimentation
+* Demonstrations and internal tools
+* Rapid prototyping on top of Jeni’s agents and models
+
+The application runs entirely on top of Jeni’s core APIs and does **not** modify or duplicate
+framework logic.
+
+[![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://boo-py.streamlit.app/)
+
+![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/Jeni-streamlit.gif)
+
+
+## Supported Capabilities
+
+The Streamlit application supports the following workflows:
+
+* 💬 **Chat-based Q&A**
+* 📄 **Document-grounded question answering**
+* 🖼️ **Image generation**
+* ✏️ **Image editing**
+* 🔍 **Image analysis (vision)**
+* 🎙️ **Audio transcription**
+* 🌍 **Audio translation**
+* 🧠 **Dynamic model switching**
+* 🧩 **Tool, reasoning, and source inspection (when available)**
+
+All workflows are exposed from a **single application page** with explicit mode selection,
+ensuring clear separation between text, document, image, and audio tasks.
+
+---
+
+### Running the Streamlit Application
+
+From the project root:
+
+```bash
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+Once running, the application will be available at:
+
+```
+http://localhost:8501
+```
+
+
+
+### Notes
+
+* Some capabilities (image generation, audio transcription, translation, etc.) depend on
+  model availability and configuration.
+* If a capability is unavailable in a given environment, the UI will **degrade gracefully**
+  and display an informational message rather than failing.
+
+
+
+## 🧰 Overview
+
+Jeni wraps the latest **Gemini Python SDK** with a thin class hierarchy:
+
+- **Gemini(base)** – holds the single `Gemini` client, env config, and shared helpers.
+- **Chat / Assistant / Bro / Bubba** – opinionated text assistants using the **Responses API**.
+- **Image / LargeImage** – image generation and vision analysis.
+- **Embedding** – small/large/legacy embeddings with consistent return types.
+- **TTS** – text-to-speech helpers (streaming to file).
+- **Transcription / Translation** – Whisper-powered speech-to-text (+ translate).
+- **Vector Store helpers** – list files, search via `file_search` tool, merge results.
+
+
+
+### ✨ Features
+
+- **Responses-first**: consistent `input=[{role, content:[{type:...}]}]` builders.
+- **One client**: a single `OpenAI` instance per process for reliability and testability.
+- **Typed containers**: Pydantic models for prompts/messages with pass-through `__init__`.
+- **Vector search**: easy `file_search` tools + helpers to fetch file IDs from vector stores.
+- **Audio**: TTS (stream-to-file), ASR (transcribe), and translate via Whisper.
+- **Vision & Images**: multimodal analysis (4o/4o-mini) and image generation (DALL·E 3).
+- **Guardrails**: tiny helpers that prevent recurring mistakes (e.g., `inputs` vs `input`,
+  content `type` keys, size strings, binary file handling).
+- **Uniform errors**: `GptError` + `ErrorDialog` with `module/cause/method` metadata.
+
+
+
+## ⚡ Quickstart
+
+1) **Install**
+
+```
+
+  pip install google-genai google pydantic
+
+```
+
+2) **Configure**
+
+```
+# Power your client via environment
+export GOOGLE_API_KEY="sk-..."         # macOS/Linux
+setx GOOGLE_API_KEY "sk-..."           # Windows
+```
+
+3) **Hello Jeni**
+
+```
+
+  from boo import Chat
+  
+  chat = Chat()
+  print(chat.generate_text("Say hello in one short sentence."))
+
+```
+
+
+
+## 🔧 Configuration
+
+- **Environment**
+  - `GOOGLE_API_KEY` (required)
+- **Models**
+  - Text/Responses: e.g., `gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`
+  - Images: `dall-e-3`
+  - Embeddings: `text-embedding-3-small`, `text-embedding-3-large`
+  - TTS: `gpt-4o-mini-tts`, `tts-1`, `tts-1-hd`
+  - ASR/Translate: `whisper-1`
+- **File Stores (optional)**
+  - Configure your store IDs once; Jeni converts to lists when calling tools.
+
+
+
+## 🧩 Design & Architecture
+
+- **Single client**: `Client(api_key=...)` is created in `gemini.__init__()` and reused everywhere.
+- **Schema helpers**: tiny, battle-tested builders ensure payloads are valid for the Responses API:
+  - input text only
+  - text + file
+  - text + image
+- **No duplicate methods**: each capability has one canonical implementation per class.
+- **Type-safe Pydantic**: BaseModel subclasses do **not** override `__init__` except with
+  pass-through `def __init__(self, **data): super().__init__(**data)`.
+- **Consistent naming**: `vector_stores` (with underscore), `response_format`, `output_text`.
+
+
+
+## 🔤 Text Generation
+
+- Generate high-quality responses using OpenAI's GPT models.
+- Supports parameter tuning (temperature, top_p, frequency penalties).
+- Ideal for summarization, explanations, and knowledge retrieval.
+
+```
+  
+  python
+  from jeni import Chat
+  
+  bro = Chat( )
+  response = bro.generate_text( "Explain how random forests handle overfitting." )
+  print( response )
+
+```
+
+## 🎨 Image Generation (IMAGEN)
+
+- Convert natural language prompts into images using IMAGEN 3.
+- Specify resolution and rendering quality options.
+- Useful for creating visual illustrations and conceptual diagrams.
+
+```
+python
+
+image_url = jeni.generate_image("A conceptual illustration of quantum computing in federal AI")
+print(f"Image URL: {image_url}")
+```
+
+### 🖼️ Image Analysis
+
+- Analyze visual content by combining image and text prompts.
+
+- Extract meaning, context, or structure from images.
+
+- Leverages Imagen3/4's vision capabilities for advanced perception.
+
+```
+
+  python
+  
+  url = "https://example.com/sample-image.png"
+  response = jeni.analyze_image("Describe the primary elements in this image", url)
+  print(response)
+
+```
+
+### 📄 Document Summarization
+
+- Upload and process document files directly into the assistant.
+
+- Use prompts to extract insights or summarize content.
+
+- Supports PDFs, DOCX, and other file formats via Gemini's File Store API.
+
+```
+
+  python
+  
+  file_path = "data/federal_strategy.pdf"
+  summary = bro.summarize_document(
+    prompt = "Summarize key national cybersecurity strategies.",
+    path = file_path
+  )
+  print( summary )
+
+```
+
+### 🔍 File Search with Vector Stores
+
+- Embed and store documents in vector stores for semantic search.
+
+- Retrieve contextually relevant content using natural language queries.
+
+- Ideal for knowledge base querying and document Q&A systems.
+
+```
+
+  python
+  
+  result = bro.search_files( 'Legislation related to environmental impact funding' )
+  print(result)
+
+```
+
+### 🔎 File & Web Search
+
+- Performs semantic search over domain-specific document embeddings to retrieve relevant content.
+
+- **File Search**: Query vector-embedded files using `vector_store_ids`.
+
+- **Web Search**: Real-time information retrieval using GPT web search integration.
+
+```
+
+  python
+  
+  result = bro.search_files( 'Legislation related to environmental impact funding' )
+  print(result)
+
+```
+
+### 🌐 Web Search (Real-Time Querying)
+
+- Perform web lookups in real time via OpenAI’s web-enabled models.
+
+- Extract current events, news, and regulatory updates.
+
+- No scraping required—returns model-interpreted summaries.
+
+```
+
+  python
+  
+  insights = bro.search_web( 'Current status of the Federal AI Bill 2025' )
+  print(insights)
+
+```
+
+### 🧾 Prompt & Message Structuring
+
+- Build structured prompt schemas using Pydantic models.
+
+- Define instructions, context, output goals, and data sources.
+
+- Promotes reusable, interpretable prompt engineering.
+
+```
+
+  python
+  
+  from boo import Prompt
+  p = Prompt(
+      instruction="Create a budget summary",
+      context="Federal Defense Budget FY25",
+      output_indicator="summary",
+      input_data="defense_budget_raw.csv"
+  )
+  print(p.model_dump())
+
+```
+
+### ⚙️ API Endpoint Access
+
+- Centralized access to Google's Gemini API endpoints
+
+- Includes endpoints for completions, images, speech, and files.
+
+- Facilitates debugging and manual request construction.
+
+```
+
+  python
+  
+  from gemini import EndPoint
+  api = EndPoint( )
+  print( api.get_data( ) )
+
+```
+
+### 🤖 Assistant Management
+
+- Fetches and lists OpenAI assistants created or used within the system, enabling assistant
+  lifecycle management.
+
+- Chat: General multimodal chat
+
+- Assistant: Generic AI assistant
+
+- Bubba: Budget Execution Analyst
+
+- Bro: Programming & Data Science Analyst
+
+```
+
+  python
+  
+  from boo import Assistant
+  assistant = Assistant()
+  assistants = assistant.get_list()
+  print("Available Assistants:", assistants)
+
+```
+
+## 🧪 Usage Examples
+
+> The snippets below show idiomatic Jeni usage. They assume `chat = Chat()`, `img = Image()`,
+> etc., and an `OPENAI_API_KEY` is present in your environment.
+
+## 📝 Text generation
+
+```
+    
+    from boo import Chat
+
+    chat = Chat()
+    out = chat.generate_text("Give me three bullet points on strict typing in Python.")
+    print(out)
+    
+```
+
+## 🌐 Web search (Responses)
+
+```
+
+    from boo import Chat
+
+    chat = Chat()
+    prompt = "Latest trends in Retrieval Augmented Generation. 3 bullets, 1 reference each."
+    out = chat.search_web(prompt)  # internally uses web_search_options
+    print(out)
+
+```
+
+## 📄 Summarize a document (file-grounded)
+
+```
+
+    from boo import Chat
+
+    chat = Chat()
+    out = chat.summarize_document(
+        prompt="Summarize the document with a 5-bullet executive brief.",
+        path="docs/paper.pdf"
+    )
+    print(out)
+    
+```
+
+## 🗂️ File search (vector stores)
+
+```
+
+    from boo import Chat
+
+    chat = Chat()
+    # Assumes chat.vector_stores is configured with { "Appropriations": "...", "Guidance": "..." }
+    out = chat.search_files("What are the major themes around FY2024 OCO funding?")
+    print(out)
+
+```
+
+## 👀 Vision: analyze an image
+
+```
+
+    from boo import Image
+
+    img = Image()
+    out = img.analyze(
+        text="Describe the chart and call out any anomalies in one paragraph.",
+        path="https://example.com/plot.png"
+    )
+    print(out)
+    
+```
+
+## 🖼️ Images: generate / edit
+
+```
+
+    from boo import Image
+
+    img = Image()
+    url = img.generate("A minimalist logo for 'Jeni' in monochrome, vector style")
+    print(url)
+
+    # If your SDK supports edits, ensure the correct API path (images.edit vs images.edits)
+    # url = img.edit("Add subtle grid background", "logo.png", size="1024x1024")
+
+```
+
+## 🧬 Embeddings
+
+```
+    from boo import Embedding
+
+    emb = Embedding()
+    vec = emb.create_small_embedding("Vectorize this sentence.")
+    print(len(vec), "dims")
+
+```
+
+## 🔊 Text-to-Speech (TTS)
+
+```
+
+    from boo import TTS
+
+    tts = TTS()
+    outfile = tts.save_audio("Hello from Jeni in a calm voice.", "out/hello.mp3")
+    print("Saved:", outfile)
+
+```
+
+## 🎙️ Transcription / Translation (Whisper)
+
+```
+
+    from boo import Transcription, Translation
+
+    asr = Transcription()
+    text = asr.transcribe("audio/meeting.m4a")
+    print(text)
+
+    xlat = Translation()
+    english = xlat.create("Translate this speech to English.", "audio/spanish.m4a")
+    print(english)
+
+```
+
+
+
+## 📝 License
+
+Jeni is published under the [MIT General Public License v3](https://github.com/is-leeroy-jenkins/Boo/blob/main/LICENSE).
+
+
