@@ -1,5 +1,5 @@
 ###### Jeni
-<img src="https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/img/github/Boo.gif" width="800" height="200"/>
+<img src="https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni_project.png" width="800" height="200"/>
 
 
 
