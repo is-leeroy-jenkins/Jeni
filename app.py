@@ -443,7 +443,7 @@ if mode == "Text":
 # IMAGES MODE
 # ======================================================================================
 elif mode == "Images":
-	img = Images( use_ai=True, version=st.session_state.get( "gemini_version", "v1alpha" ) )
+	img = Images( use_ai=False, version=st.session_state.get( "gemini_version", "v1alpha" ) )
 
 	with st.sidebar:
 		st.header( "Image Settings" )
@@ -499,7 +499,7 @@ elif mode == "Images":
 elif mode == "Audio":
 	transcriber = Transcription( use_ai=True, version=st.session_state.get( "gemini_version", "v1alpha" ) )
 	translator = Translation( use_ai=True, version=st.session_state.get( "gemini_version", "v1alpha" ) )
-	tts = TTS( use_ai=True, version=st.session_state.get( "gemini_version", "v1alpha" ) )
+	tts = TTS( use_ai=False, version=st.session_state.get( "gemini_version", "v1alpha" ) )
 
 	with st.sidebar:
 		st.header( "Audio Settings" )
@@ -561,7 +561,7 @@ elif mode == "Audio":
 # EMBEDDINGS MODE
 # ======================================================================================
 elif mode == "Embeddings":
-	embed = Embedding( use_ai=True, version=st.session_state.get( "gemini_version", "v1alpha" ) )
+	embed = Embedding( use_ai=False, version=st.session_state.get( "gemini_version", "v1alpha" ) )
 
 	with st.sidebar:
 		st.header( "Embedding Settings" )
