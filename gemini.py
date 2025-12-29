@@ -384,14 +384,20 @@ class Chat( Gemini ):
 	
 	def generate_text( self, prompt: str, model: str = 'gemini-2.0-flash' ) -> GenerateContentResponse | None:
 		"""
-		Purpose: Generates a text completion based on the provided prompt and configuration.
-		Parameters:
-		-----------
-		prompt: str - The text input for the model.
-		model: str - The specific Gemini model identifier.
-		Returns:
-		--------
-		Optional[ GenerateContentResponse ] - The response object or None on failure.
+		
+			Purpose:
+			--------
+			Generates a text completion based on the provided prompt and configuration.
+			
+			Parameters:
+			-----------
+			prompt: str - The text input for the model.
+			model: str - The specific Gemini model identifier.
+			
+			Returns:
+			--------
+			Optional[ GenerateContentResponse ] - The response object or None on failure.
+			
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -412,7 +418,7 @@ class Chat( Gemini ):
 			error = ErrorDialog( exception )
 			error.show( )
 	
-	def web_search( self, prompt: str, model: str = 'gemini-2.0-flash' ) -> Optional[ str ]:
+	def web_search( self, prompt: str, model: str='gemini-2.0-flash' ) -> Optional[ str ]:
 		"""
 		
 			Purpose:
@@ -635,7 +641,7 @@ class Embedding( Gemini ):
 		return [ 'text-embedding-004',
 		         'text-multilingual-embedding-002' ]
 	
-	def generate( self, text: str, model: str = 'text-embedding-004' ) -> Optional[ List[ float ] ]:
+	def generate( self, text: str, model: str='text-embedding-004' ) -> Optional[ List[ float ] ]:
 		"""
 			
 			Purpose:
