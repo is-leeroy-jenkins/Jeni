@@ -2796,6 +2796,7 @@ with st.sidebar:
 if mode == 'Text':
 	st.subheader( "💬 Text Generation", help=cfg.TEXT_GENERATION )
 	st.divider( )
+	text_model = st.session_state.get( 'text_model', '' )
 	text_number = st.session_state.get( 'text_number', 0 )
 	text_max_calls = st.session_state.get( 'text_max_calls', 0 )
 	text_max_searches = st.session_state.get( 'text_max_searches', 0 )
@@ -2809,7 +2810,6 @@ if mode == 'Text':
 	text_parallel_tools = st.session_state.get( 'text_parallel_tools', False )
 	text_store = st.session_state.get( 'text_store', False )
 	text_background = st.session_state.get( 'text_background', False )
-	text_model = st.session_state.get( 'text_model', '' )
 	text_reasoning = st.session_state.get( 'text_reasoning', '' )
 	text_resolution = st.session_state.get( 'text_resolution', '' )
 	text_media_resolution = st.session_state.get( 'text_media_resolution', '' )
@@ -3154,6 +3154,7 @@ if mode == 'Text':
 elif mode == "Images":
 	st.subheader( '📷 Images API', help=cfg.IMAGES_API )
 	st.divider( )
+	image_model = st.session_state.get( 'image_model', '' )
 	image_number = st.session_state.get( 'image_number', 0 )
 	image_max_calls = st.session_state.get( 'image_max_calls', 0 )
 	image_max_searches = st.session_state.get( 'image_max_searches', 0 )
@@ -3167,7 +3168,6 @@ elif mode == "Images":
 	image_store = st.session_state.get( 'image_store', False )
 	image_parallel_calls = st.session_state.get( 'image_parallel_calls', False )
 	image_background = st.session_state.get( 'image_background', False )
-	image_model = st.session_state.get( 'image_model', '' )
 	image_response_format = st.session_state.get( 'image_response_format', '' )
 	image_mime_type = st.session_state.get( 'image_mime_type', '' )
 	image_output = st.session_state.get( 'image_output', '' )
@@ -3745,6 +3745,7 @@ elif mode == 'Audio':
 	# ------------------------------------------------------------------
 	# Provider-aware Audio instantiation
 	# ------------------------------------------------------------------
+	audio_model = st.session_state.get( 'audio_model', '' )
 	audio_top_percent = st.session_state.get( 'audio_top_percent', 0.0 )
 	audio_freq = st.session_state.get( 'audio_frequency_penalty', 0.0 )
 	audio_presense = st.session_state.get( 'audio_presense_penalty', 0.0 )
@@ -3759,7 +3760,6 @@ elif mode == 'Audio':
 	audio_autoplay = st.session_state.get( 'audio_autoplay', False )
 	audio_input = st.session_state.get( 'audio_input', '' )
 	audio_task = st.session_state.get( 'audio_task', '' )
-	audio_model = st.session_state.get( 'audio_model', '' )
 	audio_language = st.session_state.get( 'audio_language', '' )
 	audio_format = st.session_state.get( 'audio_format', '' )
 	audio_file = st.session_state.get( 'audio_file', '' )
@@ -3776,9 +3776,6 @@ elif mode == 'Audio':
 	# ---------------- Task ----------------
 	available_tasks = [ 'Transcribe', 'Translate', 'Text-to-Speech' ]
 	model_options = [ ]
-	audio_language = None
-	audio_voice = None
-	audio_model = None
 	
 	# ------------------------------------------------------------------
 	#  Session State Initilization
@@ -3980,10 +3977,10 @@ elif mode == 'Audio':
 elif mode == 'Embeddings':
 	st.subheader( '🔢 Embeddings', help=cfg.EMBEDDINGS_API )
 	st.divider( )
+	embedding_model = st.session_state.get( 'embedding_model', '' )
 	embeddings_dimensions = st.session_state.get( 'embeddings_dimensions', )
 	embeddings_chunk_size = st.session_state.get( 'embeddings_chunk_size', 0 )
 	embeddings_overlap_amount = st.session_state.get( 'embeddings_overlap_amount', 0 )
-	embedding_model = st.session_state.get( 'embedding_model', '' )
 	embeddings_encoding = st.session_state.get( 'embeddings_encoding_format', '' )
 	embeddings_input = st.session_state.get( 'embeddings_input_text', '' )
 	embedding = Embeddings( )
@@ -4268,7 +4265,7 @@ elif mode == 'Vector Stores':
 elif mode == 'Document Q&A':
 	st.subheader( '📚 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
 	st.divider( )
-	provider_name = st.session_state.get( 'provider', 'GPT' )
+	docqna_model = st.session_state.get( 'docqna_model', '' )
 	docqna_number = st.session_state.get( 'docqna_number', 0 )
 	docqna_max_calls = st.session_state.get( 'docqna_max_calls', 0 )
 	docqna_max_searches = st.session_state.get( 'docqna_max_searches', 0 )
@@ -4282,7 +4279,6 @@ elif mode == 'Document Q&A':
 	docqna_parallel_tools = st.session_state.get( 'docqna_parallel_tools', False )
 	docqna_store = st.session_state.get( 'docqna_store', False )
 	docqna_background = st.session_state.get( 'docqna_background', False )
-	docqna_model = st.session_state.get( 'docqna_model', '' )
 	docqna_reasoning = st.session_state.get( 'docqna_reasoning', '' )
 	docqna_resolution = st.session_state.get( 'docqna_resolution', '' )
 	docqna_media_resolution = st.session_state.get( 'docqna_media_resolution', '' )
@@ -4624,11 +4620,12 @@ elif mode == 'Files':
 	st.subheader( '📁 Files API', help=cfg.FILES_API )
 	st.divider( )
 	files = Files( )
-	files_purpose = st.session_state.get( 'files_purpose' )
-	files_type = st.session_state.get( 'files_type' )
-	files_id = st.session_state.get( 'files_id' )
-	files_url = st.session_state.get( 'files_url' )
-	files_table = st.session_state.get( 'files_table' )
+	files_model = st.session_state.get( 'files_model', '' )
+	files_purpose = st.session_state.get( 'files_purpose', '' )
+	files_type = st.session_state.get( 'files_type', '' )
+	files_id = st.session_state.get( 'files_id', '' )
+	files_url = st.session_state.get( 'files_url', '' )
+	files_table = st.session_state.get( 'files_table', '' )
 	
 	for key in [ 'files_domains', 'files_stops', 'files_includes', 'files_input', ]:
 		if key in st.session_state and isinstance( st.session_state[ key ], list ):
@@ -5467,7 +5464,9 @@ _mode_to_model_key = \
 	'Embedding': 'embedding_model',
 	'Document Q&A': 'docqna_model',
 	'Files': 'files_model',
-	'Vector Stores': 'stores_model'
+	'Vector Stores': 'stores_model',
+	'Prompt Engineering': 'text_model',
+	'Data Management': 'text_model'
 }
 
 st.markdown(
