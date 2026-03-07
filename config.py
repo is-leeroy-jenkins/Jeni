@@ -51,11 +51,10 @@ from pathlib import Path
 # ---------------- CONSTANTS ------------------
 GEOCODING_API_KEY = os.getenv( 'GEOCODING_API_KEY' )
 GEMINI_API_KEY = os.getenv( 'GEMINI_API_KEY' )
-GROQ_API_KEY = os.getenv( 'GROQ_API_KEY' )
 GOOGLE_API_KEY = os.getenv( 'GOOGLE_API_KEY' )
 GOOGLE_CSE_ID = os.getenv( 'GOOGLE_CSE_ID' )
 GOOGLE_CLOUD_LOCATION = os.getenv( 'GOOGLE_CLOUD_LOCATION' )
-GOOGLE_CLOUD_PROJECT = os.getenv( 'GOOGLE_CLOUD_PROJECT' )
+GOOGLE_CLOUD_PROJECT_ID = os.getenv( 'GOOGLE_CLOUD_PROJECT_ID' )
 OUTPUT_FILE_NAME = "jeni.wav"
 SAMPLE_RATE = 48000
 MODELS = [ 'gpt-5-nano-2025-08-07', 'gpt-4.1-nano-2025-04-14', 'gpt-4o-mini', ]
@@ -77,7 +76,6 @@ ANALYST = '❓'
 JENI = '🧠'
 DEFAULT_CTX = 4096
 CORES = multiprocessing.cpu_count( )
-
 MODE_CLASS_MAP = {
 		'Text': [ 'Chat' ],
 		'Images': [ 'Images' ],
