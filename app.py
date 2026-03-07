@@ -2782,7 +2782,6 @@ with st.sidebar:
 			st.session_state.google_api_key = google_key
 			os.environ[ 'GOOGLE_API_KEY' ] = google_key
 		
-	
 	if st.button( 'Clear Chat' ):
 		reset_state( )
 		st.rerun( )

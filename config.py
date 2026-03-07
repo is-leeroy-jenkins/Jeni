@@ -83,7 +83,7 @@ MODE_CLASS_MAP = {
 		           'Translation',
 		           'Transcription' ],
 		'Embeddings': [ 'Embeddings' ],
-		'Documents': [ 'Files' ],
+		'Document Q&A': [ 'Files' ],
 		'Files': [ 'Files' ],
 		'Vector Stores': [ 'VectorStores' ],
 }
@@ -92,10 +92,10 @@ GEMINI_LOGO = r'resources/images/gemini.png'
 
 GEMINI_MODES = [ 'Text',
                  'Images',
-                 'Files',
+                 'Audio',
                  'Document Q&A',
                  'Embeddings',
-                 'Audio',
+                 'Files',
                  'Vector Stores',
                  'Prompt Engineering',
                  'Data Management',
