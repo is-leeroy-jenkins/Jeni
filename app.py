@@ -3319,7 +3319,7 @@ with st.sidebar:
 		st.rerun( )
 	
 	st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-	mode = st.sidebar.radio( 'Select Mode', cfg.GPT_MODES, index=0 )
+	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0 )
 	
 # ======================================================================================
 # TEXT MODE
