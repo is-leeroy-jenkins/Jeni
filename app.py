@@ -97,6 +97,9 @@ if 'google_cse_id' not in st.session_state:
 if 'googlemaps_api_key' not in st.session_state:
 	st.session_state[ 'googlemaps_api_key' ] = ''
 
+if 'geocoding_api_key' not in st.session_state:
+	st.session_state[ 'geocoding_api_key' ] = ''
+
 if st.session_state.gemini_api_key == '':
 	default = cfg.GEMINI_API_KEY
 	if default:
@@ -120,6 +123,12 @@ if st.session_state.googlemaps_api_key == '':
 	if default:
 		st.session_state.googlemaps_api_key = default
 		os.environ[ 'GOOGLEMAPS_API_KEY' ] = default
+
+if st.session_state.geocoding_api_key == '':
+	default = cfg.GEOODING_API_KEY
+	if default:
+		st.session_state.geocoding_api_key = default
+		os.environ[ 'GEOODING_API_KEY' ] = default
 
 if 'mode' not in st.session_state or st.session_state[ 'mode' ] is None:
 	st.session_state[ 'mode' ] = 'Text'
