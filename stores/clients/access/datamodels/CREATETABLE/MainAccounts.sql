@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS "MainAccounts" 
+(
+	"MainAccountsId"	INTEGER NOT NULL UNIQUE,
+	"AgencyIdentifier"	TEXT(80) DEFAULT 'NS',
+	"AgencyCode"	TEXT(80) DEFAULT 'NS',
+	"Code"	TEXT(80) DEFAULT 'NS',
+	"Name"	TEXT(80) DEFAULT 'NS',
+	"Type"	TEXT(80) DEFAULT 'NS',
+	PRIMARY KEY("MainAccountsId" AUTOINCREMENT)
+);
