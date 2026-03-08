@@ -55,7 +55,7 @@ import re
 import io
 import numpy as np
 import pandas as pd
-import plotly.express as px
+import plotly.graph_objects as go
 import tiktoken
 from reportlab.lib.pagesizes import LETTER
 
@@ -2278,53 +2278,153 @@ def create_aggregation( df: pd.DataFrame ):
 	
 	st.metric( 'Result', result )
 
-def create_visualization( df: pd.DataFrame ):
+def create_visualization( df: pd.DataFrame ) -> None:
+	"""
+	
+		Purpose:
+		--------
+		Render data visualizations without passing pandas objects directly into
+		Plotly/Narwhals.
+		
+		Parameters:
+		-----------
+		df : pd.DataFrame
+			The input DataFrame.
+		
+		Returns:
+		--------
+		None
+		
+	"""
 	st.subheader( 'Visualization Engine' )
 	
-	numeric_cols = df.select_dtypes( include=[ 'number' ] ).columns.tolist( )
-	categorical_cols = df.select_dtypes( include=[ 'object' ] ).columns.tolist( )
+	if df is None or df.empty:
+		st.info( 'No data available.' )
+		return
 	
-	chart = st.selectbox( 'Chart Type', [ 'Histogram', 'Bar', 'Line',
-	                                      'Scatter', 'Box', 'Pie', 'Correlation' ] )
+	df_plot = df.copy( )
 	
-	if chart == 'Histogram' and numeric_cols:
+	for col in df_plot.columns:
+		if df_plot[ col ].dtype == object:
+			df_plot[ col ] = df_plot[ col ].map(
+				lambda x: '' if x is None else str( x )
+			)
+	
+	numeric_cols: List[ str ] = [ ]
+	for col in df_plot.columns:
+		series_num = pd.to_numeric( df_plot[ col ], errors='coerce' )
+		if series_num.notna( ).any( ):
+			numeric_cols.append( col )
+	
+	categorical_cols: List[ str ] = [ col for col in df_plot.columns if col not in numeric_cols ]
+	
+	chart = st.selectbox(
+		'Chart Type',
+		[ 'Histogram', 'Bar', 'Line', 'Scatter', 'Box', 'Pie', 'Correlation' ] )
+	
+	if chart == 'Histogram':
+		if not numeric_cols:
+			st.info( 'No numeric columns available.' )
+			return
+		
 		col = st.selectbox( 'Column', numeric_cols )
-		fig = px.histogram( df, x=col )
+		values = pd.to_numeric( df_plot[ col ], errors='coerce' ).dropna( ).tolist( )
+		
+		fig = go.Figure( data=[ go.Histogram( x=values ) ] )
+		fig.update_layout( xaxis_title=col, yaxis_title='Count' )
 		st.plotly_chart( fig, use_container_width=True )
 	
 	elif chart == 'Bar':
-		x = st.selectbox( 'X', df.columns )
+		if not numeric_cols:
+			st.info( 'No numeric columns available.' )
+			return
+		
+		x = st.selectbox( 'X', df_plot.columns )
 		y = st.selectbox( 'Y', numeric_cols )
-		fig = px.bar( df, x=x, y=y )
+		
+		x_values = df_plot[ x ].astype( str ).tolist( )
+		y_values = pd.to_numeric( df_plot[ y ], errors='coerce' ).fillna( 0 ).tolist( )
+		
+		fig = go.Figure( data=[ go.Bar( x=x_values, y=y_values ) ] )
+		fig.update_layout( xaxis_title=x, yaxis_title=y )
 		st.plotly_chart( fig, use_container_width=True )
 	
 	elif chart == 'Line':
-		x = st.selectbox( 'X', df.columns )
+		if not numeric_cols:
+			st.info( 'No numeric columns available.' )
+			return
+		
+		x = st.selectbox( 'X', df_plot.columns )
 		y = st.selectbox( 'Y', numeric_cols )
-		fig = px.line( df, x=x, y=y )
+		
+		x_values = df_plot[ x ].astype( str ).tolist( )
+		y_values = pd.to_numeric( df_plot[ y ], errors='coerce' ).fillna( 0 ).tolist( )
+		
+		fig = go.Figure( data=[ go.Scatter( x=x_values, y=y_values, mode='lines' ) ] )
+		fig.update_layout( xaxis_title=x, yaxis_title=y )
 		st.plotly_chart( fig, use_container_width=True )
 	
 	elif chart == 'Scatter':
-		x = st.selectbox( 'X', numeric_cols )
-		y = st.selectbox( 'Y', numeric_cols )
-		fig = px.scatter( df, x=x, y=y )
+		if len( numeric_cols ) < 2:
+			st.info( 'At least two numeric columns are required.' )
+			return
+		
+		x = st.selectbox( 'X', numeric_cols, key='viz_scatter_x' )
+		y = st.selectbox( 'Y', numeric_cols, key='viz_scatter_y' )
+		
+		x_series = pd.to_numeric( df_plot[ x ], errors='coerce' )
+		y_series = pd.to_numeric( df_plot[ y ], errors='coerce' )
+		mask = x_series.notna( ) & y_series.notna( )
+		
+		x_values = x_series[ mask ].tolist( )
+		y_values = y_series[ mask ].tolist( )
+		
+		fig = go.Figure( data=[ go.Scatter( x=x_values, y=y_values, mode='markers' ) ] )
+		fig.update_layout( xaxis_title=x, yaxis_title=y )
 		st.plotly_chart( fig, use_container_width=True )
 	
 	elif chart == 'Box':
-		col = st.selectbox( 'Column', numeric_cols )
-		fig = px.box( df, y=col )
+		if not numeric_cols:
+			st.info( 'No numeric columns available.' )
+			return
+		
+		col = st.selectbox( 'Column', numeric_cols, key='viz_box_col' )
+		values = pd.to_numeric( df_plot[ col ], errors='coerce' ).dropna( ).tolist( )
+		
+		fig = go.Figure( data=[ go.Box( y=values, name=col ) ] )
+		fig.update_layout( yaxis_title=col )
 		st.plotly_chart( fig, use_container_width=True )
 	
 	elif chart == 'Pie':
+		if not categorical_cols:
+			st.info( 'No categorical columns available.' )
+			return
+		
 		col = st.selectbox( 'Category Column', categorical_cols )
-		fig = px.pie( df, names=col )
+		counts = df_plot[ col ].astype( str ).value_counts( )
+		
+		fig = go.Figure(
+			data=[ go.Pie( labels=counts.index.tolist( ), values=counts.values.tolist( ) ) ] )
 		st.plotly_chart( fig, use_container_width=True )
 	
-	elif chart == 'Correlation' and len( numeric_cols ) > 1:
-		corr = df[ numeric_cols ].corr( )
-		fig = px.imshow( corr, text_auto=True )
+	elif chart == 'Correlation':
+		if len( numeric_cols ) < 2:
+			st.info( 'At least two numeric columns are required.' )
+			return
+		
+		corr_df = pd.DataFrame( )
+		for col in numeric_cols:
+			corr_df[ col ] = pd.to_numeric( df_plot[ col ], errors='coerce' )
+		
+		corr = corr_df.corr( )
+		
+		fig = go.Figure(
+			data=[ go.Heatmap(
+				z=corr.values.tolist( ),
+				x=corr.columns.tolist( ),
+				y=corr.index.tolist( ) ) ] )
 		st.plotly_chart( fig, use_container_width=True )
-
+		
 def dm_create_table_from_df( table_name: str, df: pd.DataFrame ):
 	columns = [ ]
 	for col in df.columns:
@@ -5731,11 +5831,7 @@ elif mode == 'Data Management':
 			if tables:
 				table = st.selectbox( 'Table', tables, key='viz_table' )
 				df = read_table( table )
-				numeric_cols = df.select_dtypes( include=[ 'number' ] ).columns.tolist( )
-				if numeric_cols:
-					col = st.selectbox( 'Column', numeric_cols )
-					fig = px.histogram( df, x=col )
-					st.plotly_chart( fig, use_container_width=True )
+				create_visualization( df )
 		
 		# ------------------------------------------------------------------------------
 		# ADMIN
