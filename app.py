@@ -94,12 +94,6 @@ if 'google_api_key' not in st.session_state:
 if 'google_cse_id' not in st.session_state:
 	st.session_state[ 'google_cse_id' ] = ''
 
-if 'google_cloud_project_id' not in st.session_state:
-	st.session_state[ 'google_cloud_project_id' ] = ''
-
-if 'google_cloud_location' not in st.session_state:
-	st.session_state[ 'google_cloud_location' ] = ''
-
 if 'googlemaps_api_key' not in st.session_state:
 	st.session_state[ 'googlemaps_api_key' ] = ''
 
@@ -118,24 +112,12 @@ if st.session_state.google_api_key == '':
 		st.session_state.google_api_key = default
 		os.environ[ 'GOOGLE_API_KEY' ] = default
 
-if st.session_state.google_cloud_project_id == '':
-	default = cfg.GOOGLE_CLOUD_PROJECT_ID
-	if default:
-		st.session_state.google_cloud_project_id = default
-		os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = default
-
-if st.session_state.google_cloud_location == '':
-	default = cfg.GOOGLE_CLOUD_LOCATION
-	if default:
-		st.session_state.google_cloud_location = default
-		os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = default
-
 if st.session_state.google_cse_id == '':
 	default = cfg.GOOGLE_CSE_ID
 	if default:
 		st.session_state.google_cse_id = default
 		os.environ[ 'GOOGLE_CSE_ID' ] = default
-	
+
 if st.session_state.googlemaps_api_key == '':
 	default = cfg.GOOGLEMAPS_API_KEY
 	if default:
@@ -143,10 +125,10 @@ if st.session_state.googlemaps_api_key == '':
 		os.environ[ 'GOOGLEMAPS_API_KEY' ] = default
 
 if st.session_state.geocoding_api_key == '':
-	default = cfg.GEOCODING_API_KEY
+	default = cfg.GEOODING_API_KEY
 	if default:
 		st.session_state.geocoding_api_key = default
-		os.environ[ 'GEOCODING_API_KEY' ] = default
+		os.environ[ 'GEOODING_API_KEY' ] = default
 
 if 'mode' not in st.session_state or st.session_state[ 'mode' ] is None:
 	st.session_state[ 'mode' ] = 'Text'
@@ -180,7 +162,7 @@ if 'selected_prompt_id' not in st.session_state:
 
 if 'pending_system_prompt_name' not in st.session_state:
 	st.session_state[ 'pending_system_prompt_name' ] = ''
-	
+
 # ----------MODEL PARAMETERS --------------------------------
 
 if 'text_model' not in st.session_state:
@@ -232,7 +214,7 @@ if 'audio_system_instructions' not in st.session_state:
 
 if 'docqna_system_instructions' not in st.session_state:
 	st.session_state[ 'docqna_systems_instructions' ] = ''
-	
+
 # ----------MODEL PARAMETERS --------------------------------
 
 if 'text_model' not in st.session_state:
@@ -664,7 +646,7 @@ if 'docqna_chunk_count' not in st.session_state:
 
 if 'docqna_fallback_rows' not in st.session_state:
 	st.session_state[ 'docqna_fallback_rows' ] = [ ]
-	
+
 # ------- EMBEDDING-SPECIFIC PARAMETERS ----------------------
 
 if 'embedding_model' not in st.session_state:
@@ -841,29 +823,29 @@ def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
 			"total_tokens": 0 }
 	if not resp:
 		return usage
-
+	
 	raw = None
 	try:
 		raw = getattr( resp, "usage", None )
 	except Exception:
 		raw = None
-
+	
 	if not raw and isinstance( resp, dict ):
 		raw = resp.get( "usage" )
-
+	
 	# Gemini SDK commonly uses "usage_metadata"
 	if not raw and isinstance( resp, dict ):
 		raw = resp.get( "usage_metadata" )
-
+	
 	if not raw:
 		try:
 			raw = getattr( resp, "usage_metadata", None )
 		except Exception:
 			raw = None
-
+	
 	if not raw:
 		return usage
-
+	
 	try:
 		if isinstance( raw, dict ):
 			usage[ "prompt_tokens" ] = int( raw.get( "prompt_tokens", raw.get( "input_tokens", 0 ) ) )
@@ -883,7 +865,7 @@ def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
 			)
 	except Exception:
 		usage[ "total_tokens" ] = usage[ "prompt_tokens" ] + usage[ "completion_tokens" ]
-
+	
 	return usage
 
 def _update_token_counters( resp: Any ) -> None:
@@ -918,11 +900,11 @@ def resolve_gemini_api_key( ) -> Optional[ str ]:
 	session_key = st.session_state.get( "gemini_api_key" )
 	if session_key:
 		return session_key
-
+	
 	cfg_key = getattr( cfg, "GOOGLE_API_KEY", None )
 	if cfg_key:
 		return cfg_key
-
+	
 	return os.environ.get( "GOOGLE_API_KEY" )
 
 def _apply_gemini_runtime_config( ) -> None:
@@ -934,7 +916,7 @@ def _apply_gemini_runtime_config( ) -> None:
 	key = resolve_gemini_api_key( )
 	if key:
 		os.environ[ "GOOGLE_API_KEY" ] = key
-
+	
 	# Ensure project/location do not get passed when using API key mode.
 	# gemini.py reads these from the shared config module at runtime.
 	try:
@@ -1307,7 +1289,7 @@ def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
 				raw.get(
 					'total_tokens',
 					usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ],
-				)
+					)
 			)
 		else:
 			usage[ "prompt_tokens" ] = int( getattr( raw, "prompt_tokens", 0 ) )
@@ -2183,7 +2165,7 @@ def render_table( df: pd.DataFrame ) -> None:
 			lambda x: x if isinstance( x, (str, int, float, bool) ) or x == '' else str( x ) )
 	
 	st.markdown( fallback_df.to_html( index=False, escape=True ), unsafe_allow_html=True )
-	
+
 def make_display_safe( df: pd.DataFrame ) -> pd.DataFrame:
 	display_df = df.copy( )
 	
@@ -2463,7 +2445,7 @@ def create_visualization( df: pd.DataFrame ) -> None:
 				x=corr.columns.tolist( ),
 				y=corr.index.tolist( ) ) ] )
 		st.plotly_chart( fig, use_container_width=True )
-		
+
 def dm_create_table_from_df( table_name: str, df: pd.DataFrame ):
 	columns = [ ]
 	for col in df.columns:
@@ -3016,7 +2998,7 @@ def rename_table( old_name: str, new_name: str ) -> None:
 				conn.execute( idx_sql )
 		
 		conn.commit( )
-		
+
 # ---------- PROMPT ENGINEERING UTILITIES ---------------
 
 def fetch_prompt_names( db_path: str ) -> list[ str ]:
@@ -3302,7 +3284,7 @@ with st.sidebar:
 		if google_key:
 			st.session_state.google_api_key = google_key
 			os.environ[ 'GOOGLE_API_KEY' ] = google_key
-			
+		
 		gemini_key = st.text_input( 'Gemini API Key', type='password',
 			value=st.session_state.gemini_api_key or '',
 			help='Overrides GEMINI_API_KEY from config.py for this session only.' )
@@ -3311,7 +3293,7 @@ with st.sidebar:
 			st.session_state.gemini_key = gemini_key
 			os.environ[ 'GEMINI_KEY' ] = gemini_key
 		
-			
+		
 		googlemaps_key = st.text_input( 'Google Maps API Key', type='password',
 			value=st.session_state.googlemaps_api_key or '',
 			help='Overrides GOOGLEMAPS_API_KEY from config.py for this session only.' )
@@ -3319,14 +3301,6 @@ with st.sidebar:
 		if googlemaps_key:
 			st.session_state.googlemaps_api_key = googlemaps_key
 			os.environ[ 'GOOGLEMAPS_API_KEY' ] = googlemaps_key
-		
-		geocoding_key = st.text_input( 'Geocoding API Key', type='password',
-			value=st.session_state.geocoding_api_key or '',
-			help='Overrides GEOCODING_API_KEY from config.py for this session only.' )
-		
-		if geocoding_key:
-			st.session_state.geocoding_api_key = geocoding_key
-			os.environ[ 'GEOCODING_API_KEY' ] = geocoding_key
 		
 		google_cse_id = st.text_input( 'Google Custom Search ID', type='password',
 			value=st.session_state.google_cse_id or '',
@@ -3347,7 +3321,7 @@ with st.sidebar:
 		google_cloud_location = st.text_input( 'Google Cloud Location', type='password',
 			value=st.session_state.google_cloud_location or '',
 			help='Overrides GOOGLE_CLOUD_LOCATION from config.py for this session only.' )
-
+		
 		if google_cloud_location:
 			st.session_state.google_cloud_location = google_cloud_location
 			os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = google_cloud_location
@@ -3358,7 +3332,7 @@ with st.sidebar:
 	
 	st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0 )
-	
+
 # ======================================================================================
 # TEXT MODE
 # ======================================================================================
@@ -3407,7 +3381,7 @@ if mode == 'Text':
 			st.session_state[ 'text_system_instructions' ] = ''
 			st.session_state[ 'instructions_last_loaded' ] = ''
 			st.session_state[ 'clear_instructions' ] = False
-			
+		
 		with st.expander( label='LLM Configuration', icon='🧠', expanded=False, width='stretch' ):
 			
 			with st.expander( label='Model Settings', expanded=False, width='stretch' ):
@@ -3638,7 +3612,7 @@ if mode == 'Text':
 						del st.session_state[ 'text_stops_input' ]
 					
 					st.rerun( )
-	
+		
 		# ------------------------------------------------------------------
 		# Expander — Text System Instructions
 		# ------------------------------------------------------------------
@@ -4125,7 +4099,7 @@ elif mode == "Images":
 				st.session_state[ 'instructions' ] = ''
 			
 			st.button( 'Clear Instructions', width='stretch', on_click=_on_clear )
-			
+		
 		# ------------------------------------------------------------------
 		# Tab Section
 		# ------------------------------------------------------------------
@@ -4532,7 +4506,7 @@ elif mode == 'Audio':
 							del st.session_state[ key ]
 					
 					st.rerun( )
-					
+		
 		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
@@ -4597,7 +4571,7 @@ elif mode == 'Audio':
 						
 						except Exception as exc:
 							st.error( f'Translation failed: {exc}' )
-			
+				
 				elif audio_task == 'Text-to-Speech' and tts:
 					text = st.text_area( 'Enter Text to Synthesize' )
 					if text and st.button( 'Generate Audio' ):
@@ -4710,7 +4684,7 @@ elif mode == 'Embedding':
 						del st.session_state[ key ]
 				
 				st.rerun( )
-	
+		
 		# ------------------------------------------------------------------
 		# Main UI — Embedding execution (unchanged behavior)
 		# ------------------------------------------------------------------
@@ -4919,7 +4893,7 @@ elif mode == 'Vector Stores':
 									vs = searcher.delete( store_id=sel_id )
 								except Exception as exc:
 									st.error( f'Delete failed: {exc}' )
-	
+
 # ======================================================================================
 # DOCUMENTS MODE
 # ======================================================================================
@@ -5209,7 +5183,7 @@ elif mode == 'Document Q&A':
 						del st.session_state[ 'docqna_stops_input' ]
 					
 					st.rerun( )
-
+		
 		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
@@ -6157,17 +6131,17 @@ st.markdown(
 # FOOTER RENDERING
 # ======================================================================================
 _mode_to_model_key = \
-{
-	'Text': 'text_model',
-	'Images': 'image_model',
-	'Audio': 'audio_model',
-	'Embedding': 'embedding_model',
-	'Document Q&A': 'docqna_model',
-	'Files': 'files_model',
-	'Vector Stores': 'stores_model',
-	'Prompt Engineering': 'text_model',
-	'Data Management': 'text_model'
-}
+	{
+			'Text': 'text_model',
+			'Images': 'image_model',
+			'Audio': 'audio_model',
+			'Embedding': 'embedding_model',
+			'Document Q&A': 'docqna_model',
+			'Files': 'files_model',
+			'Vector Stores': 'stores_model',
+			'Prompt Engineering': 'text_model',
+			'Data Management': 'text_model'
+	}
 
 provider_val = st.session_state.get( 'provider', '—' )
 mode_val = mode or '—'
