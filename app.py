@@ -2028,28 +2028,132 @@ def create_schema( table: str ) -> List[ Tuple ]:
 		return conn.execute( f'PRAGMA table_info("{table}");' ).fetchall( )
 
 def read_table( table: str, limit: int = None, offset: int = 0 ) -> pd.DataFrame:
-	schema = create_schema( table )
-	column_names = [ row[ 1 ] for row in schema ]
+	"""
 	
-	has_explicit_id = any(
-		str( col ).lower( ) in {
-				'id',
-				f'{table.lower( )}id',
-				'rowid'
-		}
-		for col in column_names
-	)
+		Purpose:
+		--------
+		Read a SQLite table into a pandas DataFrame using a normalized scalar-only path.
 	
-	if has_explicit_id:
-		query = f'SELECT * FROM "{table}"'
-	else:
-		query = f'SELECT rowid AS rowid, * FROM "{table}"'
+		Parameters:
+		-----------
+		table : str
+			Table name.
+		limit : int = None
+			Optional row limit.
+		offset : int = 0
+			Optional row offset.
 	
+		Returns:
+		--------
+		pd.DataFrame
+			DataFrame of plain Python scalar values.
+	
+	"""
+	if not table:
+		return pd.DataFrame( )
+	
+	query = f'SELECT * FROM "{table}"'
 	if limit:
-		query += f' LIMIT {limit} OFFSET {offset}'
+		query += f' LIMIT {int( limit )} OFFSET {int( offset )}'
 	
 	with create_connection( ) as conn:
-		return pd.read_sql_query( query, conn )
+		cur = conn.cursor( )
+		cur.execute( query )
+		
+		raw_columns = [ d[ 0 ] for d in (cur.description or [ ]) ]
+		rows = cur.fetchall( )
+	
+	seen: Dict[ str, int ] = { }
+	columns: List[ str ] = [ ]
+	
+	for col in raw_columns:
+		name = str( col )
+		if name not in seen:
+			seen[ name ] = 0
+			columns.append( name )
+		else:
+			seen[ name ] += 1
+			columns.append( f'{name}_{seen[ name ]}' )
+	
+	def _scalarize( value: Any ) -> Any:
+		if value is None or isinstance( value, (str, int, float, bool) ):
+			return value
+		
+		if isinstance( value, bytes ):
+			try:
+				return value.decode( 'utf-8' )
+			except Exception:
+				return value.hex( )
+		
+		if isinstance( value, (list, tuple, set, dict) ):
+			try:
+				return str( normalize( value ) )
+			except Exception:
+				return str( value )
+		
+		if hasattr( value, 'model_dump' ):
+			try:
+				return str( value.model_dump( ) )
+			except Exception:
+				return str( value )
+		
+		return str( value )
+	
+	normalized_rows: List[ Dict[ str, Any ] ] = [ ]
+	for row in rows:
+		record: Dict[ str, Any ] = { }
+		for idx, col in enumerate( columns ):
+			record[ col ] = _scalarize( row[ idx ] )
+		normalized_rows.append( record )
+	
+	return pd.DataFrame( normalized_rows, columns=columns )
+
+def render_table( df: pd.DataFrame ) -> None:
+	"""
+	
+		Purpose:
+		--------
+		Render a DataFrame safely in Streamlit. Use the normal interactive dataframe
+		first, and fall back to HTML rendering if Streamlit/PyArrow serialization fails.
+	
+		Parameters:
+		-----------
+		df : pd.DataFrame
+			The DataFrame to render.
+	
+		Returns:
+		--------
+		None
+	
+	"""
+	if df is None:
+		st.info( 'No data available.' )
+		return
+	
+	try:
+		st.dataframe( df, use_container_width=True )
+		return
+	except Exception:
+		pass
+	
+	fallback_df = df.copy( )
+	fallback_df = fallback_df.where( pd.notnull( fallback_df ), '' )
+	
+	for col in fallback_df.columns:
+		fallback_df[ col ] = fallback_df[ col ].map(
+			lambda x: x if isinstance( x, (str, int, float, bool) ) or x == '' else str( x ) )
+	
+	st.markdown( fallback_df.to_html( index=False, escape=True ), unsafe_allow_html=True )
+	
+def make_display_safe( df: pd.DataFrame ) -> pd.DataFrame:
+	display_df = df.copy( )
+	
+	for col in display_df.columns:
+		display_df[ col ] = display_df[ col ].map(
+			lambda x: '' if x is None else str( x )
+		)
+	
+	return display_df
 
 def drop_table( table: str ) -> None:
 	"""
@@ -2354,89 +2458,6 @@ def create_custom_table( table_name: str, columns: list ) -> None:
 		conn.execute( sql )
 		conn.commit( )
 
-def rename_table( old_name: str, new_name: str ) -> None:
-	"""
-	
-		Purpose:
-		--------
-		Rename an existing SQLite table. Attempts native ALTER TABLE rename first; if it fails,
-		falls back to a schema-safe rebuild using the original CREATE TABLE statement and
-		preserves indexes.
-
-		Parameters:
-		-----------
-		old_name : str
-			Existing table name.
-
-		new_name : str
-			New table name.
-
-		Returns:
-		--------
-		None
-		
-	"""
-	if not old_name or not new_name:
-		return
-	
-	with create_connection( ) as conn:
-		try:
-			conn.execute( f'ALTER TABLE "{old_name}" RENAME TO "{new_name}";' )
-			conn.commit( )
-			return
-		except Exception:
-			pass
-		
-		row = conn.execute(
-			"""
-            SELECT sql
-            FROM sqlite_master
-            WHERE type ='table' AND name =?
-			""",
-			(old_name,)
-		).fetchone( )
-		
-		if not row or not row[ 0 ]:
-			raise ValueError( "Table definition not found." )
-		
-		create_sql = row[ 0 ]
-		
-		indexes = conn.execute(
-			"""
-            SELECT sql
-            FROM sqlite_master
-            WHERE type ='index' AND tbl_name=? AND sql IS NOT NULL
-			""",
-			(old_name,)
-		).fetchall( )
-		
-		open_paren = create_sql.find( "(" )
-		if open_paren == -1:
-			raise ValueError( "Malformed CREATE TABLE statement." )
-		
-		temp_name = f"{new_name}__rebuild_temp"
-		
-		conn.execute( "BEGIN" )
-		conn.execute( f'CREATE TABLE "{temp_name}" {create_sql[ open_paren: ]}' )
-		
-		cols = [ r[ 1 ] for r in conn.execute( f'PRAGMA table_info("{old_name}");' ).fetchall( ) ]
-		col_list = ", ".join( [ f'"{c}"' for c in cols ] )
-		
-		conn.execute(
-			f'INSERT INTO "{temp_name}" ({col_list}) SELECT {col_list} FROM "{old_name}";'
-		)
-		
-		conn.execute( f'DROP TABLE "{old_name}";' )
-		conn.execute( f'ALTER TABLE "{temp_name}" RENAME TO "{new_name}";' )
-		
-		for idx in indexes:
-			idx_sql = idx[ 0 ]
-			if idx_sql:
-				idx_sql = idx_sql.replace( f'ON "{old_name}"', f'ON "{new_name}"' )
-				conn.execute( idx_sql )
-		
-		conn.commit( )
-		
 def is_safe_query( query: str ) -> bool:
 	"""
 	
@@ -2774,6 +2795,89 @@ def drop_column( table: str, column: str ):
 		
 		conn.commit( )
 
+def rename_table( old_name: str, new_name: str ) -> None:
+	"""
+	
+		Purpose:
+		--------
+		Rename an existing SQLite table. Attempts native ALTER TABLE rename first; if it fails,
+		falls back to a schema-safe rebuild using the original CREATE TABLE statement and
+		preserves indexes.
+
+		Parameters:
+		-----------
+		old_name : str
+			Existing table name.
+
+		new_name : str
+			New table name.
+
+		Returns:
+		--------
+		None
+		
+	"""
+	if not old_name or not new_name:
+		return
+	
+	with create_connection( ) as conn:
+		try:
+			conn.execute( f'ALTER TABLE "{old_name}" RENAME TO "{new_name}";' )
+			conn.commit( )
+			return
+		except Exception:
+			pass
+		
+		row = conn.execute(
+			"""
+            SELECT sql
+            FROM sqlite_master
+            WHERE type ='table' AND name =?
+			""",
+			(old_name,)
+		).fetchone( )
+		
+		if not row or not row[ 0 ]:
+			raise ValueError( "Table definition not found." )
+		
+		create_sql = row[ 0 ]
+		
+		indexes = conn.execute(
+			"""
+            SELECT sql
+            FROM sqlite_master
+            WHERE type ='index' AND tbl_name=? AND sql IS NOT NULL
+			""",
+			(old_name,)
+		).fetchall( )
+		
+		open_paren = create_sql.find( "(" )
+		if open_paren == -1:
+			raise ValueError( "Malformed CREATE TABLE statement." )
+		
+		temp_name = f"{new_name}__rebuild_temp"
+		
+		conn.execute( "BEGIN" )
+		conn.execute( f'CREATE TABLE "{temp_name}" {create_sql[ open_paren: ]}' )
+		
+		cols = [ r[ 1 ] for r in conn.execute( f'PRAGMA table_info("{old_name}");' ).fetchall( ) ]
+		col_list = ", ".join( [ f'"{c}"' for c in cols ] )
+		
+		conn.execute(
+			f'INSERT INTO "{temp_name}" ({col_list}) SELECT {col_list} FROM "{old_name}";'
+		)
+		
+		conn.execute( f'DROP TABLE "{old_name}";' )
+		conn.execute( f'ALTER TABLE "{temp_name}" RENAME TO "{new_name}";' )
+		
+		for idx in indexes:
+			idx_sql = idx[ 0 ]
+			if idx_sql:
+				idx_sql = idx_sql.replace( f'ON "{old_name}"', f'ON "{new_name}"' )
+				conn.execute( idx_sql )
+		
+		conn.commit( )
+		
 # ---------- PROMPT ENGINEERING UTILITIES ---------------
 
 def fetch_prompt_names( db_path: str ) -> list[ str ]:
@@ -3106,7 +3210,6 @@ with st.sidebar:
 	
 	st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0 )
-
 
 # ======================================================================================
 # TEXT MODE
@@ -5454,10 +5557,8 @@ elif mode == 'Data Management':
 									f'VALUES ({placeholders});'
 							)
 							
-							conn.executemany(
-								insert_stmt,
-								df.where( pd.notnull( df ), None ).values.tolist( )
-							)
+							conn.executemany( insert_stmt,
+								df.where( pd.notnull( df ), None ).values.tolist( ) )
 						
 						conn.commit( )
 					
@@ -5479,7 +5580,7 @@ elif mode == 'Data Management':
 			if tables:
 				table = st.selectbox( 'Table', tables, key='table_name' )
 				df = read_table( table )
-				st.dataframe( df, use_container_width=True )
+				render_table( df )
 			else:
 				st.info( 'No tables available.' )
 		
@@ -5505,16 +5606,13 @@ elif mode == 'Data Management':
 				insert_data = { }
 				for column, col_type in type_map.items( ):
 					if 'INT' in col_type:
-						insert_data[
-							column ] = st.number_input( column, step=1, key=f'ins_{column}' )
+						insert_data[ column ] = st.number_input( column, step=1, key=f'ins_{column}' )
 					
 					elif 'REAL' in col_type:
-						insert_data[
-							column ] = st.number_input( column, format='%.6f', key=f'ins_{column}' )
+						insert_data[ column ] = st.number_input( column, format='%.6f', key=f'ins_{column}' )
 					
 					elif 'BOOL' in col_type:
-						insert_data[
-							column ] = 1 if st.checkbox( column, key=f'ins_{column}' ) else 0
+						insert_data[ column ] = 1 if st.checkbox( column, key=f'ins_{column}' ) else 0
 					
 					else:
 						insert_data[ column ] = st.text_input( column, key=f'ins_{column}' )
@@ -5589,7 +5687,7 @@ elif mode == 'Data Management':
 				page = st.number_input( 'Page', min_value=1, step=1 )
 				offset = (page - 1) * page_size
 				df_page = read_table( table, page_size, offset )
-				st.dataframe( df_page, use_container_width=True )
+				render_table( df_page )
 		
 		# ------------------------------------------------------------------------------
 		# FILTER
@@ -5603,7 +5701,8 @@ elif mode == 'Data Management':
 				value = st.text_input( 'Contains' )
 				if value:
 					df = df[ df[ column ].astype( str ).str.contains( value ) ]
-				st.dataframe( df, use_container_width=True )
+				
+				render_table( df )
 		
 		# ------------------------------------------------------------------------------
 		# AGGREGATE
@@ -5654,7 +5753,7 @@ elif mode == 'Data Management':
 				table = st.selectbox( 'Select Table', tables, key='profile_table' )
 				if st.button( 'Generate Profile' ):
 					profile_df = create_profile_table( table )
-					st.dataframe( profile_df, use_container_width=True )
+					render_table( profile_df )
 			
 			st.subheader( 'Drop Table' )
 			
@@ -5744,7 +5843,11 @@ elif mode == 'Data Management':
 					columns=[ 'cid', 'name', 'type', 'notnull', 'default', 'pk' ] )
 				
 				st.markdown( "### Columns" )
-				st.dataframe( schema_df, use_container_width=True )
+				st.data_editor(
+					make_display_safe( schema_df ),
+					hide_index=True,
+					use_container_width=True,
+					disabled=True )
 				
 				# Row count
 				with create_connection( ) as conn:
@@ -5762,7 +5865,11 @@ elif mode == 'Data Management':
 						columns=[ 'seq', 'name', 'unique', 'origin', 'partial' ]
 					)
 					st.markdown( "### Indexes" )
-					st.dataframe( idx_df, use_container_width=True )
+					st.data_editor(
+						make_display_safe( idx_df ),
+						hide_index=True,
+						use_container_width=True,
+						disabled=True )
 				else:
 					st.info( "No indexes defined." )
 			
