@@ -2027,7 +2027,7 @@ def create_schema( table: str ) -> List[ Tuple ]:
 	with create_connection( ) as conn:
 		return conn.execute( f'PRAGMA table_info("{table}");' ).fetchall( )
 
-def read_table( table: str, limit: int = None, offset: int = 0 ) -> pd.DataFrame:
+def read_table( table: str, limit: int=None, offset: int=0 ) -> pd.DataFrame:
 	"""
 	
 		Purpose:
@@ -2131,7 +2131,7 @@ def render_table( df: pd.DataFrame ) -> None:
 		return
 	
 	try:
-		st.dataframe( df, use_container_width=True )
+		st.data_editor( df, use_container_width=True )
 		return
 	except Exception:
 		pass
