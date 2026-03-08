@@ -34,7 +34,6 @@ Leeroy runs natively in llama.cpp, LM Studio, Ollama, and similar GGUF-compatibl
 - [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://leeroy-py.streamlit.app/)
 - [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/leeroy) 
 
-
 ### ⚙️  [Bro](https://huggingface.co/leeroy-jankins/bro) 
 Bro is a LLM fine-tuned variant of the gemma-3-1b-it transformer model, optimized for 
 enhanced contextual comprehension, instruction following, and domain-specific reasoning. 
@@ -46,7 +45,6 @@ deployment and academic research.
 
 - [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://bro-py.streamlit.app/)
 - [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/bro)
-
 
 ### ⚙️  [Bubba](https://huggingface.co/leeroy-jankins/bubba) 
 Bubba is a fine-tuned LLM based on OpenAI’s Chat GPT-5. This release packages the 

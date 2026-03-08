@@ -84,16 +84,6 @@ from gemini import (
 )
 
 # ======================================================================================
-# Page Configuration
-# ======================================================================================
-st.set_page_config(
-	page_title="Jeni",
-	page_icon=cfg.FAVICON,
-	layout="wide",
-)
-
-
-# ======================================================================================
 # SESSION STATE INITIALIZATION
 # ======================================================================================
 
@@ -103,6 +93,48 @@ if 'gemini_api_key' not in st.session_state:
 if 'google_api_key' not in st.session_state:
 	st.session_state[ 'google_api_key' ] = ''
 
+if 'google_cse_id' not in st.session_state:
+	st.session_state[ 'google_cse_id' ] = ''
+
+if 'googlemaps_api_key' not in st.session_state:
+	st.session_state[ 'googlemaps_api_key' ] = ''
+
+if 'google_cloud_location' not in st.session_state:
+	st.session_state[ 'google_cloud_location' ] = ''
+	
+if 'google_cloud_project_id' not in st.session_state:
+	st.session_state[ 'google_cloud_project_id' ] = ''
+
+if st.session_state.gemini_api_key == '':
+	default = cfg.GEMINI_API_KEY
+	if default:
+		st.session_state.gemini_api_key = default
+		os.environ[ 'GEMINI_API_KEY' ] = default
+
+if st.session_state.google_cse_id == '':
+	default = cfg.GOOGLE_CSE_ID
+	if default:
+		st.session_state.google_cse_id = default
+		os.environ[ 'GOOGLE_CSE_ID' ] = default
+	
+if st.session_state.googlemaps_api_key == '':
+	default = cfg.GOOGLEMAPS_API_KEY
+	if default:
+		st.session_state.googlemaps_api_key = default
+		os.environ[ 'GOOGLEMAPS_API_KEY' ] = default
+
+if st.session_state.google_cloud_location == '':
+	default = cfg.GOOGLE_CLOUD_LOCATION
+	if default:
+		st.session_state.google_cloud_location = default
+		os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = default
+
+if st.session_state.google_cloud_project_id == '':
+	default = cfg.GOOGLE_CLOUD_PROJECT_ID
+	if default:
+		st.session_state.google_cloud_project_id = default
+		os.environ[ 'GOOGLE_CLOUD_PRODUCT_ID' ] = default
+		
 if 'mode' not in st.session_state or st.session_state[ 'mode' ] is None:
 	st.session_state[ 'mode' ] = 'Text'
 
@@ -127,6 +159,18 @@ if 'files' not in st.session_state:
 if 'gemini_version' not in st.session_state:
 	st.session_state[ 'gemini_version' ] = getattr( cfg, 'GOOGLE_API_VERSION', 'v1alpha' )
 
+if 'use_semantic' not in st.session_state:
+	st.session_state[ 'use_semantic' ] = False
+
+if 'is_grounded' not in st.session_state:
+	st.session_state[ 'is_grounded' ] = False
+
+if 'selected_prompt_id' not in st.session_state:
+	st.session_state[ 'selected_prompt_id' ] = ''
+
+if 'pending_system_prompt_name' not in st.session_state:
+	st.session_state[ 'pending_system_prompt_name' ] = ''
+	
 # ----------MODEL PARAMETERS --------------------------------
 
 if 'text_model' not in st.session_state:
@@ -175,6 +219,7 @@ if 'audio_system_instructions' not in st.session_state:
 
 if 'docqna_system_instructions' not in st.session_state:
 	st.session_state[ 'docqna_systems_instructions' ] = ''
+	
 # --------TEXT-GENERATION PARAMETERS--------------------
 
 if 'text_number' not in st.session_state:
@@ -471,8 +516,6 @@ if 'docqna_frequency_penalty' not in st.session_state:
 if 'docqna_presense_penalty' not in st.session_state:
 	st.session_state[ 'docqna_presense_penalty' ] = 0.0
 
-# --------DOCQNA PARAMETERS--------------------
-
 if 'docqna_number' not in st.session_state:
 	st.session_state[ 'docqna_number' ] = 0
 
@@ -552,6 +595,30 @@ if 'docqna_source' not in st.session_state:
 
 if 'docqna_multi_mode' not in st.session_state:
 	st.session_state.docqna_multi_mode = False
+
+if 'uploaded' not in st.session_state:
+	st.session_state[ 'uploaded' ] = [ ]
+
+if 'active_docs' not in st.session_state:
+	st.session_state[ 'active_docs' ] = [ ]
+
+if 'doc_bytes' not in st.session_state:
+	st.session_state[ 'doc_bytes' ] = { }
+
+if 'doc_source' not in st.session_state:
+	st.session_state[ 'doc_source' ] = 'uploadlocal'
+
+if 'docqna_vec_ready' not in st.session_state:
+	st.session_state[ 'docqna_vec_ready' ] = False
+
+if 'docqna_fingerprint' not in st.session_state:
+	st.session_state[ 'docqna_fingerprint' ] = ''
+
+if 'docqna_chunk_count' not in st.session_state:
+	st.session_state[ 'docqna_chunk_count' ] = 0
+
+if 'docqna_fallback_rows' not in st.session_state:
+	st.session_state[ 'docqna_fallback_rows' ] = [ ]
 	
 # ------- EMBEDDING-SPECIFIC PARAMETERS ----------------------
 
@@ -997,74 +1064,6 @@ def sanitize_markdown( text: str ) -> str:
 	text = re.sub( r"\*(.*?)\*", r"\1", text )
 	return text
 
-def inject_response_css( ) -> None:
-	"""
-	
-		Purpose:
-		_________
-		Set the the format via css.
-		
-	"""
-	st.markdown(
-		"""
-		<style>
-		/* Chat message text */
-		.stChatMessage p {
-			color: rgb(220, 220, 220);
-			font-size: 1rem;
-			line-height: 1.6;
-		}
-
-		/* Headings inside chat responses */
-		.stChatMessage h1 {
-			color: rgb(0, 120, 252); /* DoD Blue */
-			font-size: 1.6rem;
-		}
-
-		.stChatMessage h2 {
-			color: rgb(0, 120, 252);
-			font-size: 1.35rem;
-		}
-
-		.stChatMessage h3 {
-			color: rgb(0, 120, 252);
-			font-size: 1.15rem;
-		}
-		
-		.stChatMessage a {
-			color: rgb(0, 120, 252); /* DoD Blue */
-			text-decoration: underline;
-		}
-		
-		.stChatMessage a:hover {
-			color: rgb(80, 160, 255);
-		}
-
-		</style>
-		""", unsafe_allow_html=True )
-
-def style_subheaders( ) -> None:
-	"""
-	
-		Purpose:
-		_________
-		Sets the style of subheaders in the main UI
-		
-	"""
-	st.markdown(
-		"""
-		<style>
-		div[data-testid="stMarkdownContainer"] h2,
-		div[data-testid="stMarkdownContainer"] h3,
-		div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h2,
-		div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h3 {
-			color: rgb(0, 120, 252) !important;
-		}
-		</style>
-		""",
-		unsafe_allow_html=True,
-	)
-
 def init_state( ) -> None:
 	"""
 	
@@ -1315,18 +1314,6 @@ def build_intent_prefix( mode: str ) -> str:
 		)
 	return ''
 
-def save_message( role: str, content: str ) -> None:
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute( 'INSERT INTO chat_history (role, content) VALUES (?, ?)', (role, content) )
-
-def load_history( ) -> List[ Tuple[ str, str ] ]:
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		return conn.execute( 'SELECT role, content FROM chat_history ORDER BY id' ).fetchall( )
-
-def clear_history( ) -> None:
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute( 'DELETE FROM chat_history' )
-
 def format_results( results ):
 	formatted_results = ''
 	for result in results.data:
@@ -1356,50 +1343,6 @@ def count_tokens( text: str ) -> int:
 	return num_tokens
 
 # ------------ TEXT UTILITIES -----------------
-
-def normalize_text( text: str ) -> str:
-	"""
-		
-		Purpose
-		-------
-		Normalize text by:
-			• Converting to lowercase
-			• Removing punctuation except sentence delimiters (. ! ?)
-			• Ensuring clean sentence boundary spacing
-			• Collapsing whitespace
-	
-		Parameters
-		----------
-		text: str
-	
-		Returns
-		-------
-		str
-		
-	"""
-	if not text:
-		return ""
-	
-	# Lowercase
-	text = text.lower( )
-	
-	# Remove punctuation except . ! ?
-	text = re.sub( r"[^\w\s\.\!\?]", "", text )
-	
-	# Ensure single space after sentence delimiters
-	text = re.sub( r"([.!?])\s*", r"\1 ", text )
-	
-	# Normalize whitespace
-	text = re.sub( r"\s+", " ", text ).strip( )
-	
-	return text
-
-def chunk_text( text: str, size: int=1200, overlap: int=200 ) -> List[ str ]:
-	chunks, i = [ ], 0
-	while i < len( text ):
-		chunks.append( text[ i:i + size ] )
-		i += size - overlap
-	return chunks
 
 def convert_xml( text: str ) -> str:
 	"""
@@ -1596,116 +1539,34 @@ def extract_text_from_bytes( file_bytes: bytes ) -> str:
 			return ""
 
 def route_document_query( prompt: str ) -> str:
-	source = st.session_state.get( 'doc_source' )
-	instructions = st.session_state.get( 'instructions' )
-	active_docs = st.session_state.get( 'docqna_active_docs', [ ] )
-	doc_bytes = st.session_state.get( 'doc_bytes', { } )
+	"""
+		Purpose:
+		--------
+		Route a document question through the unified chat pipeline and return a model-generated answer.
+
+		Parameters:
+		-----------
+		prompt : str
+			The user question to answer about active documents.
+
+		Returns:
+		--------
+		str
+			The assistant answer text.
+	"""
+	user_input = build_document_user_input( prompt )
+	if not user_input:
+		user_input = (prompt or '').strip( )
 	
-	if not source:
-		return 'No document source selected.'
-	
-	if not active_docs:
-		return 'No document selected.'
-	
-	# --------------------------------------------------
-	# LOCAL DOCUMENT → Chat (single or multi)
-	# --------------------------------------------------
-	if source == 'uploadlocal':
-		chat = Chat( )
-		
-		# Single document
-		if len( active_docs ) == 1:
-			name = active_docs[ 0 ]
-			file_bytes = doc_bytes.get( name )
-			
-			if not file_bytes:
-				return 'Document content not available.'
-			
-			text = extract_text_from_bytes( file_bytes )
-			
-			full_prompt = f"""
-				{instructions}
-				
-				Use the following document to answer the question.
-				Be precise and cite relevant portions when possible.
-				
-				DOCUMENT:
-				{text}
-				
-				QUESTION:
-				{prompt}
-				"""
-			return chat.generate_text( prompt=full_prompt )
-		
-		# Multi-document injection
-		combined_text = ""
-		
-		for name in active_docs:
-			file_bytes = doc_bytes.get( name )
-			if not file_bytes:
-				continue
-			
-			text = extract_text_from_bytes( file_bytes )
-			
-			combined_text += f"\n\n===== DOCUMENT: {name} =====\n\n{text}\n"
-		
-		if not combined_text.strip( ):
-			return 'No readable document content available.'
-		
-		full_prompt = f"""
-			{instructions}
-			
-			You are analyzing multiple documents.
-			
-			Use the content below to answer the question.
-			If multiple documents are relevant, compare them.
-			Cite document names when possible.
-			
-			DOCUMENT SET:
-			{combined_text}
-			
-			QUESTION:
-			{prompt}
-			"""
-		
-		return chat.generate_text( prompt=full_prompt )
-	
-	# --------------------------------------------------
-	# FILES API → Files class
-	# --------------------------------------------------
-	if source == "filesapi":
-		files = Files( )
-		
-		# Single file search
-		if len( active_docs ) == 1:
-			return files.search( prompt, active_docs[ 0 ] )
-		
-		# Multi-file survey
-		return files.survey( prompt )
-	
-	# --------------------------------------------------
-	# VECTOR STORE → VectorStores class
-	# --------------------------------------------------
-	if source == 'vectorstore':
-		vectorstores = VectorStores( )
-		
-		# Single store
-		if len( active_docs ) == 1:
-			return vectorstores.search( prompt, active_docs[ 0 ] )
-		
-		# Multi-store aggregation
-		responses = [ ]
-		for store_id in active_docs:
-			result = vectorstores.search( prompt, store_id )
-			if result:
-				responses.append( result )
-		
-		if not responses:
-			return 'No results found across selected vector stores.'
-		
-		return "\n\n".join( responses )
-	
-	return 'Unsupported document source.'
+	return run_llm_turn(
+		user_input=user_input,
+		temperature=float( st.session_state.get( 'temperature', 0.0 ) ),
+		top_p=float( st.session_state.get( 'top_percent', 0.95 ) ),
+		repeat_penalty=float( st.session_state.get( 'repeat_penalty', 1.1 ) ),
+		max_tokens=int( st.session_state.get( 'max_tokens', 1024 ) ) or 1024,
+		stream=False,
+		output=None
+	)
 
 def summarize_active_document( ) -> str:
 	"""
@@ -1802,6 +1663,8 @@ def _docqna_safe_load_sqlite_vec( conn: sqlite3.Connection ) -> bool:
 		
 	'''
 	try:
+		import sqlite_vec
+		
 		sqlite_vec.load( conn )
 		return True
 	except Exception:
@@ -2006,7 +1869,7 @@ def retrieve_top_doc_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, 
 	results.sort( key=lambda r: r[ 2 ], reverse=True )
 	return results[ : int( k ) ]
 
-def build_document_user_input( user_query: str, k: int=6 ) -> str:
+def build_document_user_input( user_query: str, k: int = 6 ) -> str:
 	'''
 	
 		Purpose:
@@ -2053,65 +1916,94 @@ def build_document_user_input( user_query: str, k: int=6 ) -> str:
 # ----------  DATABASE UTILITIES ----------
 
 def initialize_database( ) -> None:
-	Path( 'stores/sqlite/datamodels' ).mkdir( parents=True, exist_ok=True )
+	"""
+		Purpose:
+		--------
+		Ensure required SQLite tables exist and that the Prompts table contains the
+		columns required by the prompt utilities and Prompt Engineering mode.
+
+		Parameters:
+		-----------
+		None
+
+		Returns:
+		--------
+		None
+	"""
+	Path( 'stores/sqlite' ).mkdir( parents=True, exist_ok=True )
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute( """
-                      CREATE TABLE IF NOT EXISTS chat_history
-                      (
-                          id
-                          INTEGER
-                          PRIMARY
-                          KEY
-                          AUTOINCREMENT,
-                          role
-                          TEXT,
-                          content
-                          TEXT
-                      )
-		              """ )
-		conn.execute( """
-                      CREATE TABLE IF NOT EXISTS embeddings
-                      (
-                          id
-                          INTEGER
-                          PRIMARY
-                          KEY
-                          AUTOINCREMENT,
-                          chunk
-                          TEXT,
-                          vector
-                          BLOB
-                      )
-		              """ )
-		conn.execute( """
-                      CREATE TABLE IF NOT EXISTS Prompts
-                      (
-                          PromptsId
-                          INTEGER
-                          NOT
-                          NULL
-                          UNIQUE,
-                          Name
-                          TEXT
-                      (
-                          80
-                      ),
-                          Text TEXT,
-                          Version TEXT
-                      (
-                          80
-                      ),
-                          ID TEXT
-                      (
-                          80
-                      ),
-                          PRIMARY KEY
-                      (
-                          PromptsId
-                          AUTOINCREMENT
-                      )
-                          )
-		              """ )
+		conn.execute(
+			"""
+            CREATE TABLE IF NOT EXISTS chat_history
+            (
+                id
+                INTEGER
+                PRIMARY
+                KEY
+                AUTOINCREMENT,
+                role
+                TEXT,
+                content
+                TEXT
+            )
+			"""
+		)
+		
+		conn.execute(
+			"""
+            CREATE TABLE IF NOT EXISTS embeddings
+            (
+                id
+                INTEGER
+                PRIMARY
+                KEY
+                AUTOINCREMENT,
+                chunk
+                TEXT,
+                vector
+                BLOB
+            )
+			"""
+		)
+		
+		conn.execute(
+			"""
+            CREATE TABLE IF NOT EXISTS Prompts
+            (
+                PromptsId
+                INTEGER
+                NOT
+                NULL
+                PRIMARY
+                KEY
+                AUTOINCREMENT,
+                Caption
+                TEXT,
+                Name
+                TEXT
+            (
+                80
+            ),
+                Text TEXT,
+                Version TEXT
+            (
+                80
+            ),
+                ID TEXT
+            (
+                80
+            )
+                )
+			"""
+		)
+		
+		prompt_columns = [ row[ 1 ] for row in
+		                   conn.execute( 'PRAGMA table_info("Prompts");' ).fetchall( ) ]
+		
+		if 'Caption' not in prompt_columns:
+			conn.execute( 'ALTER TABLE "Prompts" ADD COLUMN "Caption" TEXT;' )
+		
+		conn.commit( )
 
 def create_connection( ) -> sqlite3.Connection:
 	return sqlite3.connect( cfg.DB_PATH )
@@ -2436,6 +2328,89 @@ def create_custom_table( table_name: str, columns: list ) -> None:
 		conn.execute( sql )
 		conn.commit( )
 
+def rename_table( old_name: str, new_name: str ) -> None:
+	"""
+	
+		Purpose:
+		--------
+		Rename an existing SQLite table. Attempts native ALTER TABLE rename first; if it fails,
+		falls back to a schema-safe rebuild using the original CREATE TABLE statement and
+		preserves indexes.
+
+		Parameters:
+		-----------
+		old_name : str
+			Existing table name.
+
+		new_name : str
+			New table name.
+
+		Returns:
+		--------
+		None
+		
+	"""
+	if not old_name or not new_name:
+		return
+	
+	with create_connection( ) as conn:
+		try:
+			conn.execute( f'ALTER TABLE "{old_name}" RENAME TO "{new_name}";' )
+			conn.commit( )
+			return
+		except Exception:
+			pass
+		
+		row = conn.execute(
+			"""
+            SELECT sql
+            FROM sqlite_master
+            WHERE type ='table' AND name =?
+			""",
+			(old_name,)
+		).fetchone( )
+		
+		if not row or not row[ 0 ]:
+			raise ValueError( "Table definition not found." )
+		
+		create_sql = row[ 0 ]
+		
+		indexes = conn.execute(
+			"""
+            SELECT sql
+            FROM sqlite_master
+            WHERE type ='index' AND tbl_name=? AND sql IS NOT NULL
+			""",
+			(old_name,)
+		).fetchall( )
+		
+		open_paren = create_sql.find( "(" )
+		if open_paren == -1:
+			raise ValueError( "Malformed CREATE TABLE statement." )
+		
+		temp_name = f"{new_name}__rebuild_temp"
+		
+		conn.execute( "BEGIN" )
+		conn.execute( f'CREATE TABLE "{temp_name}" {create_sql[ open_paren: ]}' )
+		
+		cols = [ r[ 1 ] for r in conn.execute( f'PRAGMA table_info("{old_name}");' ).fetchall( ) ]
+		col_list = ", ".join( [ f'"{c}"' for c in cols ] )
+		
+		conn.execute(
+			f'INSERT INTO "{temp_name}" ({col_list}) SELECT {col_list} FROM "{old_name}";'
+		)
+		
+		conn.execute( f'DROP TABLE "{old_name}";' )
+		conn.execute( f'ALTER TABLE "{temp_name}" RENAME TO "{new_name}";' )
+		
+		for idx in indexes:
+			idx_sql = idx[ 0 ]
+			if idx_sql:
+				idx_sql = idx_sql.replace( f'ON "{old_name}"', f'ON "{new_name}"' )
+				conn.execute( idx_sql )
+		
+		conn.commit( )
+		
 def is_safe_query( query: str ) -> bool:
 	"""
 	
@@ -2527,6 +2502,123 @@ def add_column( table: str, column: str, col_type: str ):
 	with create_connection( ) as conn:
 		conn.execute(
 			f'ALTER TABLE "{table}" ADD COLUMN "{column}" {col_type};' )
+		conn.commit( )
+
+def rename_column( table_name: str, old_name: str, new_name: str ) -> None:
+	"""
+	
+		Purpose:
+		--------
+		Rename a column within an existing SQLite table. Attempts native ALTER TABLE rename
+		first; if it fails, falls back to a schema-safe rebuild preserving column order, data,
+		and indexes.
+
+		Parameters:
+		-----------
+		table_name : str
+			Table containing the column.
+
+		old_name : str
+			Existing column name.
+
+		new_name : str
+			New column name.
+
+		Returns:
+		--------
+		None
+		
+	"""
+	if not table_name or not old_name or not new_name:
+		return
+	
+	with create_connection( ) as conn:
+		try:
+			conn.execute(
+				f'ALTER TABLE "{table_name}" RENAME COLUMN "{old_name}" TO "{new_name}";'
+			)
+			conn.commit( )
+			return
+		except Exception:
+			pass
+		
+		row = conn.execute(
+			"""
+            SELECT sql
+            FROM sqlite_master
+            WHERE type ='table' AND name =?
+			""",
+			(table_name,)
+		).fetchone( )
+		
+		if not row or not row[ 0 ]:
+			raise ValueError( "Table definition not found." )
+		
+		create_sql = row[ 0 ]
+		
+		indexes = conn.execute(
+			"""
+            SELECT sql
+            FROM sqlite_master
+            WHERE type ='index' AND tbl_name=? AND sql IS NOT NULL
+			""",
+			(table_name,)
+		).fetchall( )
+		
+		schema = conn.execute( f'PRAGMA table_info("{table_name}");' ).fetchall( )
+		cols = [ r[ 1 ] for r in schema ]
+		if old_name not in cols:
+			raise ValueError( "Column not found." )
+		
+		mapped_cols = [ (new_name if c == old_name else c) for c in cols ]
+		
+		temp_table = f"{table_name}__rebuild_temp"
+		
+		col_defs: List[ str ] = [ ]
+		pk_cols = [ r for r in schema if int( r[ 5 ] or 0 ) > 0 ]
+		single_pk = len( pk_cols ) == 1
+		
+		for row in schema:
+			col_name = row[ 1 ]
+			col_type = row[ 2 ] or ''
+			not_null = int( row[ 3 ] or 0 )
+			default_value = row[ 4 ]
+			pk = int( row[ 5 ] or 0 )
+			
+			out_name = new_name if col_name == old_name else col_name
+			col_def = f'"{out_name}" {col_type}'.strip( )
+			
+			if not_null:
+				col_def += ' NOT NULL'
+			
+			if default_value is not None:
+				col_def += f' DEFAULT {default_value}'
+			
+			if single_pk and pk == 1:
+				col_def += ' PRIMARY KEY'
+			
+			col_defs.append( col_def )
+		
+		new_create_sql = f'CREATE TABLE "{temp_table}" ({", ".join( col_defs )});'
+		
+		old_select = ", ".join( [ f'"{c}"' for c in cols ] )
+		new_insert = ", ".join( [ f'"{c}"' for c in mapped_cols ] )
+		
+		conn.execute( "BEGIN" )
+		conn.execute( new_create_sql )
+		conn.execute(
+			f'INSERT INTO "{temp_table}" ({new_insert}) SELECT {old_select} FROM "{table_name}";'
+		)
+		
+		conn.execute( f'DROP TABLE "{table_name}";' )
+		conn.execute( f'ALTER TABLE "{temp_table}" RENAME TO "{table_name}";' )
+		
+		for idx in indexes:
+			idx_sql = idx[ 0 ]
+			if idx_sql:
+				idx_sql = idx_sql.replace( f'"{old_name}"', f'"{new_name}"' )
+				conn.execute( idx_sql )
+		
 		conn.commit( )
 
 def create_profile_table( table: str ):
@@ -2755,9 +2847,176 @@ def delete_prompt( pid: int ) -> None:
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute( "DELETE FROM Prompts WHERE PromptsId=?", (pid,) )
 
+def build_prompt( user_input: str ) -> str:
+	"""
+		Purpose:
+		--------
+		Build a llama.cpp-compatible prompt using the application's system instructions, optional
+		retrieval context (semantic + basic RAG), and the current in-memory chat history.
+
+		Parameters:
+		-----------
+		user_input : str
+			The current user turn to append to the prompt.
+
+		Returns:
+		--------
+		str
+			A fully constructed prompt in chat template format.
+	"""
+	system_instructions = st.session_state.get( 'system_instructions', '' )
+	use_semantic = bool( st.session_state.get( 'use_semantic', False ) )
+	basic_docs = st.session_state.get( 'basic_docs', [ ] )
+	messages = st.session_state.get( 'messages', [ ] )
+	
+	top_k_value = int( st.session_state.get( 'top_k', 0 ) )
+	if top_k_value <= 0:
+		top_k_value = 4
+	
+	prompt = f"<|system|>\n{system_instructions}\n</s>\n"
+	
+	if use_semantic:
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			rows = conn.execute( "SELECT chunk, vector FROM embeddings" ).fetchall( )
+		
+		if rows:
+			q = embedder.encode( [ user_input ] )[ 0 ]
+			scored = [ (c, cosine_sim( q, np.frombuffer( v ) )) for c, v in rows ]
+			for c, _ in sorted( scored, key=lambda x: x[ 1 ], reverse=True )[ :top_k_value ]:
+				prompt += f"<|system|>\n{c}\n</s>\n"
+	
+	for d in basic_docs[ :6 ]:
+		prompt += f"<|system|>\n{d}\n</s>\n"
+	
+	if isinstance( messages, list ):
+		for msg in messages:
+			role = ''
+			content = ''
+			
+			if isinstance( msg, tuple ) or isinstance( msg, list ):
+				if len( msg ) == 2:
+					role = str( msg[ 0 ] or '' ).strip( )
+					content = str( msg[ 1 ] or '' )
+			elif isinstance( msg, dict ):
+				role = str( msg.get( 'role', '' ) or '' ).strip( )
+				content = str( msg.get( 'content', '' ) or '' )
+			
+			if role:
+				prompt += f"<|{role}|>\n{content}\n</s>\n"
+	
+	prompt += f"<|user|>\n{user_input}\n</s>\n<|assistant|>\n"
+	return prompt
+
+def run_llm_turn( user_input: str, temperature: float, top_p: float, repeat_penalty: float,
+		max_tokens: int, stream: bool, output: Any | None = None ) -> str:
+	"""
+	
+		Purpose:
+		--------
+		Run a single LLM turn using the application's shared prompt builder and either stream or
+		return the full response text.
+
+		Parameters:
+		-----------
+		user_input : str
+			The user turn (already constructed, including any document/RAG context if applicable).
+		temperature : float
+			Sampling temperature.
+		top_p : float
+			Nucleus sampling probability.
+		repeat_penalty : float
+			Repeat penalty.
+		max_tokens : int
+			Maximum tokens to generate.
+		stream : bool
+			When True, stream tokens to the provided Streamlit placeholder.
+		output : Any | None
+			A Streamlit placeholder (e.g., st.empty()) used for streaming output.
+
+		Returns:
+		--------
+		str
+			The assistant response text.
+			
+	"""
+	if user_input is None:
+		return ''
+	
+	prompt = build_prompt( user_input )
+	if not stream:
+		resp = llm(
+			prompt,
+			stream=False,
+			max_tokens=max_tokens,
+			temperature=temperature,
+			top_p=top_p,
+			repeat_penalty=repeat_penalty,
+			stop=[ '</s>' ]
+		)
+		text = (resp.get( 'choices', [ { 'text': '' } ] )[ 0 ].get( 'text', '' ) or '')
+		return text.strip( )
+	
+	buf = ''
+	if output is None:
+		output = st.empty( )
+	
+	for chunk in llm(
+			prompt,
+			stream=True,
+			max_tokens=max_tokens,
+			temperature=temperature,
+			top_p=top_p,
+			repeat_penalty=repeat_penalty,
+			stop=[ '</s>' ]
+	):
+		buf += chunk[ 'choices' ][ 0 ][ 'text' ]
+		output.markdown( buf + '▌' )
+	
+	output.markdown( buf )
+	return buf.strip( )
+
+# -------------- LLM  UTILITIES -------------------
+
+@st.cache_resource
+def load_llm( ctx: int, threads: int ) -> Llama:
+	return Llama( model_path=str( cfg.MODEL_PATH ), n_ctx=ctx, n_threads=threads, n_batch=512,
+		verbose=False )
+
+@st.cache_resource
+def load_embedder( ) -> SentenceTransformer:
+	return SentenceTransformer( 'all-MiniLM-L6-v2' )
+
+# ==============================================================================
+# Init
+# ==============================================================================
+
+initialize_database( )
+llm = load_llm( cfg.DEFAULT_CTX, cfg.CORES )
+embedder = load_embedder( )
+
+if not isinstance( st.session_state.get( 'messages' ), list ):
+	st.session_state[ 'messages' ] = [ ]
+
+if len( st.session_state[ 'messages' ] ) == 0:
+	st.session_state[ 'messages' ] = load_history( )
+
+if 'system_instructions' not in st.session_state:
+	st.session_state[ 'system_instructions' ] = ''
+
+# ======================================================================================
+# Page Configuration
+# ======================================================================================
+st.set_page_config( page_title="Jeni", page_icon=cfg.FAVICON,
+	layout="wide", initial_sidebar_state='collapsed' )
+
+st.caption( cfg.APP_SUBTITLE )
+inject_response_css( )
+init_state( )
+
 # ======================================================================================
 # Sidebar
 # ======================================================================================
+
 with st.sidebar:
 	style_subheaders( )
 	st.logo( cfg.LOGO_PATH, size='large' )
@@ -2766,22 +3025,54 @@ with st.sidebar:
 	# -----API KEY Expander------------------------------
 	with st.expander( label='Keys:', icon='🔑', expanded=False ):
 		
-		gemini_key = st.text_input( 'Gemini API Key', type='password',
-			value=st.session_state.gemini_api_key or '',
-			help='Overrides GEMINI_API_KEY from config.py for this session only.' )
-		
 		google_key = st.text_input( 'Google API Key', type='password',
 			value=st.session_state.google_api_key or '',
 			help='Overrides GOOGLE_API_KEY from config.py for this session only.' )
 		
-		if gemini_key:
-			st.session_state.gemini_api_key = gemini_key
-			os.environ[ 'GEMINI_API_KEY' ] = gemini_key
+		gemini_key = st.text_input( 'Gemini API Key', type='password',
+			value=st.session_state.gemini_api_key or '',
+			help='Overrides GEMINI_API_KEY from config.py for this session only.' )
+		
+		googlemaps_key = st.text_input( 'Google Maps API Key', type='password',
+			value=st.session_state.googlemaps_api_key or '',
+			help='Overrides GOOGLEMAPS_API_KEY from config.py for this session only.' )
+		
+		google_cse_id = st.text_input( 'Google Custom Search ID', type='password',
+			value=st.session_state.google_cse_id or '',
+			help='Overrides GOOGLE_CSE_ID from config.py for this session only.' )
+		
+		google_cloud_project_id = st.text_input( 'Google Cloud Project ID', type='password',
+			value=st.session_state.google_cloud_project_id or '',
+			help='Overrides GOOGLE_CLOUD_PROJECT_ID from config.py for this session only.' )
+		
+		google_cloud_location = st.text_input( 'Google Cloud Location', type='password',
+			value=st.session_state.google_cloud_location or '',
+			help='Overrides GOOGLE_CLOUD_LOCATION from config.py for this session only.' )
+		
+		if googlemaps_key:
+			st.session_state.googlemaps_api_key = googlemaps_key
+			os.environ[ 'GOOGLEMAPS_API_KEY' ] = googlemaps_key
+		
+		if google_cse_id:
+			st.session_state.google_cse_id = google_cse_id
+			os.environ[ 'GOOGLE_CSE_ID' ] = google_cse_id
+		
+		if google_cloud_project_id:
+			st.session_state.google_cloud_project_id = google_cloud_project_id
+			os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = google_cloud_project_id
 		
 		if google_key:
 			st.session_state.google_api_key = google_key
 			os.environ[ 'GOOGLE_API_KEY' ] = google_key
 		
+		if gemini_key:
+			st.session_state.gemini_key = gemini_key
+			os.environ[ 'GEMINI_KEY' ] = gemini_key
+		
+		if google_cloud_location:
+			st.session_state.google_cloud_location = google_cloud_location
+			os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = google_cloud_location
+	
 	if st.button( 'Clear Chat' ):
 		reset_state( )
 		st.rerun( )
@@ -4602,6 +4893,8 @@ elif mode == 'Document Q&A':
 				file_bytes = st.session_state.doc_bytes.get( name )
 				if file_bytes:
 					st.pdf( file_bytes, height=420 )
+	
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		for msg in st.session_state.docqna_messages:
 			with st.chat_message( msg[ 'role' ] ):
@@ -5454,21 +5747,6 @@ elif mode == 'Data Management':
 # ======================================================================================
 # FOOTER — SECTION
 # ======================================================================================
-_mode_to_model_key = \
-{
-	'Text': 'text_model',
-	'Images': 'image_model',
-	'TTS': 'tts_model',
-	'Translation': 'translation_model',
-	'Transcription': 'transcription_model',
-	'Embedding': 'embedding_model',
-	'Document Q&A': 'docqna_model',
-	'Files': 'files_model',
-	'Vector Stores': 'stores_model',
-	'Prompt Engineering': 'text_model',
-	'Data Management': 'text_model'
-}
-
 st.markdown(
 	"""
 	<style>
@@ -5511,17 +5789,19 @@ st.markdown(
 # FOOTER RENDERING
 # ======================================================================================
 _mode_to_model_key = \
-	{
-			'Text': 'text_model',
-			'Images': 'image_model',
-			'TTS': 'tts_model',
-			'Translation': 'translation_model',
-			'Transcription': 'transcription_model',
-			'Embedding': 'embedding_model',
-			'DocQnA': 'docqna_model',
-			'Files': 'files_model',
-			'Stores': 'stores_model'
-	}
+{
+	'Text': 'text_model',
+	'Images': 'image_model',
+	'TTS': 'tts_model',
+	'Translation': 'translation_model',
+	'Transcription': 'transcription_model',
+	'Embedding': 'embedding_model',
+	'Document Q&A': 'docqna_model',
+	'Files': 'files_model',
+	'Vector Stores': 'stores_model',
+	'Prompt Engineering': 'text_model',
+	'Data Management': 'text_model'
+}
 
 provider_val = st.session_state.get( 'provider', '—' )
 mode_val = mode or '—'

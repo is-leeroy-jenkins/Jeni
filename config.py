@@ -50,6 +50,7 @@ from pathlib import Path
 
 # ---------------- CONSTANTS ------------------
 GEOCODING_API_KEY = os.getenv( 'GEOCODING_API_KEY' )
+GOOGLEMAPS_API_KEY = os.getenv( 'GOOGLEMAPS_API_KEY' )
 GEMINI_API_KEY = os.getenv( 'GEMINI_API_KEY' )
 GOOGLE_API_KEY = os.getenv( 'GOOGLE_API_KEY' )
 GOOGLE_CSE_ID = os.getenv( 'GOOGLE_CSE_ID' )
