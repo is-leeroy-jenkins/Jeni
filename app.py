@@ -111,6 +111,12 @@ if st.session_state.gemini_api_key == '':
 		st.session_state.gemini_api_key = default
 		os.environ[ 'GEMINI_API_KEY' ] = default
 
+if st.session_state.google_api_key == '':
+	default = cfg.GOOGLE_API_KEY
+	if default:
+		st.session_state.google_api_key = default
+		os.environ[ 'GOOGLE_API_KEY' ] = default
+		
 if st.session_state.google_cse_id == '':
 	default = cfg.GOOGLE_CSE_ID
 	if default:
@@ -182,18 +188,6 @@ if 'image_model' not in st.session_state:
 if 'audio_model' not in st.session_state:
 	st.session_state[ 'audio_model' ] = ''
 
-if 'embedding_model' not in st.session_state:
-	st.session_state[ 'embedding_model' ] = ''
-
-if 'docqna_model' not in st.session_state:
-	st.session_state[ 'docqna_model' ] = ''
-
-if 'files_model' not in st.session_state:
-	st.session_state[ 'files_model' ] = ''
-
-if 'stores_model' not in st.session_state:
-	st.session_state[ 'stores_model' ] = ''
-
 if 'tts_model' not in st.session_state:
 	st.session_state[ 'tts_model' ] = ''
 
@@ -202,6 +196,18 @@ if 'transcription_model' not in st.session_state:
 
 if 'translation_model' not in st.session_state:
 	st.session_state[ 'translation_model' ] = ''
+
+if 'docqna_model' not in st.session_state:
+	st.session_state[ 'docqna_model' ] = ''
+
+if 'embedding_model' not in st.session_state:
+	st.session_state[ 'embedding_model' ] = ''
+
+if 'files_model' not in st.session_state:
+	st.session_state[ 'files_model' ] = ''
+
+if 'stores_model' not in st.session_state:
+	st.session_state[ 'stores_model' ] = ''
 
 # -------- INSTRUCTION VARIABLES ----------------------
 
@@ -246,8 +252,8 @@ if 'text_top_percent' not in st.session_state:
 if 'text_frequency_penalty' not in st.session_state:
 	st.session_state[ 'text_frequency_penalty' ] = 0.0
 
-if 'text_presense_penalty' not in st.session_state:
-	st.session_state[ 'text_presense_penalty' ] = 0.0
+if 'text_presence_penalty' not in st.session_state:
+	st.session_state[ 'text_presence_penalty' ] = 0.0
 
 if 'text_parallel_tools' not in st.session_state:
 	st.session_state[ 'text_parallel_tools' ] = False
@@ -323,8 +329,8 @@ if 'image_top_percent' not in st.session_state:
 if 'image_frequency_penalty' not in st.session_state:
 	st.session_state[ 'image_frequency_penalty' ] = 0.0
 
-if 'image_presense_penalty' not in st.session_state:
-	st.session_state[ 'image_presense_penalty' ] = 0.0
+if 'image_presence_penalty' not in st.session_state:
+	st.session_state[ 'image_presence_penalty' ] = 0.0
 
 if 'image_number' not in st.session_state:
 	st.session_state[ 'image_number' ] = 0.0
@@ -422,8 +428,8 @@ if 'audio_top_percent' not in st.session_state:
 if 'audio_frequency_penalty' not in st.session_state:
 	st.session_state[ 'audio_frequency_penalty' ] = 0.0
 
-if 'audio_presense_penalty' not in st.session_state:
-	st.session_state[ 'audio_presense_penalty' ] = 0.0
+if 'audio_presence_penalty' not in st.session_state:
+	st.session_state[ 'audio_presence_penalty' ] = 0.0
 
 if 'audio_background' not in st.session_state:
 	st.session_state[ 'audio_background' ] = False
@@ -513,8 +519,8 @@ if 'docqna_top_percent' not in st.session_state:
 if 'docqna_frequency_penalty' not in st.session_state:
 	st.session_state[ 'docqna_frequency_penalty' ] = 0.0
 
-if 'docqna_presense_penalty' not in st.session_state:
-	st.session_state[ 'docqna_presense_penalty' ] = 0.0
+if 'docqna_presence_penalty' not in st.session_state:
+	st.session_state[ 'docqna_presence_penalty' ] = 0.0
 
 if 'docqna_number' not in st.session_state:
 	st.session_state[ 'docqna_number' ] = 0
@@ -622,6 +628,9 @@ if 'docqna_fallback_rows' not in st.session_state:
 	
 # ------- EMBEDDING-SPECIFIC PARAMETERS ----------------------
 
+if 'embedding_model' not in st.session_state:
+	st.session_state[ 'embedding_model' ] = ''
+
 if 'embeddings_dimensions' not in st.session_state:
 	st.session_state[ 'embeddings_dimensions' ] = 0
 
@@ -654,8 +663,8 @@ if 'files_top_percent' not in st.session_state:
 if 'files_frequency_penalty' not in st.session_state:
 	st.session_state[ 'files_frequency_penalty' ] = 0.0
 
-if 'files_presense_penalty' not in st.session_state:
-	st.session_state[ 'files_presense_penalty' ] = 0.0
+if 'files_presence_penalty' not in st.session_state:
+	st.session_state[ 'files_presence_penalty' ] = 0.0
 
 if 'files_background' not in st.session_state:
 	st.session_state[ 'files_background' ] = False
@@ -724,8 +733,8 @@ if 'stores_max_tokens' not in st.session_state:
 if 'stores_frequency_penalty' not in st.session_state:
 	st.session_state[ 'stores_frequency_penalty' ] = 0.0
 
-if 'stores_presense_penalty' not in st.session_state:
-	st.session_state[ 'stores_presense_penalty' ] = 0.0
+if 'stores_presence_penalty' not in st.session_state:
+	st.session_state[ 'stores_presence_penalty' ] = 0.0
 
 if 'stores_max_calls' not in st.session_state:
 	st.session_state[ 'stores_max_calls' ] = 0
@@ -783,9 +792,9 @@ if 'stores_id' not in st.session_state:
 
 def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
 	"""
-	Extract token usage from a response object/dict.
-	Returns dict with prompt_tokens, completion_tokens, total_tokens.
-	Defensive: returns zeros if not present.
+		Extract token usage from a response object/dict.
+		Returns dict with prompt_tokens, completion_tokens, total_tokens.
+		Defensive: returns zeros if not present.
 	"""
 	usage = {
 			"prompt_tokens": 0,
@@ -840,7 +849,7 @@ def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
 
 def _update_token_counters( resp: Any ) -> None:
 	"""
-	Update session_state.last_call_usage and accumulate into session_state.token_usage.
+		Update session_state.last_call_usage and accumulate into session_state.token_usage.
 	"""
 	usage = _extract_usage_from_response( resp )
 	st.session_state.last_call_usage = usage
@@ -850,8 +859,8 @@ def _update_token_counters( resp: Any ) -> None:
 
 def _display_value( val: Any ) -> str:
 	"""
-	Render a friendly display string for header values.
-	None -> em dash; otherwise str(value).
+		Render a friendly display string for header values.
+		None -> em dash; otherwise str(value).
 	"""
 	if val is None:
 		return "—"
@@ -862,10 +871,10 @@ def _display_value( val: Any ) -> str:
 
 def resolve_gemini_api_key( ) -> Optional[ str ]:
 	"""
-	Resolve Gemini API key using the following precedence:
-	1) Session override (user-entered)
-	2) config.py default
-	3) Environment variable (optional fallback)
+		Resolve Gemini API key using the following precedence:
+		1) Session override (user-entered)
+		2) config.py default
+		3) Environment variable (optional fallback)
 	"""
 	session_key = st.session_state.get( "gemini_api_key" )
 	if session_key:
@@ -1097,7 +1106,7 @@ def reset_state( ) -> None:
 		
 	"""
 	st.session_state.chat_history = [ ]
-	st.session_state.last_answer = ""
+	st.session_state.last_answer = ''
 	st.session_state.last_sources = [ ]
 	st.session_state.last_analysis = {
 			'tables': [ ],
@@ -2019,9 +2028,26 @@ def create_schema( table: str ) -> List[ Tuple ]:
 		return conn.execute( f'PRAGMA table_info("{table}");' ).fetchall( )
 
 def read_table( table: str, limit: int = None, offset: int = 0 ) -> pd.DataFrame:
-	query = f'SELECT rowid, * FROM "{table}"'
+	schema = create_schema( table )
+	column_names = [ row[ 1 ] for row in schema ]
+	
+	has_explicit_id = any(
+		str( col ).lower( ) in {
+				'id',
+				f'{table.lower( )}id',
+				'rowid'
+		}
+		for col in column_names
+	)
+	
+	if has_explicit_id:
+		query = f'SELECT * FROM "{table}"'
+	else:
+		query = f'SELECT rowid AS rowid, * FROM "{table}"'
+	
 	if limit:
-		query += f" LIMIT {limit} OFFSET {offset}"
+		query += f' LIMIT {limit} OFFSET {offset}'
+	
 	with create_connection( ) as conn:
 		return pd.read_sql_query( query, conn )
 
@@ -3029,46 +3055,47 @@ with st.sidebar:
 			value=st.session_state.google_api_key or '',
 			help='Overrides GOOGLE_API_KEY from config.py for this session only.' )
 		
-		gemini_key = st.text_input( 'Gemini API Key', type='password',
-			value=st.session_state.gemini_api_key or '',
-			help='Overrides GEMINI_API_KEY from config.py for this session only.' )
-		
-		googlemaps_key = st.text_input( 'Google Maps API Key', type='password',
-			value=st.session_state.googlemaps_api_key or '',
-			help='Overrides GOOGLEMAPS_API_KEY from config.py for this session only.' )
-		
-		google_cse_id = st.text_input( 'Google Custom Search ID', type='password',
-			value=st.session_state.google_cse_id or '',
-			help='Overrides GOOGLE_CSE_ID from config.py for this session only.' )
-		
-		google_cloud_project_id = st.text_input( 'Google Cloud Project ID', type='password',
-			value=st.session_state.google_cloud_project_id or '',
-			help='Overrides GOOGLE_CLOUD_PROJECT_ID from config.py for this session only.' )
-		
-		google_cloud_location = st.text_input( 'Google Cloud Location', type='password',
-			value=st.session_state.google_cloud_location or '',
-			help='Overrides GOOGLE_CLOUD_LOCATION from config.py for this session only.' )
-		
-		if googlemaps_key:
-			st.session_state.googlemaps_api_key = googlemaps_key
-			os.environ[ 'GOOGLEMAPS_API_KEY' ] = googlemaps_key
-		
-		if google_cse_id:
-			st.session_state.google_cse_id = google_cse_id
-			os.environ[ 'GOOGLE_CSE_ID' ] = google_cse_id
-		
-		if google_cloud_project_id:
-			st.session_state.google_cloud_project_id = google_cloud_project_id
-			os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = google_cloud_project_id
-		
 		if google_key:
 			st.session_state.google_api_key = google_key
 			os.environ[ 'GOOGLE_API_KEY' ] = google_key
+			
+		gemini_key = st.text_input( 'Gemini API Key', type='password',
+			value=st.session_state.gemini_api_key or '',
+			help='Overrides GEMINI_API_KEY from config.py for this session only.' )
 		
 		if gemini_key:
 			st.session_state.gemini_key = gemini_key
 			os.environ[ 'GEMINI_KEY' ] = gemini_key
 		
+			
+		googlemaps_key = st.text_input( 'Google Maps API Key', type='password',
+			value=st.session_state.googlemaps_api_key or '',
+			help='Overrides GOOGLEMAPS_API_KEY from config.py for this session only.' )
+		
+		if googlemaps_key:
+			st.session_state.googlemaps_api_key = googlemaps_key
+			os.environ[ 'GOOGLEMAPS_API_KEY' ] = googlemaps_key
+			
+		google_cse_id = st.text_input( 'Google Custom Search ID', type='password',
+			value=st.session_state.google_cse_id or '',
+			help='Overrides GOOGLE_CSE_ID from config.py for this session only.' )
+		
+		if google_cse_id:
+			st.session_state.google_cse_id = google_cse_id
+			os.environ[ 'GOOGLE_CSE_ID' ] = google_cse_id
+		
+		google_cloud_project_id = st.text_input( 'Google Cloud Project ID', type='password',
+			value=st.session_state.google_cloud_project_id or '',
+			help='Overrides GOOGLE_CLOUD_PROJECT_ID from config.py for this session only.' )
+		
+		if google_cloud_project_id:
+			st.session_state.google_cloud_project_id = google_cloud_project_id
+			os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = google_cloud_project_id
+		
+		google_cloud_location = st.text_input( 'Google Cloud Location', type='password',
+			value=st.session_state.google_cloud_location or '',
+			help='Overrides GOOGLE_CLOUD_LOCATION from config.py for this session only.' )
+
 		if google_cloud_location:
 			st.session_state.google_cloud_location = google_cloud_location
 			os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = google_cloud_location
@@ -3095,7 +3122,7 @@ if mode == 'Text':
 	text_top_percent = st.session_state.get( 'text_top_percent', 0.0 )
 	text_top_k = st.session_state.get( 'text_top_k', 0 )
 	text_freq = st.session_state.get( 'text_frequency_penalty', 0.0 )
-	text_presense = st.session_state.get( 'text_presense_penalty', 0.0 )
+	text_presence = st.session_state.get( 'text_presence_penalty', 0.0 )
 	text_temperature = st.session_state.get( 'text_temperature', 0.0 )
 	text_stream = st.session_state.get( 'text_stream', False )
 	text_parallel_tools = st.session_state.get( 'text_parallel_tools', False )
@@ -3216,11 +3243,11 @@ if mode == 'Text':
 				
 				# ---------- Presense ------------
 				with prm_c3:
-					set_text_presense = st.slider( label='Presense Penalty', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'text_presense_penalty', 0.0 ) ),
-						step=0.01, help=cfg.PRESENCE_PENALTY, key='text_presense_penalty' )
+					set_text_presence = st.slider( label='Presense Penalty', min_value=-2.0, max_value=2.0,
+						value=float( st.session_state.get( 'text_presence_penalty', 0.0 ) ),
+						step=0.01, help=cfg.PRESENCE_PENALTY, key='text_presence_penalty' )
 					
-					text_presense = st.session_state[ 'text_presense_penalty' ]
+					text_presence = st.session_state[ 'text_presence_penalty' ]
 				
 				# ---------- Temperature ------------
 				with prm_c4:
@@ -3242,7 +3269,7 @@ if mode == 'Text':
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_inference_reset', width='stretch' ):
 					for key in [ 'text_top_percent', 'text_frequency_penalty',
-					             'text_presense_penalty', 'text_temperature', 'text_top_k', ]:
+					             'text_presence_penalty', 'text_temperature', 'text_top_k', ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -3409,7 +3436,7 @@ if mode == 'Text':
 					gen_kwargs[ 'background' ] = st.session_state[ 'text_background' ]
 					gen_kwargs[ 'max_tokens' ] = st.session_state[ 'text_max_tokens' ]
 					gen_kwargs[ 'frequency' ] = st.session_state[ 'text_frequency_penalty' ]
-					gen_kwargs[ 'presence' ] = st.session_state[ 'text_presense_penalty' ]
+					gen_kwargs[ 'presence' ] = st.session_state[ 'text_presence_penalty' ]
 					
 					if st.session_state[ 'text_stops' ]:
 						gen_kwargs[ 'stops' ] = st.session_state[ 'text_stops' ]
@@ -3453,7 +3480,7 @@ elif mode == "Images":
 	image_top_percent = st.session_state.get( 'image_top_percent', 0.0 )
 	image_top_k = st.session_state.get( 'image_top_k', 0.0 )
 	image_frequency = st.session_state.get( 'image_frequency_penalty', 0.0 )
-	image_presense = st.session_state.get( 'image_presense_penalty', 0.0 )
+	image_presence = st.session_state.get( 'image_presence_penalty', 0.0 )
 	image_temperature = st.session_state.get( 'image_temperature', 0.0 )
 	image_stream = st.session_state.get( 'image_stream', False )
 	image_store = st.session_state.get( 'image_store', False )
@@ -3616,12 +3643,12 @@ elif mode == "Images":
 				
 				# ---------  Presense --------
 				with inf_c3:
-					set_image_presense = st.slider( label='Presence Penalty',
-						key='image_presense_penalty', min_value=-2.0, max_value=2.0,
+					set_image_presence = st.slider( label='Presence Penalty',
+						key='image_presence_penalty', min_value=-2.0, max_value=2.0,
 						value=float( st.session_state.get( 'image_presence_penalty', 0.0 ) ),
 						step=0.01, help=cfg.PRESENCE_PENALTY )
 					
-					image_presense = st.session_state[ 'image_presense_penalty' ]
+					image_presence = st.session_state[ 'image_presence_penalty' ]
 				
 				# ---------  Temperature --------
 				with inf_c4:
@@ -3643,7 +3670,7 @@ elif mode == "Images":
 				# --------- Reset Settings --------
 				if st.button( label='Reset', key='image_inference_reset', width='stretch' ):
 					for key in [ 'image_top_percent', 'image_frequency_penalty', 'image_top_k',
-					             'image_presense_penalty', 'image_temperature', ]:
+					             'image_presence_penalty', 'image_temperature', ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -4033,13 +4060,10 @@ elif mode == "Images":
 elif mode == 'Audio':
 	st.subheader( '🎧 Audio API', help=cfg.AUDIO_API )
 	st.divider( )
-	# ------------------------------------------------------------------
-	# Provider-aware Audio instantiation
-	# ------------------------------------------------------------------
 	audio_model = st.session_state.get( 'audio_model', '' )
 	audio_top_percent = st.session_state.get( 'audio_top_percent', 0.0 )
 	audio_freq = st.session_state.get( 'audio_frequency_penalty', 0.0 )
-	audio_presense = st.session_state.get( 'audio_presense_penalty', 0.0 )
+	audio_presence = st.session_state.get( 'audio_presence_penalty', 0.0 )
 	audio_number = st.session_state.get( 'audio_number', 0 )
 	audio_temperature = st.session_state.get( 'audio_temperature', 0.0 )
 	audio_start = st.session_state.get( 'audio_start_time', 0.0 )
@@ -4098,7 +4122,7 @@ elif mode == 'Audio':
 						
 						audio_task = st.session_state[ 'audio_task' ]
 				
-				# ---------  Mode ---------------
+				# ---------  Model ---------------
 				with aud_c2:
 					if audio_task == 'Transcribe':
 						model_options = list( transcriber.model_options )
@@ -4129,7 +4153,6 @@ elif mode == 'Audio':
 								key='audio_voice', placeholder='Options', index=None )
 							
 							audio_voice = st.session_state[ 'audio_voice' ]
-				# ---------------- Sample Rate ----------------
 				
 				# ---------- Sample Rate ----------
 				with aud_c4:
@@ -4156,9 +4179,6 @@ elif mode == 'Audio':
 				
 				# ----------- Reset Settings -------
 				if st.button( 'Reset', key='audio_model_reset', width='stretch' ):
-					# ----------------------------------------------------------
-					# Remove Audio Model Settings session keys
-					# ----------------------------------------------------------
 					for key in [ 'audio_task', 'audio_model', 'audio_language',
 					             'audio_voice', 'audio_rate', 'audio_format' ]:
 						if key in st.session_state:
@@ -4188,11 +4208,11 @@ elif mode == 'Audio':
 				
 				# ---------  Presense --------
 				with prm_three:
-					set_audio_presense = st.slider( label='Presence Penalty', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'audio_presense_penalty', 0.0 ) ),
+					set_audio_presence = st.slider( label='Presence Penalty', min_value=-2.0, max_value=2.0,
+						value=float( st.session_state.get( 'audio_presence_penalty', 0.0 ) ),
 						step=0.01, help=cfg.PRESENCE_PENALTY )
 					
-					audio_presense = st.session_state[ 'audio_presense_penalty' ]
+					audio_presence = st.session_state[ 'audio_presence_penalty' ]
 				
 				# ---------  Temperature --------
 				with prm_four:
@@ -4205,7 +4225,7 @@ elif mode == 'Audio':
 				# --------- Reset Settings --------
 				if st.button( 'Reset', key='audio_inference_reset', width='stretch' ):
 					for key in [ 'audio_top_percent', 'audio_temperature',
-					             'audio_presense_penalty',
+					             'audio_presence_penalty',
 					             'audio_frequency_penalty', ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
@@ -4261,11 +4281,110 @@ elif mode == 'Audio':
 							del st.session_state[ key ]
 					
 					st.rerun( )
+					
+		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			prompt_names = fetch_prompt_names( cfg.DB_PATH )
+			if not prompt_names:
+				prompt_names = [ 'No Templates Found' ]
 			
+			with in_left:
+				st.text_area( 'Enter Text', height=50, width='stretch',
+					help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
+			
+			def _on_template_change( ) -> None:
+				name = st.session_state.get( 'instructions' )
+				if name and name != 'No Templates Found':
+					text = fetch_prompt_text( cfg.DB_PATH, name )
+					if text is not None:
+						st.session_state[ 'audio_system_instructions' ] = text
+			
+			with in_right:
+				st.selectbox( 'Select Template', prompt_names,
+					key='instructions', on_change=_on_template_change, index=None )
+			
+			def _on_clear( ) -> None:
+				st.session_state[ 'audio_system_instructions' ] = ''
+				st.session_state[ 'instructions' ] = ''
+			
+			st.button( 'Clear Instructions', width='stretch', on_click=_on_clear )
+		
+		left_audio, center_audio, right_audio = st.columns( [ 0.33, 0.33, 0.33 ],
+			border=True, gap='medium' )
+		
+		# -----------UPLOAD AUDIO----------------------
+		with left_audio:
+			uploaded = st.file_uploader( 'Upload File', type=[ 'wav', 'mp3', 'm4a', 'flac' ], )
+			if uploaded:
+				tmp_path = save_temp( uploaded )
+				if audio_task == 'Transcribe' and transcriber:
+					with st.spinner( 'Transcribing…' ):
+						try:
+							audio_language = st.session_state.get( 'audio_language' )
+							text = transcriber.transcribe( tmp_path, model=audio_model,
+								language=audio_language, )
+							st.text_area( 'Transcript', value=text, height=300 )
+							try:
+								_update_token_counters( getattr( transcriber, 'response', None ) )
+							except Exception:
+								pass
+						except Exception as exc:
+							st.error( f'Transcription failed: {exc}' )
+				
+				elif audio_task == 'Translate' and translator:
+					with st.spinner( 'Translating…' ):
+						try:
+							audio_language = st.session_state.get( 'audio_language' )
+							text = translator.translate( tmp_path, model=audio_model,
+								language=audio_language, )
+							st.text_area( 'Translation', value=text, height=300 )
+							
+							try:
+								_update_token_counters( getattr( translator, 'response', None ) )
+							except Exception:
+								pass
+						
+						except Exception as exc:
+							st.error( f'Translation failed: {exc}' )
+			
+				elif audio_task == 'Text-to-Speech' and tts:
+					text = st.text_area( 'Enter Text to Synthesize' )
+					if text and st.button( 'Generate Audio' ):
+						with st.spinner( 'Synthesizing speech…' ):
+							try:
+								audio_voice = st.session_state.get( 'audio_voice' )
+								audio_bytes = tts.create_speech( text, model=audio_model, voice=audio_voice )
+								st.audio( audio_bytes )
+								try:
+									_update_token_counters( getattr( tts, 'response', None ) )
+								except Exception:
+									pass
+							
+							except Exception as exc:
+								st.error( f'Text-to-speech failed: {exc}' )
+		
+		# -----------RECORD AUDIO----------------------
+		with center_audio:
+			recording = st.audio_input( label='Record Audio', sample_rate=audio_rate )
+		
+		# -----------PLAY AUDIO----------------------
+		with right_audio:
+			data = cfg.AUDIO_TEST_FILE
+			st.caption( 'Local Audio File' )
+			if data is not None:
+				audio_recording = st.audio( data, sample_rate=audio_rate,
+					start_time=audio_start, end_time=audio_end, format='wav', width='stretch',
+					loop=audio_loop, autoplay=audio_autoplay )
+			else:
+				audio_recording = st.audio( data, start_time=audio_start, end_time=audio_end,
+					format='wav', width='stretch', loop=audio_loop, autoplay=audio_autoplay )
+		
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+
 # ======================================================================================
 # EMBEDDINGS MODE
 # ======================================================================================
-elif mode == 'Embeddings':
+elif mode == 'Embedding':
 	st.subheader( '🔢 Embeddings', help=cfg.EMBEDDINGS_API )
 	st.divider( )
 	embedding_model = st.session_state.get( 'embedding_model', '' )
@@ -4462,7 +4581,7 @@ elif mode == 'Vector Stores':
 	stores_format = st.session_state.get( 'stores_response_format', None )
 	stores_top_percent = st.session_state.get( 'stores_top_percent', None )
 	stores_frequency = st.session_state.get( 'stores_frequency_penalty', None )
-	stores_presense = st.session_state.get( 'stores_presense_penalty', None )
+	stores_presence = st.session_state.get( 'stores_presence_penalty', None )
 	stores_number = st.session_state.get( 'stores_number', None )
 	stores_temperature = st.session_state.get( 'stores_temperature', None )
 	stores_stream = st.session_state.get( 'stores_stream', None )
@@ -4564,7 +4683,7 @@ elif mode == 'Document Q&A':
 	docqna_top_percent = st.session_state.get( 'docqna_top_percent', 0.0 )
 	docqna_top_k = st.session_state.get( 'docqna_top_k', 0 )
 	docqna_freq = st.session_state.get( 'docqna_frequency_penalty', 0.0 )
-	docqna_presense = st.session_state.get( 'docqna_presense_penalty', 0.0 )
+	docqna_presence = st.session_state.get( 'docqna_presence_penalty', 0.0 )
 	docqna_temperature = st.session_state.get( 'docqna_temperature', 0.0 )
 	docqna_stream = st.session_state.get( 'docqna_stream', False )
 	docqna_parallel_tools = st.session_state.get( 'docqna_parallel_tools', False )
@@ -4693,11 +4812,11 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Presense ------------
 				with prm_c3:
-					set_docqna_presense = st.slider( label='Presense Penalty', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'docqna_presense_penalty', 0.0 ) ),
-						step=0.01, help=cfg.PRESENCE_PENALTY, key='docqna_presense_penalty' )
+					set_docqna_presence = st.slider( label='Presense Penalty', min_value=-2.0, max_value=2.0,
+						value=float( st.session_state.get( 'docqna_presence_penalty', 0.0 ) ),
+						step=0.01, help=cfg.PRESENCE_PENALTY, key='docqna_presence_penalty' )
 					
-					docqna_presense = st.session_state[ 'docqna_presense_penalty' ]
+					docqna_presence = st.session_state[ 'docqna_presence_penalty' ]
 				
 				# ---------- Temperature ------------
 				with prm_c4:
@@ -4719,7 +4838,7 @@ elif mode == 'Document Q&A':
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='docqna_inference_reset', width='stretch' ):
 					for key in [ 'docqna_top_percent', 'docqna_frequency_penalty',
-					             'docqna_presense_penalty', 'docqna_temperature',
+					             'docqna_presence_penalty', 'docqna_temperature',
 					             'docqna_top_k', ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
@@ -4840,9 +4959,6 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 
-		# ------------------------------------------------------------------
-		# Expander — DocQA System Instructions
-		# ------------------------------------------------------------------
 		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
@@ -4870,30 +4986,31 @@ elif mode == 'Document Q&A':
 			
 			st.button( 'Clear Instructions', width='stretch', on_click=_on_clear )
 		
-		doc_left, doc_right = st.columns( [ 0.2, 0.8 ], border=True )
-		with doc_left:
-			docqna_uploaded = st.file_uploader( 'Upload', type=[ 'pdf', 'txt', 'md', 'docx' ],
-				accept_multiple_files=False, label_visibility='visible' )
+		with st.expander( label='Document Loading', icon='📥', expanded=False, width='stretch' ):
+			doc_left, doc_right = st.columns( [ 0.2, 0.8 ], border=True )
+			with doc_left:
+				docqna_uploaded = st.file_uploader( 'Upload', type=[ 'pdf', 'txt', 'md', 'docx' ],
+					accept_multiple_files=False, label_visibility='visible' )
+				
+				if docqna_uploaded is not None:
+					st.session_state.docqna_active_docs = [ docqna_uploaded.name ]
+					st.session_state.doc_bytes = { docqna_uploaded.name: docqna_uploaded.getvalue( ) }
+					st.success( f'{docqna_uploaded.name} has been loaded!' )
+				else:
+					st.info( 'Load a document.' )
+				
+				unload = st.button( label='Unload Document', width='stretch' )
+				if unload:
+					docqna_uploaded = None
+					st.session_state.docqna_active_docs = None
 			
-			if docqna_uploaded is not None:
-				st.session_state.docqna_active_docs = [ docqna_uploaded.name ]
-				st.session_state.doc_bytes = { docqna_uploaded.name: docqna_uploaded.getvalue( ) }
-				st.success( f'{docqna_uploaded.name} has been loaded!' )
-			else:
-				st.info( 'Load a document.' )
-			
-			unload = st.button( label='Unload Document', width='stretch' )
-			if unload:
-				docqna_uploaded = None
-				st.session_state.docqna_active_docs = None
+			with doc_right:
+				if st.session_state.get( 'docqna_active_docs' ):
+					name = st.session_state.docqna_active_docs[ 0 ]
+					file_bytes = st.session_state.doc_bytes.get( name )
+					if file_bytes:
+						st.pdf( file_bytes, height=420 )
 		
-		with doc_right:
-			if st.session_state.get( 'docqna_active_docs' ):
-				name = st.session_state.docqna_active_docs[ 0 ]
-				file_bytes = st.session_state.doc_bytes.get( name )
-				if file_bytes:
-					st.pdf( file_bytes, height=420 )
-	
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		for msg in st.session_state.docqna_messages:
@@ -5675,7 +5792,7 @@ elif mode == 'Data Management':
 					new_col = st.text_input( 'New Column Name' )
 					
 					if st.button( 'Rename Column' ):
-						dm_rename_column( table, old_col, new_col )
+						rename_column( table, old_col, new_col )
 						st.success( 'Column renamed.' )
 						st.rerun( )
 				
@@ -5683,7 +5800,7 @@ elif mode == 'Data Management':
 					new_name = st.text_input( 'New Table Name' )
 					
 					if st.button( 'Rename Table' ):
-						dm_rename_table( table, new_name )
+						rename_table( table, new_name )
 						st.success( 'Table renamed.' )
 						st.rerun( )
 				
@@ -5792,9 +5909,7 @@ _mode_to_model_key = \
 {
 	'Text': 'text_model',
 	'Images': 'image_model',
-	'TTS': 'tts_model',
-	'Translation': 'translation_model',
-	'Transcription': 'transcription_model',
+	'Audio': 'audio_model',
 	'Embedding': 'embedding_model',
 	'Document Q&A': 'docqna_model',
 	'Files': 'files_model',
@@ -5815,7 +5930,7 @@ if mode == 'Text':
 	temperature = st.session_state.get( 'text_temperature' )
 	top_p = st.session_state.get( 'text_top_percent' )
 	freq = st.session_state.get( 'text_frequency_penalty' )
-	presence = st.session_state.get( 'text_presense_penalty' )
+	presence = st.session_state.get( 'text_presence_penalty' )
 	number = st.session_state.get( 'text_number' )
 	stream = st.session_state.get( 'text_stream' )
 	parallel_tools = st.session_state.get( 'text_parallel_tools' )
@@ -5927,7 +6042,7 @@ elif mode == 'Audio':
 	audio_format = st.session_state.get( 'audio_response_format' )
 	audio_top_p = st.session_state.get( 'audio_top_percent' )
 	audio_freq = st.session_state.get( 'audio_frequency_penalty' )
-	audio_presence = st.session_state.get( 'audio_presense_penalty' )
+	audio_presence = st.session_state.get( 'audio_presence_penalty' )
 	audio_number = st.session_state.get( 'audio_number' )
 	audio_temperature = st.session_state.get( 'audio_temperature' )
 	audio_stream = st.session_state.get( 'audio_stream' )
@@ -6031,7 +6146,7 @@ elif mode == 'VectorStores':
 	temperature = st.session_state.get( 'stores_temperature' )
 	top_p = st.session_state.get( 'stores_top_percent' )
 	freq = st.session_state.get( 'stores_frequency_penalty' )
-	presence = st.session_state.get( 'stores_presense_penalty' )
+	presence = st.session_state.get( 'stores_presence_penalty' )
 	number = st.session_state.get( 'stores_number' )
 	stream = st.session_state.get( 'stores_stream' )
 	store = st.session_state.get( 'stores_store' )

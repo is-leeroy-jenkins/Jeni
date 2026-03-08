@@ -72,7 +72,7 @@ OPEN_TAG = re.compile( r'<([A-Za-z0-9_\-:.]+)>' )
 CLOSE_TAG = re.compile( r'</([A-Za-z0-9_\-:.]+)>' )
 MARKDOWN_HEADING_PATTERN = re.compile( r'^##\s+(?P<title>.+?)\s*$' )
 XML_BLOCK_PATTERN = re.compile( r'<(?P<tag>[a-zA-Z0-9_:-]+)>(?P<body>.*?)</\1>', re.DOTALL )
-AUDIO_TEST_FILE = r'stores/audio/conditions.mp3'
+AUDIO_TEST_FILE = r'resources/audio/conditions.mp3'
 ANALYST = '❓'
 JENI = '🧠'
 DEFAULT_CTX = 4096
@@ -83,7 +83,7 @@ MODE_CLASS_MAP = {
 		'Audio': [ 'TTS',
 		           'Translation',
 		           'Transcription' ],
-		'Embeddings': [ 'Embeddings' ],
+		'Embedding': [ 'Embeddings' ],
 		'Document Q&A': [ 'Files' ],
 		'Files': [ 'Files' ],
 		'Vector Stores': [ 'VectorStores' ],
@@ -95,7 +95,7 @@ GEMINI_MODES = [ 'Text',
                  'Images',
                  'Audio',
                  'Document Q&A',
-                 'Embeddings',
+                 'Embedding',
                  'Files',
                  'Vector Stores',
                  'Prompt Engineering',
