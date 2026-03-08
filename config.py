@@ -128,12 +128,14 @@ TOP_K = r'''Optional. The maximum number of tokens to consider when sampling. Ge
 		from the getModel function. An empty topK attribute indicates that the model doesn't apply
 		top-k sampling and doesn't allow setting topK on requests.'''
 
-PRESENCE_PENALTY = r'''Optional. Presence penalty applied to the next token's logprobs
-		if the token has already been seen in the response. This penalty is binary on/off
-		and not dependant on the number of times the token is used (after the first).'''
+PRESENCE_PENALTY = r'''Optional. A value between -2 and 2. Presence penalty applied to the
+		next token's logprobs if the token has already been seen in the response.
+		This penalty is binary on/off and not dependant on the number of times the token is
+		used (after the first).'''
 
-FREQUENCY_PENALTY = r'''Optional. Frequency penalty applied to the next token's logprobs,
-		multiplied by the number of times each token has been seen in the respponse so far.
+FREQUENCY_PENALTY = r'''Optional. A value between -2 and 2.
+		Frequency penalty applied to the next token's logprobs, multiplied by the number of
+		 times each token has been seen in the respponse so far.
 		A positive penalty will discourage the use of tokens that have already been used,
 		proportional to the number of times the token has been used: The more a token is used,
 		the more difficult it is for the model to use that token again increasing
@@ -317,3 +319,8 @@ IMAGE_QUALITY = r'''Optional. The quality of the image that will be generated: '
 IMAGE_DETAIL = r'''The detail parameter tells the model what level of detail to use when processing
 		and understanding the image (low, high, or auto to let the model decide). If you skip the
 		parameter, the model will use auto.'''
+
+MEDIA_RESOLUTION = r'''The media_resolution parameter controls how the Gemini API processes media
+		inputs like images, videos, and PDF documents by determining the maximum number of tokens
+		allocated for media inputs, allowing you to balance response quality
+		against latency and cost. '''

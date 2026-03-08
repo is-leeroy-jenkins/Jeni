@@ -3181,7 +3181,7 @@ if mode == 'Text':
 					media_options = list( text.media_options )
 					set_media_resolution = st.selectbox( label='Media Resolution',
 						options=media_options, key='text_media_resolution',
-						help=cfg.REASONING, index=None, placeholder='Options' )
+						help=cfg.MEDIA_RESOLUTION, index=None, placeholder='Options' )
 					
 					media_resolution = st.session_state[ 'text_media_resolution' ]
 				
@@ -3224,7 +3224,7 @@ if mode == 'Text':
 				
 				# ---------- Temperature ------------
 				with prm_c4:
-					set_text_temperature = st.slider( label='Temperature', min_value=0.0, max_value=1.0,
+					set_text_temperature = st.slider( label='Temperature', min_value=-2.0, max_value=2.0,
 						value=float( st.session_state.get( 'text_temperature', 0.0 ) ), step=0.01,
 						help=cfg.TEMPERATURE, key='text_temperature' )
 					
