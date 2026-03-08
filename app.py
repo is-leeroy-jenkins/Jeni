@@ -94,6 +94,12 @@ if 'google_api_key' not in st.session_state:
 if 'google_cse_id' not in st.session_state:
 	st.session_state[ 'google_cse_id' ] = ''
 
+if 'google_cloud_project_id' not in st.session_state:
+	st.session_state[ 'google_cloud_project_id' ] = ''
+
+if 'google_cloud_location' not in st.session_state:
+	st.session_state[ 'google_cloud_location' ] = ''
+
 if 'googlemaps_api_key' not in st.session_state:
 	st.session_state[ 'googlemaps_api_key' ] = ''
 
@@ -111,7 +117,19 @@ if st.session_state.google_api_key == '':
 	if default:
 		st.session_state.google_api_key = default
 		os.environ[ 'GOOGLE_API_KEY' ] = default
-		
+
+if st.session_state.google_cloud_project_id == '':
+	default = cfg.GOOGLE_CLOUD_PROJECT_ID
+	if default:
+		st.session_state.google_cloud_project_id = default
+		os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = default
+
+if st.session_state.google_cloud_location == '':
+	default = cfg.GOOGLE_CLOUD_LOCATION
+	if default:
+		st.session_state.google_cloud_location = default
+		os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = default
+
 if st.session_state.google_cse_id == '':
 	default = cfg.GOOGLE_CSE_ID
 	if default:
@@ -3301,7 +3319,15 @@ with st.sidebar:
 		if googlemaps_key:
 			st.session_state.googlemaps_api_key = googlemaps_key
 			os.environ[ 'GOOGLEMAPS_API_KEY' ] = googlemaps_key
-			
+		
+		geocoding_key = st.text_input( 'Geocoding API Key', type='password',
+			value=st.session_state.geocoding_api_key or '',
+			help='Overrides GEOCODING_API_KEY from config.py for this session only.' )
+		
+		if geocoding_key:
+			st.session_state.geocoding_api_key = geocoding_key
+			os.environ[ 'GEOCODING_API_KEY' ] = geocoding_key
+		
 		google_cse_id = st.text_input( 'Google Custom Search ID', type='password',
 			value=st.session_state.google_cse_id or '',
 			help='Overrides GOOGLE_CSE_ID from config.py for this session only.' )
