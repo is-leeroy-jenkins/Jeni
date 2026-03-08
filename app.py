@@ -125,10 +125,10 @@ if st.session_state.googlemaps_api_key == '':
 		os.environ[ 'GOOGLEMAPS_API_KEY' ] = default
 
 if st.session_state.geocoding_api_key == '':
-	default = cfg.GEOODING_API_KEY
+	default = cfg.GEOCODING_API_KEY
 	if default:
 		st.session_state.geocoding_api_key = default
-		os.environ[ 'GEOODING_API_KEY' ] = default
+		os.environ[ 'GEOCODING_API_KEY' ] = default
 
 if 'mode' not in st.session_state or st.session_state[ 'mode' ] is None:
 	st.session_state[ 'mode' ] = 'Text'
