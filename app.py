@@ -58,7 +58,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import tiktoken
 from reportlab.lib.pagesizes import LETTER
-
 import config as cfg
 import sqlite_vec
 
@@ -80,15 +79,14 @@ from gemini import (
 	Translation,
 	TTS,
 	Files,
-	VectorStores
-)
+	VectorStores )
 
 # ======================================================================================
 # SESSION STATE INITIALIZATION
 # ======================================================================================
 
-if 'gemini_api_key' not in st.session_state:
-	st.session_state[ 'gemini_api_key' ] = ''
+if 'openai_api_key' not in st.session_state:
+	st.session_state[ 'openai_api_key' ] = ''
 
 if 'google_api_key' not in st.session_state:
 	st.session_state[ 'google_api_key' ] = ''
@@ -98,18 +96,6 @@ if 'google_cse_id' not in st.session_state:
 
 if 'googlemaps_api_key' not in st.session_state:
 	st.session_state[ 'googlemaps_api_key' ] = ''
-
-if 'google_cloud_location' not in st.session_state:
-	st.session_state[ 'google_cloud_location' ] = ''
-	
-if 'google_cloud_project_id' not in st.session_state:
-	st.session_state[ 'google_cloud_project_id' ] = ''
-
-if st.session_state.gemini_api_key == '':
-	default = cfg.GEMINI_API_KEY
-	if default:
-		st.session_state.gemini_api_key = default
-		os.environ[ 'GEMINI_API_KEY' ] = default
 
 if st.session_state.google_api_key == '':
 	default = cfg.GOOGLE_API_KEY
@@ -129,18 +115,6 @@ if st.session_state.googlemaps_api_key == '':
 		st.session_state.googlemaps_api_key = default
 		os.environ[ 'GOOGLEMAPS_API_KEY' ] = default
 
-if st.session_state.google_cloud_location == '':
-	default = cfg.GOOGLE_CLOUD_LOCATION
-	if default:
-		st.session_state.google_cloud_location = default
-		os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = default
-
-if st.session_state.google_cloud_project_id == '':
-	default = cfg.GOOGLE_CLOUD_PROJECT_ID
-	if default:
-		st.session_state.google_cloud_project_id = default
-		os.environ[ 'GOOGLE_CLOUD_PRODUCT_ID' ] = default
-		
 if 'mode' not in st.session_state or st.session_state[ 'mode' ] is None:
 	st.session_state[ 'mode' ] = 'Text'
 
@@ -161,9 +135,6 @@ if 'token_usage' not in st.session_state:
 
 if 'files' not in st.session_state:
 	st.session_state.files: List[ str ] = [ ]
-
-if 'gemini_version' not in st.session_state:
-	st.session_state[ 'gemini_version' ] = getattr( cfg, 'GOOGLE_API_VERSION', 'v1alpha' )
 
 if 'use_semantic' not in st.session_state:
 	st.session_state[ 'use_semantic' ] = False
@@ -214,6 +185,9 @@ if 'stores_model' not in st.session_state:
 if 'instructions' not in st.session_state:
 	st.session_state[ 'instructions' ] = ''
 
+if 'chat_system_instructions' not in st.session_state:
+	st.session_state[ 'chat_system_instructions' ] = ''
+
 if 'text_system_instructions' not in st.session_state:
 	st.session_state[ 'text_system_instructions' ] = ''
 
@@ -226,6 +200,41 @@ if 'audio_system_instructions' not in st.session_state:
 if 'docqna_system_instructions' not in st.session_state:
 	st.session_state[ 'docqna_systems_instructions' ] = ''
 	
+# ----------MODEL PARAMETERS --------------------------------
+
+if 'chat_model' not in st.session_state:
+	st.session_state.chat_model = ''
+
+if 'text_model' not in st.session_state:
+	st.session_state[ 'text_model' ] = ''
+
+if 'image_model' not in st.session_state:
+	st.session_state[ 'image_model' ] = ''
+
+if 'audio_model' not in st.session_state:
+	st.session_state[ 'audio_model' ] = ''
+
+if 'embedding_model' not in st.session_state:
+	st.session_state[ 'embedding_model' ] = ''
+
+if 'docqna_model' not in st.session_state:
+	st.session_state[ 'docqna_model' ] = ''
+
+if 'files_model' not in st.session_state:
+	st.session_state[ 'files_model' ] = ''
+
+if 'stores_model' not in st.session_state:
+	st.session_state[ 'stores_model' ] = ''
+
+if 'tts_model' not in st.session_state:
+	st.session_state[ 'tts_model' ] = ''
+
+if 'transcription_model' not in st.session_state:
+	st.session_state[ 'transcription_model' ] = ''
+
+if 'translation_model' not in st.session_state:
+	st.session_state[ 'translation_model' ] = ''
+
 # --------TEXT-GENERATION PARAMETERS--------------------
 
 if 'text_number' not in st.session_state:
@@ -3236,6 +3245,7 @@ if 'system_instructions' not in st.session_state:
 # ======================================================================================
 # Page Configuration
 # ======================================================================================
+
 st.set_page_config( page_title="Jeni", page_icon=cfg.FAVICON,
 	layout="wide", initial_sidebar_state='collapsed' )
 
@@ -3309,7 +3319,117 @@ with st.sidebar:
 		st.rerun( )
 	
 	st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0 )
+	mode = st.sidebar.radio( 'Select Mode', cfg.GPT_MODES, index=0 )
+	
+# =============================================================================
+# CHAT MODE
+# =============================================================================
+if mode == 'Chat':
+	st.subheader( "💬 Chat Completions", help=cfg.CHAT_COMPLETIONS )
+	st.divider( )
+	provider_module = get_provider_module( )
+	provider_name = st.session_state.get( 'provider', 'GPT' )
+	chat_number = st.session_state.get( 'number', 0 )
+	chat_top_p = st.session_state.get( 'top_percent', 0.0 )
+	chat_freq = st.session_state.get( 'frequency_penalty', 0.0 )
+	chat_presense = st.session_state.get( 'presense_penalty', 0.0 )
+	chat_temperature = st.session_state.get( 'temperature', 0.0 )
+	chat_background = st.session_state.get( 'background', False )
+	chat_stream = st.session_state.get( 'stream', False )
+	chat_store = st.session_state.get( 'store', False )
+	chat_model = st.session_state.get( 'chat_model', '' )
+	chat_format = st.session_state.get( 'response_format', '' )
+	chat_input = st.session_state.get( 'input', [ ] )
+	chat_reasoning = st.session_state.get( 'reasoning', '' )
+	chat_choice = st.session_state.get( 'tool_choice', '' )
+	chat_messages = st.session_state.get( 'messages', [ ] )
+	execution_mode = st.session_state.get( 'execution_mode', '' )
+	chat_history = st.session_state.get( 'chat_history', [ ] )
+	
+	# ------------------------------------------------------------------
+	# Sidebar — Text Settings
+	# ------------------------------------------------------------------
+	with st.sidebar:
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		st.text( '⚙️  Chat Settings' )
+		st.radio( 'Execution Mode', options=[ 'Standard', 'Guidance Only', 'Analysis Only' ],
+			index=[ 'Standard', 'Guidance Only',
+			        'Analysis Only' ].index( st.session_state.execution_mode ),
+			key='execution_mode', )
+	
+	# ------------------------------------------------------------------
+	# Main Chat UI
+	# ------------------------------------------------------------------
+	left, center, right = st.columns( [ 0.25, 3.5, 0.25 ] )
+	with center:
+		user_input = st.chat_input( 'Have a Planning, Programming, or Budget Execution question?' )
+		if user_input:
+			# -------------------------------
+			# Render user message
+			# -------------------------------
+			with st.chat_message( 'user', avatar=cfg.ANALYST ):
+				st.markdown( user_input )
+			
+			# -------------------------------
+			# Run prompt
+			# -------------------------------
+			with st.chat_message( 'assistant', avatar=cfg.BUDDY ):
+				try:
+					chat = OpenAI( api_key=cfg.OPENAI_API_KEY )
+					with st.spinner( 'Running prompt...' ):
+						response = chat.responses.create(
+							prompt={ 'id': cfg.PROMPT_ID, 'version': cfg.PROMPT_VERSION, },
+							input=[ { 'role': 'user', 'content': [ { 'type': 'input_text',
+							                                         'text': user_input, } ], } ],
+							tools=[ { 'type': 'file_search',
+							          'vector_store_ids': cfg.GPT_VECTORSTORES, },
+							        { 'type': 'web_search',
+							          'filters': { 'allowed_domains': cfg.GPT_DOMAINS, },
+							          'search_context_size': 'medium',
+							          'user_location': { 'type': 'approximate' },
+							          },
+							        { 'type': 'code_interpreter',
+							          'container': { 'type': 'auto', 'file_ids': cfg.GPT_FILES, },
+							          }, ],
+							include=[ 'web_search_call.action.sources',
+							          'code_interpreter_call.outputs', ], store=True, )
+					sources = st.session_state.get( "last_sources", [ ] )
+					if sources:
+						st.markdown( '#### Sources' )
+						for i, src in enumerate( sources, 1 ):
+							url = src.get( 'url' )
+							title = src.get( 'title' ) or src.get( 'file_name' ) or f'Source {i}'
+							
+							if url:
+								st.markdown( f'- [{title}]({url})' )
+							elif src.get( 'file_id' ):
+								st.markdown( f"- {title} _(Vector Store File: `{src[ 'files_id' ]}`)_" )
+					
+					# -------------------------------
+					# Extract and render text output
+					# -------------------------------
+					output_text = ""
+					for item in response.output:
+						if item.type == 'message':
+							for part in item.content:
+								if part.type == 'output_text':
+									output_text += part.text
+					
+					if output_text.strip( ):
+						st.markdown( output_text )
+					else:
+						st.warning( 'No text response returned by the prompt.' )
+					
+					# -------------------------------
+					# Persist minimal chat history
+					# -------------------------------
+					st.session_state.chat_history.append( { 'role': 'user',
+					                                        'content': user_input } )
+					st.session_state.chat_history.append( { 'role': 'assistant',
+					                                        'content': output_text } )
+				except Exception as e:
+					st.error( 'An error occurred while running the prompt.' )
+					st.exception( e )
 
 # ======================================================================================
 # TEXT MODE
