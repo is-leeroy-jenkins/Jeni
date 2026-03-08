@@ -85,8 +85,8 @@ from gemini import (
 # SESSION STATE INITIALIZATION
 # ======================================================================================
 
-if 'openai_api_key' not in st.session_state:
-	st.session_state[ 'openai_api_key' ] = ''
+if 'gemini_api_key' not in st.session_state:
+	st.session_state[ 'gemini_api_key' ] = ''
 
 if 'google_api_key' not in st.session_state:
 	st.session_state[ 'google_api_key' ] = ''
@@ -96,6 +96,12 @@ if 'google_cse_id' not in st.session_state:
 
 if 'googlemaps_api_key' not in st.session_state:
 	st.session_state[ 'googlemaps_api_key' ] = ''
+
+if st.session_state.gemini_api_key == '':
+	default = cfg.GEMINI_API_KEY
+	if default:
+		st.session_state.gemini_api_key = default
+		os.environ[ 'GEMINI_API_KEY' ] = default
 
 if st.session_state.google_api_key == '':
 	default = cfg.GOOGLE_API_KEY
@@ -201,9 +207,6 @@ if 'docqna_system_instructions' not in st.session_state:
 	st.session_state[ 'docqna_systems_instructions' ] = ''
 	
 # ----------MODEL PARAMETERS --------------------------------
-
-if 'chat_model' not in st.session_state:
-	st.session_state.chat_model = ''
 
 if 'text_model' not in st.session_state:
 	st.session_state[ 'text_model' ] = ''
