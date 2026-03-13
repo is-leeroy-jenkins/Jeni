@@ -3798,7 +3798,7 @@ elif mode == "Images":
 	with center:
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
-			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
+			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -4398,7 +4398,7 @@ elif mode == 'Audio':
 	with center:
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
-			with st.expander( 'LLM Options', icon='🧊', expanded=False, width='stretch' ):
+			with st.expander( 'LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				aud_c1, aud_c2, aud_c3, aud_c4, aud_c5 = st.columns(
 					[ 0.2, 0.2, 0.2, 0.2, 0.2 ], gap='xxsmall', border=True )
 				
@@ -4477,7 +4477,7 @@ elif mode == 'Audio':
 					
 					st.rerun( )
 			
-			with st.expander( 'Inference Options', icon='🎚️', expanded=False, width='stretch' ):
+			with st.expander( 'Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				prm_one, prm_two, prm_three, prm_four = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
 					border=True, gap='medium' )
 				
@@ -4523,7 +4523,7 @@ elif mode == 'Audio':
 					
 					st.rerun( )
 			
-			with st.expander( 'Response Options', icon='↔️', expanded=False, width='stretch' ):
+			with st.expander( 'Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], gap='xxsmall', border=True, )
 				
