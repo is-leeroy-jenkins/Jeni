@@ -3374,6 +3374,7 @@ if mode == 'Text':
 	text_include = st.session_state.get( 'text_include', [ ] )
 	text_domains = st.session_state.get( 'text_domains', [ ] )
 	text_stops = st.session_state.get( 'text_stops', [ ] )
+	text_kwargs = { }
 	text = Chat( )
 	
 	for key in [ 'text_domains', 'text_stops', 'text_includes', 'text_input', ]:
@@ -3390,16 +3391,16 @@ if mode == 'Text':
 			st.session_state[ 'instructions_last_loaded' ] = ''
 			st.session_state[ 'clear_instructions' ] = False
 		
-		with st.expander( label='LLM Configuration', icon='🧠', expanded=False, width='stretch' ):
+		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
-			with st.expander( label='Model Settings', expanded=False, width='stretch' ):
+			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
 				# ---------- Model ------------
 				with llm_c1:
 					model_options = list( text.model_options )
-					set_text_model = st.selectbox( label='Select Model', options=model_options,
+					set_text_model = st.selectbox( label='Model', options=model_options,
 						key='text_model', placeholder='Options', index=None,
 						help='REQUIRED. Text Generation model used by the AI', )
 					
@@ -3408,7 +3409,7 @@ if mode == 'Text':
 				# ---------- Include ------------
 				with llm_c2:
 					include_options = list( text.include_options )
-					set_text_include = st.multiselect( label='Include:', options=include_options,
+					set_text_include = st.multiselect( label='Include', options=include_options,
 						key='text_include', help=cfg.INCLUDE, placeholder='Options' )
 					
 					text_include = [ d.strip( ) for d in set_text_include
@@ -3427,10 +3428,10 @@ if mode == 'Text':
 					
 					st.session_state[ 'text_domains' ] = text_domains
 				
-				# ---------- Reasoning/Thinking Level ------------
+				# ---------- Thinking Level ------------
 				with llm_c4:
 					reasoning_options = list( text.reasoning_options )
-					set_text_reasoning = st.selectbox( label='Thinking Level:',
+					set_text_reasoning = st.selectbox( label='Thinking Level',
 						options=reasoning_options, key='text_reasoning',
 						help=cfg.REASONING, index=None, placeholder='Options' )
 					
@@ -3454,7 +3455,7 @@ if mode == 'Text':
 					
 					st.rerun( )
 			
-			with st.expander( label='Inference Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -3508,7 +3509,7 @@ if mode == 'Text':
 					
 					st.rerun( )
 			
-			with st.expander( label='Tool Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
 				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -3529,7 +3530,7 @@ if mode == 'Text':
 					
 					text_max_calls = st.session_state[ 'text_max_calls' ]
 				
-				# ---------- Choice/Calling Mode ------------
+				# ---------- Calling Mode ------------
 				with tool_c3:
 					choice_options = list( text.choice_options )
 					set_text_choice = st.selectbox( label='Calling Mode', options=choice_options,
@@ -3540,7 +3541,7 @@ if mode == 'Text':
 				# ---------- Tools ------------
 				with tool_c4:
 					tool_options = list( text.tool_options )
-					set_text_tools = st.multiselect( label='Available Tools', options=tool_options,
+					set_text_tools = st.multiselect( label='Tools', options=tool_options,
 						key='text_tools', help=cfg.TOOLS, placeholder='Options' )
 					
 					text_tools = [ d.strip( ) for d in set_text_tools
@@ -3569,7 +3570,7 @@ if mode == 'Text':
 					
 					st.rerun( )
 			
-			with st.expander( label='Response Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -3681,7 +3682,7 @@ if mode == 'Text':
 				with st.chat_message( msg[ 'role' ], avatar='' ):
 					st.markdown( msg[ 'content' ] )
 		
-		prompt = st.chat_input( 'Gipity Generate …' )
+		prompt = st.chat_input( 'Jeni Generate …' )
 		if prompt is not None:
 			st.session_state.text_messages.append( { 'role': 'user', 'content': prompt } )
 			with st.chat_message( 'assistant', avatar=cfg.GIPITY ):
@@ -3795,9 +3796,9 @@ elif mode == "Images":
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
-		with st.expander( label='LLM Configuration', icon='🧠', expanded=False, width='stretch' ):
+		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
-			with st.expander( label='Model Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -3882,7 +3883,7 @@ elif mode == "Images":
 					
 					st.rerun( )
 			
-			with st.expander( label='Inference Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				inf_c1, inf_c2, inf_c3, inf_c4, inf_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -3941,7 +3942,7 @@ elif mode == "Images":
 					
 					st.rerun( )
 			
-			with st.expander( label='Tool Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
 				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -3995,7 +3996,7 @@ elif mode == "Images":
 					
 					st.rerun( )
 			
-			with st.expander( label='Response Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				res_one, res_two, res_three, res_four, res_five = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -4049,7 +4050,7 @@ elif mode == "Images":
 					
 					st.rerun( )
 			
-			with st.expander( label='Visual Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Visual Settings', icon='👁️', expanded=False, width='stretch' ):
 				img_c1, img_c2, img_c3, img_c4, img_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -4110,7 +4111,7 @@ elif mode == "Images":
 		# ------------------------------------------------------------------
 		# Expander — Image System Instructions
 		# ------------------------------------------------------------------
-		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
@@ -4395,9 +4396,9 @@ elif mode == 'Audio':
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
-		with st.expander( label='LLM Configuration', icon='🧠', expanded=False, width='stretch' ):
+		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
-			with st.expander( 'Model Options', expanded=False, width='stretch' ):
+			with st.expander( 'LLM Options', icon='🧊', expanded=False, width='stretch' ):
 				aud_c1, aud_c2, aud_c3, aud_c4, aud_c5 = st.columns(
 					[ 0.2, 0.2, 0.2, 0.2, 0.2 ], gap='xxsmall', border=True )
 				
@@ -4476,7 +4477,7 @@ elif mode == 'Audio':
 					
 					st.rerun( )
 			
-			with st.expander( 'Inference Options', expanded=False, width='stretch' ):
+			with st.expander( 'Inference Options', icon='🎚️', expanded=False, width='stretch' ):
 				prm_one, prm_two, prm_three, prm_four = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
 					border=True, gap='medium' )
 				
@@ -4522,7 +4523,7 @@ elif mode == 'Audio':
 					
 					st.rerun( )
 			
-			with st.expander( 'Response Options', expanded=False, width='stretch' ):
+			with st.expander( 'Response Options', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], gap='xxsmall', border=True, )
 				
@@ -4572,7 +4573,7 @@ elif mode == 'Audio':
 					
 					st.rerun( )
 		
-		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
@@ -4716,7 +4717,7 @@ elif mode == 'Embedding':
 	# ------------------------------------------------------------------
 	emb_left, emb_center, emb_right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with emb_center:
-		with st.expander( label='Configuration', icon='⚙️', expanded=False, width='stretch' ):
+		with st.expander( label='Configuration', icon='🎚️', expanded=False, width='stretch' ):
 			emb_c1, emb_c2, emb_c3, emb_c4, emb_c5 = st.columns(
 				[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 			
@@ -4989,7 +4990,7 @@ elif mode == 'Vector Stores':
 # DOCUMENTS MODE
 # ======================================================================================
 elif mode == 'Document Q&A':
-	st.subheader( '📚 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
+	st.subheader( '📖 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
 	st.divider( )
 	docqna_model = st.session_state.get( 'docqna_model', '' )
 	docqna_number = st.session_state.get( 'docqna_number', 0 )
@@ -5042,9 +5043,9 @@ elif mode == 'Document Q&A':
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
-		with st.expander( label='LLM Configuration', icon='🧠', expanded=False, width='stretch' ):
+		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
-			with st.expander( label='Model Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -5082,7 +5083,7 @@ elif mode == 'Document Q&A':
 				# ---------- Reasoning/Thinking Level ------------
 				with llm_c4:
 					reasoning_options = list( docqna.reasoning_options )
-					set_docqna_reasoning = st.selectbox( label='Thinking Level:',
+					set_docqna_reasoning = st.selectbox( label='Thinking Level',
 						options=reasoning_options, key='docqna_reasoning',
 						help=cfg.REASONING, index=None, placeholder='Options' )
 					
@@ -5106,7 +5107,7 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
-			with st.expander( label='Inference Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -5126,7 +5127,7 @@ elif mode == 'Document Q&A':
 					
 					docqna_fequency = st.session_state[ 'docqna_frequency_penalty' ]
 				
-				# ---------- Presense ------------
+				# ---------- Presence ------------
 				with prm_c3:
 					set_docqna_presence = st.slider( label='Presense Penalty', min_value=-2.0, max_value=2.0,
 						value=float( st.session_state.get( 'docqna_presence_penalty', 0.0 ) ),
@@ -5161,7 +5162,7 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
-			with st.expander( label='Tool Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
 				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -5222,7 +5223,7 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
-			with st.expander( label='Response Settings', expanded=False, width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -5275,7 +5276,7 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 		
-		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
