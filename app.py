@@ -3771,6 +3771,7 @@ elif mode == "Images":
 	image_tools = st.session_state.get( 'image_tools', [ ] )
 	image_messages = st.session_state.get( 'image_messages', [ ] )
 	image_input = st.session_state.get( 'image_input', [ ] )
+	image_kwargs = { }
 	generator = None
 	analyzer = None
 	editor = None
@@ -4344,6 +4345,64 @@ elif mode == "Images":
 						
 						except Exception as exc:
 							st.error( f"Analysis Failed: {exc}" )
+		
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ---------------------------------------------------
+		#                   MESSAGES
+		# ---------------------------------------------------
+		if st.session_state[ 'image_input' ] is not None:
+			for msg in st.session_state.image_input:
+				with st.chat_message( msg[ 'role' ], avatar='' ):
+					st.markdown( msg[ 'content' ] )
+		
+		prompt = st.chat_input( 'Jeni Generate …' )
+		if prompt is not None:
+			st.session_state.image_messages.append( { 'role': 'user', 'content': prompt } )
+			with st.chat_message( 'assistant', avatar=cfg.GIPITY ):
+				image_kwargs = { }
+				
+				with st.spinner( 'Thinking…' ):
+					image_kwargs[ 'model' ] = st.session_state[ 'image_model' ]
+					image_kwargs[ 'top_percent' ] = st.session_state[ 'image_top_percent' ]
+					image_kwargs[ 'background' ] = st.session_state[ 'image_background' ]
+					image_kwargs[ 'max_tokens' ] = st.session_state[ 'image_max_tokens' ]
+					image_kwargs[ 'frequency' ] = st.session_state[ 'image_frequency_penalty' ]
+					image_kwargs[ 'presence' ] = st.session_state[ 'image_presence_penalty' ]
+					
+					if st.session_state[ 'image_stops' ]:
+						image_kwargs[ 'stops' ] = st.session_state[ 'image_stops' ]
+					
+					response = None
+					
+					try:
+						mdl = str( image_kwargs[ 'image_model' ] )
+						if mdl.startswith( 'gpt-5' ):
+							response = text.generate_text( prompt=prompt, model=image_kwargs[
+								'image_model' ] )
+						else:
+							response = text.generate_text( )
+					except Exception as exc:
+						err = Error( exc )
+						st.error( f'Generation Failed: {err.info}' )
+						response = None
+					
+					if response is not None and str( response ).strip( ):
+						st.markdown( response )
+						st.session_state.text_messages.append( { 'role': 'assistant',
+						                                         'content': response } )
+					else:
+						st.error( 'Generation Failed!.' )
+						try:
+							update_counters( getattr( text, 'response', None ) or response )
+						except Exception:
+							pass
+		
+		# --------  Reset Button
+		if st.button( 'Clear Messages' ):
+			reset_state( )
+			st.rerun( )
+
 
 # ======================================================================================
 # AUDIO MODE
@@ -4377,6 +4436,7 @@ elif mode == 'Audio':
 	audio_rate = st.session_state.get( 'audio_rate', [ ] )
 	transcriber = Transcription( )
 	translator = Translation( )
+	audio_kwargs = { }
 	tts = TTS( )
 	
 	# ---------------- Task ----------------
@@ -4697,6 +4757,62 @@ elif mode == 'Audio':
 					format='wav', width='stretch', loop=audio_loop, autoplay=audio_autoplay )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ---------------------------------------------------
+		#                   MESSAGES
+		# ---------------------------------------------------
+		if st.session_state[ 'audio_input' ] is not None:
+			for msg in st.session_state.audio_input:
+				with st.chat_message( msg[ 'role' ], avatar='' ):
+					st.markdown( msg[ 'content' ] )
+		
+		prompt = st.chat_input( 'Jeni Generate …' )
+		if prompt is not None:
+			st.session_state.audio_messages.append( { 'role': 'user', 'content': prompt } )
+			with st.chat_message( 'assistant', avatar=cfg.GIPITY ):
+				audio_kwargs = { }
+				
+				with st.spinner( 'Thinking…' ):
+					audio_kwargs[ 'model' ] = st.session_state[ 'audio_model' ]
+					audio_kwargs[ 'top_percent' ] = st.session_state[ 'audio_top_percent' ]
+					audio_kwargs[ 'background' ] = st.session_state[ 'audio_background' ]
+					audio_kwargs[ 'max_tokens' ] = st.session_state[ 'audio_max_tokens' ]
+					audio_kwargs[ 'frequency' ] = st.session_state[ 'audio_frequency_penalty' ]
+					audio_kwargs[ 'presence' ] = st.session_state[ 'audio_presence_penalty' ]
+					
+					if st.session_state[ 'audio_stops' ]:
+						audio_kwargs[ 'stops' ] = st.session_state[ 'audio_stops' ]
+					
+					response = None
+					
+					try:
+						mdl = str( audio_kwargs[ 'audio_model' ] )
+						if mdl.startswith( 'gpt-5' ):
+							response = text.generate_text( prompt=prompt,
+								model=audio_kwargs[ 'audio_model' ] )
+						else:
+							response = text.generate_text( )
+					except Exception as exc:
+						err = Error( exc )
+						st.error( f'Generation Failed: {err.info}' )
+						response = None
+					
+					if response is not None and str( response ).strip( ):
+						st.markdown( response )
+						st.session_state.text_messages.append( { 'role': 'assistant',
+						                                         'content': response } )
+					else:
+						st.error( 'Generation Failed!.' )
+						try:
+							update_counters( getattr( text, 'response', None ) or response )
+						except Exception:
+							pass
+		
+		# --------  Reset Button
+		if st.button( 'Clear Messages' ):
+			reset_state( )
+			st.rerun( )
+
 
 # ======================================================================================
 # EMBEDDINGS MODE
@@ -5447,6 +5563,11 @@ elif mode == 'Files':
 								st.success( f'Delete result: {res}' )
 							except Exception as exc:
 								st.error( f'Delete failed: {exc}' )
+		
+		# --------  Reset Button
+		if st.button( 'Clear Messages' ):
+			reset_state( )
+			st.rerun( )
 
 # ======================================================================================
 # PROMPT ENGINEERING MODE
