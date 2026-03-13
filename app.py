@@ -3338,7 +3338,7 @@ with st.sidebar:
 			os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = google_cloud_location
 
 	st.divider( )
-	st.text( 'Select Mode' )
+	st.text( 'Mode' )
 	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0, label_visibility='collapsed' )
 
 # ======================================================================================
