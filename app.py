@@ -93,6 +93,12 @@ if 'google_api_key' not in st.session_state:
 
 if 'google_cse_id' not in st.session_state:
 	st.session_state[ 'google_cse_id' ] = ''
+	
+if 'google_cloud_project_id' not in st.session_state:
+	st.session_state[ 'google_cloud_project_id' ] = ''
+
+if 'google_cloud_location' not in st.session_state:
+	st.session_state[ 'google_cloud_location' ] = ''
 
 if 'googlemaps_api_key' not in st.session_state:
 	st.session_state[ 'googlemaps_api_key' ] = ''
@@ -124,11 +130,17 @@ if st.session_state.googlemaps_api_key == '':
 		st.session_state.googlemaps_api_key = default
 		os.environ[ 'GOOGLEMAPS_API_KEY' ] = default
 
-if st.session_state.geocoding_api_key == '':
-	default = cfg.GEOODING_API_KEY
+if st.session_state.google_cloud_location == '':
+	default = cfg.GOOGLE_CLOUD_LOCATION
 	if default:
-		st.session_state.geocoding_api_key = default
-		os.environ[ 'GEOODING_API_KEY' ] = default
+		st.session_state.google_cloud_location = default
+		os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = default
+
+if st.session_state.google_cloud_project_id == '':
+	default = cfg.GEOCODING_API_KEY
+	if default:
+		st.session_state.google_cloud_project_id = default
+		os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = default
 
 if 'mode' not in st.session_state or st.session_state[ 'mode' ] is None:
 	st.session_state[ 'mode' ] = 'Text'
@@ -811,35 +823,32 @@ if 'stores_id' not in st.session_state:
 # Utilities
 # ======================================================================================
 
-def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
+def extract_usage( resp: Any ) -> Dict[ str, int ]:
 	"""
 		Extract token usage from a response object/dict.
 		Returns dict with prompt_tokens, completion_tokens, total_tokens.
 		Defensive: returns zeros if not present.
 	"""
-	usage = {
-			"prompt_tokens": 0,
-			"completion_tokens": 0,
-			"total_tokens": 0 }
+	usage = { 'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0 }
 	if not resp:
 		return usage
 	
 	raw = None
 	try:
-		raw = getattr( resp, "usage", None )
+		raw = getattr( resp, 'usage', None )
 	except Exception:
 		raw = None
 	
 	if not raw and isinstance( resp, dict ):
-		raw = resp.get( "usage" )
+		raw = resp.get( 'usage' )
 	
-	# Gemini SDK commonly uses "usage_metadata"
+	# Gemini SDK commonly uses 'usage_metadata'
 	if not raw and isinstance( resp, dict ):
-		raw = resp.get( "usage_metadata" )
+		raw = resp.get( 'usage_metadata' )
 	
 	if not raw:
 		try:
-			raw = getattr( resp, "usage_metadata", None )
+			raw = getattr( resp, 'usage_metadata', None )
 		except Exception:
 			raw = None
 	
@@ -848,37 +857,37 @@ def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
 	
 	try:
 		if isinstance( raw, dict ):
-			usage[ "prompt_tokens" ] = int( raw.get( "prompt_tokens", raw.get( "input_tokens", 0 ) ) )
-			usage[ "completion_tokens" ] = int(
-				raw.get( "completion_tokens", raw.get( "output_tokens", 0 ) )
+			usage[ 'prompt_tokens' ] = int( raw.get( 'prompt_tokens', raw.get( 'input_tokens', 0 ) ) )
+			usage[ 'completion_tokens' ] = int(
+				raw.get( 'completion_tokens', raw.get( 'output_tokens', 0 ) )
 			)
-			usage[ "total_tokens" ] = int(
-				raw.get( "total_tokens", usage[ "prompt_tokens" ] + usage[ "completion_tokens" ] )
+			usage[ 'total_tokens' ] = int(
+				raw.get( 'total_tokens', usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] )
 			)
 		else:
-			usage[ "prompt_tokens" ] = int( getattr( raw, "prompt_tokens", getattr( raw, "input_tokens", 0 ) ) )
-			usage[ "completion_tokens" ] = int(
-				getattr( raw, "completion_tokens", getattr( raw, "output_tokens", 0 ) )
+			usage[ 'prompt_tokens' ] = int( getattr( raw, 'prompt_tokens', getattr( raw, 'input_tokens', 0 ) ) )
+			usage[ 'completion_tokens' ] = int(
+				getattr( raw, 'completion_tokens', getattr( raw, 'output_tokens', 0 ) )
 			)
-			usage[ "total_tokens" ] = int(
-				getattr( raw, "total_tokens", usage[ "prompt_tokens" ] + usage[ "completion_tokens" ] )
+			usage[ 'total_tokens' ] = int(
+				getattr( raw, 'total_tokens', usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] )
 			)
 	except Exception:
-		usage[ "total_tokens" ] = usage[ "prompt_tokens" ] + usage[ "completion_tokens" ]
+		usage[ 'total_tokens' ] = usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ]
 	
 	return usage
 
-def _update_token_counters( resp: Any ) -> None:
+def update_counters( resp: Any ) -> None:
 	"""
 		Update session_state.last_call_usage and accumulate into session_state.token_usage.
 	"""
-	usage = _extract_usage_from_response( resp )
+	usage = extract_usage( resp )
 	st.session_state.last_call_usage = usage
-	st.session_state.token_usage[ "prompt_tokens" ] += usage.get( "prompt_tokens", 0 )
-	st.session_state.token_usage[ "completion_tokens" ] += usage.get( "completion_tokens", 0 )
-	st.session_state.token_usage[ "total_tokens" ] += usage.get( "total_tokens", 0 )
+	st.session_state.token_usage[ 'prompt_tokens' ] += usage.get( 'prompt_tokens', 0 )
+	st.session_state.token_usage[ 'completion_tokens' ] += usage.get( 'completion_tokens', 0 )
+	st.session_state.token_usage[ 'total_tokens' ] += usage.get( 'total_tokens', 0 )
 
-def _display_value( val: Any ) -> str:
+def display_value( val: Any ) -> str:
 	"""
 		Render a friendly display string for header values.
 		None -> em dash; otherwise str(value).
@@ -1027,7 +1036,7 @@ def normalize_text( text: str ) -> str:
 	
 	return text
 
-def chunk_text( text: str, max_tokens: int = 400 ) -> list[ str ]:
+def chunk_text( text: str, max_tokens: int=400 ) -> list[ str ]:
 	"""
 		
 		Purpose
@@ -1253,7 +1262,7 @@ def save_temp( upload ) -> str | None:
 	except Exception:
 		return None
 
-def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
+def extract_usage( resp: Any ) -> Dict[ str, int ]:
 	"""
 	
 		Purpose:
@@ -1303,7 +1312,7 @@ def _extract_usage_from_response( resp: Any ) -> Dict[ str, int ]:
 	
 	return usage
 
-def _update_token_counters( resp: Any ) -> None:
+def update_counters( resp: Any ) -> None:
 	"""
 	
 		Purpose:
@@ -1311,13 +1320,13 @@ def _update_token_counters( resp: Any ) -> None:
 		Update session_state.last_call_usage and accumulate into session_state.token_usage.
 		
 	"""
-	usage = _extract_usage_from_response( resp )
+	usage = extract_usage( resp )
 	st.session_state.last_call_usage = usage
 	st.session_state.token_usage[ 'prompt_tokens' ] += usage.get( 'prompt_tokens', 0 )
 	st.session_state.token_usage[ 'completion_tokens' ] += usage.get( 'completion_tokens', 0 )
 	st.session_state.token_usage[ 'total_tokens' ] += usage.get( 'total_tokens', 0 )
 
-def _display_value( val: Any ) -> str:
+def display_value( val: Any ) -> str:
 	"""
 		Render a friendly display string for header values.
 		None -> em dash; otherwise str(value).
@@ -1402,7 +1411,7 @@ def convert_xml( text: str ) -> str:
 			markdown_blocks.append( body )
 	return "\n\n".join( markdown_blocks )
 
-def markdown_converter( text: Any ) -> str:
+def convert_markdown( text: Any ) -> str:
 	"""
 		Purpose:
 		--------
@@ -1619,12 +1628,13 @@ def summarize_active_document( ) -> str:
 	
 	return route_document_query( summary_prompt.strip( ) )
 
-def _docqna_compute_fingerprint( active_docs: List[ str ], doc_bytes: Dict[ str, bytes ] ) -> str:
+def compute_fingerprint( active_docs: List[ str ], doc_bytes: Dict[ str, bytes ] ) -> str:
 	'''
 		
 		Purpose:
 		--------
-		Computes a stable fingerprint for the currently selected active documents and their byte contents.
+		Computes a stable fingerprint for the currently selected active
+		documents and their byte contents.
 	
 		Parameters:
 		-----------
@@ -1646,7 +1656,7 @@ def _docqna_compute_fingerprint( active_docs: List[ str ], doc_bytes: Dict[ str,
 		h.update( hashlib.sha256( b ).digest( ) )
 	return h.hexdigest( )
 
-def _docqna_extract_text_from_pdf_bytes( file_bytes: bytes ) -> str:
+def extract_text( file_bytes: bytes ) -> str:
 	'''
 	
 		Purpose:
@@ -1675,7 +1685,7 @@ def _docqna_extract_text_from_pdf_bytes( file_bytes: bytes ) -> str:
 	except Exception:
 		return ''
 
-def _docqna_safe_load_sqlite_vec( conn: sqlite3.Connection ) -> bool:
+def load_sqlite_vec( conn: sqlite3.Connection ) -> bool:
 	'''
 		
 		Purpose:
@@ -1700,7 +1710,7 @@ def _docqna_safe_load_sqlite_vec( conn: sqlite3.Connection ) -> bool:
 	except Exception:
 		return False
 
-def _docqna_ensure_vec_schema( dim: int ) -> bool:
+def ensure_schema( dim: int ) -> bool:
 	'''
 	
 		Purpose:
@@ -1719,7 +1729,7 @@ def _docqna_ensure_vec_schema( dim: int ) -> bool:
 	'''
 	conn = create_connection( )
 	try:
-		ok = _docqna_safe_load_sqlite_vec( conn )
+		ok = load_sqlite_vec( conn )
 		if not ok:
 			return False
 		
@@ -1741,7 +1751,7 @@ def _docqna_ensure_vec_schema( dim: int ) -> bool:
 	finally:
 		conn.close( )
 
-def _docqna_rebuild_index_if_needed( embedder: SentenceTransformer ) -> None:
+def rebuild_index( embedder: SentenceTransformer ) -> None:
 	'''
 		
 		Purpose:
@@ -1761,7 +1771,7 @@ def _docqna_rebuild_index_if_needed( embedder: SentenceTransformer ) -> None:
 	active_docs: List[ str ] = st.session_state.get( 'active_docs', [ ] )
 	doc_bytes: Dict[ str, bytes ] = st.session_state.get( 'doc_bytes', { } )
 	
-	fp = _docqna_compute_fingerprint( active_docs, doc_bytes )
+	fp = compute_fingerprint( active_docs, doc_bytes )
 	if fp and fp == st.session_state.get( 'docqna_fingerprint', '' ):
 		return
 	
@@ -1772,7 +1782,7 @@ def _docqna_rebuild_index_if_needed( embedder: SentenceTransformer ) -> None:
 	dim_value = getattr( embedder, 'get_sentence_embedding_dimension', lambda: 384 )( )
 	dim = int( dim_value ) if dim_value else 384
 	
-	vec_ready = _docqna_ensure_vec_schema( dim )
+	vec_ready = ensure_schema( dim )
 	st.session_state[ 'docqna_vec_ready' ] = bool( vec_ready )
 	
 	conn = create_connection( )
@@ -1795,7 +1805,7 @@ def _docqna_rebuild_index_if_needed( embedder: SentenceTransformer ) -> None:
 			if not b:
 				continue
 			
-			text = _docqna_extract_text_from_pdf_bytes( b )
+			text = extract_text( b )
 			if not text:
 				continue
 			
@@ -1831,7 +1841,7 @@ def _docqna_rebuild_index_if_needed( embedder: SentenceTransformer ) -> None:
 	finally:
 		conn.close( )
 
-def retrieve_top_doc_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] ]:
+def retrieve_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] ]:
 	'''
 	
 		Purpose:
@@ -1855,7 +1865,7 @@ def retrieve_top_doc_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, 
 		return [ ]
 	
 	embedder: SentenceTransformer = load_embedder( )
-	_docqna_rebuild_index_if_needed( embedder )
+	rebuild_index( embedder )
 	
 	qv = embedder.encode( [ query ], show_progress_bar=False )
 	qv = np.asarray( qv, dtype=np.float32 )[ 0 ]
@@ -1863,7 +1873,7 @@ def retrieve_top_doc_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, 
 	if st.session_state.get( 'docqna_vec_ready', False ):
 		conn = create_connection( )
 		try:
-			_docqna_safe_load_sqlite_vec( conn )
+			load_sqlite_vec( conn )
 			cur = conn.cursor( )
 			cur.execute(
 				'''
@@ -1919,7 +1929,7 @@ def build_document_user_input( user_query: str, k: int = 6 ) -> str:
 	
 	'''
 	system = str( st.session_state.get( 'system_instructions', '' ) or '' ).strip( )
-	hits = retrieve_top_doc_chunks( user_query, k=int( k ) )
+	hits = retrieve_chunks( user_query, k=int( k ) )
 	
 	context_blocks: List[ str ] = [ ]
 	for doc_name, chunk, score in hits:
@@ -3618,6 +3628,7 @@ if mode == 'Text':
 		# ------------------------------------------------------------------
 		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
 			if not prompt_names:
 				prompt_names = [ '' ]
@@ -3641,37 +3652,60 @@ if mode == 'Text':
 				st.session_state[ 'text_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
-			st.button( label='Clear Instructions', width='stretch', on_click=_on_clear )
+			def _on_convert_system_instructions( ) -> None:
+				text = st.session_state.get( 'text_system_instructions', '' )
+				if not isinstance( text, str ) or not text.strip( ):
+					return
+				
+				src = text.strip( )
+				if cfg.XML_BLOCK_PATTERN.search( src ):
+					converted = convert_xml( src )
+				else:
+					converted = convert_markdown( src )
+				
+				st.session_state[ 'text_system_instructions' ] = converted
+			
+			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+			with btn_c1:
+				st.button( label='Clear Instructions', width='stretch', on_click=_on_clear )
+			
+			with btn_c2:
+				st.button( label='XML <-> Markdown', width='stretch',
+					on_click=_on_convert_system_instructions )
 		
-		# ----------- MESSAGES ---------------------------------
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ---------------------------------------------------
+		#                   MESSAGES
+		# ---------------------------------------------------
 		if st.session_state[ 'text_input' ] is not None:
 			for msg in st.session_state.text_input:
 				with st.chat_message( msg[ 'role' ], avatar='' ):
 					st.markdown( msg[ 'content' ] )
 		
-		prompt = st.chat_input( 'Ask Gemini…' )
+		prompt = st.chat_input( 'Gipity Generate …' )
 		if prompt is not None:
 			st.session_state.text_messages.append( { 'role': 'user', 'content': prompt } )
-			with st.chat_message( 'assistant', avatar="" ):
-				gen_kwargs = { }
+			with st.chat_message( 'assistant', avatar=cfg.GIPITY ):
+				text_kwargs = { }
 				
 				with st.spinner( 'Thinking…' ):
-					gen_kwargs[ 'model' ] = st.session_state[ 'text_model' ]
-					gen_kwargs[ 'top_percent' ] = st.session_state[ 'text_top_percent' ]
-					gen_kwargs[ 'background' ] = st.session_state[ 'text_background' ]
-					gen_kwargs[ 'max_tokens' ] = st.session_state[ 'text_max_tokens' ]
-					gen_kwargs[ 'frequency' ] = st.session_state[ 'text_frequency_penalty' ]
-					gen_kwargs[ 'presence' ] = st.session_state[ 'text_presence_penalty' ]
+					text_kwargs[ 'model' ] = st.session_state[ 'text_model' ]
+					text_kwargs[ 'top_percent' ] = st.session_state[ 'text_top_percent' ]
+					text_kwargs[ 'background' ] = st.session_state[ 'text_background' ]
+					text_kwargs[ 'max_tokens' ] = st.session_state[ 'text_max_tokens' ]
+					text_kwargs[ 'frequency' ] = st.session_state[ 'text_frequency_penalty' ]
+					text_kwargs[ 'presence' ] = st.session_state[ 'text_presence_penalty' ]
 					
 					if st.session_state[ 'text_stops' ]:
-						gen_kwargs[ 'stops' ] = st.session_state[ 'text_stops' ]
+						text_kwargs[ 'stops' ] = st.session_state[ 'text_stops' ]
 					
 					response = None
 					
 					try:
-						mdl = str( gen_kwargs[ 'text_model' ] )
+						mdl = str( text_kwargs[ 'text_model' ] )
 						if mdl.startswith( 'gpt-5' ):
-							response = text.generate_text( prompt=prompt, model=gen_kwargs[
+							response = text.generate_text( prompt=prompt, model=text_kwargs[
 								'text_model' ] )
 						else:
 							response = text.generate_text( )
@@ -3687,9 +3721,14 @@ if mode == 'Text':
 					else:
 						st.error( 'Generation Failed!.' )
 						try:
-							_update_token_counters( getattr( text, 'response', None ) or response )
+							update_counters( getattr( text, 'response', None ) or response )
 						except Exception:
 							pass
+		
+		# --------  Reset Button
+		if st.button( 'Clear Messages' ):
+			reset_state( )
+			st.rerun( )
 
 # ======================================================================================
 # IMAGES MODE
@@ -4075,12 +4114,13 @@ elif mode == "Images":
 		# ------------------------------------------------------------------
 		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
 			if not prompt_names:
-				prompt_names = [ 'No Templates Found' ]
+				prompt_names = [ '' ]
 			
 			with in_left:
-				st.text_area( 'Enter Text', height=50, width='stretch',
+				st.text_area( label='Enter Text', height=50, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
 			
 			def _on_template_change( ) -> None:
@@ -4091,14 +4131,41 @@ elif mode == "Images":
 						st.session_state[ 'image_system_instructions' ] = text
 			
 			with in_right:
-				st.selectbox( 'Select Template', prompt_names,
-					key='instructions', on_change=_on_template_change, index=None )
+				st.selectbox( label='Use Template', options=prompt_names, index=None,
+					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
 				st.session_state[ 'image_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
-			st.button( 'Clear Instructions', width='stretch', on_click=_on_clear )
+			def _on_convert_system_instructions( ) -> None:
+				text = st.session_state.get( 'image_system_instructions', '' )
+				if not isinstance( text, str ) or not text.strip( ):
+					return
+				
+				src = text.strip( )
+				
+				# XML-delimited prompt blocks -> Markdown headings
+				if cfg.XML_BLOCK_PATTERN.search( src ):
+					converted = convert_xml( src )
+				
+				# Markdown headings <-> simple <hN> tags handled by existing helper
+				else:
+					converted = convert_markdown( src )
+				
+				st.session_state[ 'image_system_instructions' ] = converted
+			
+			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+			with btn_c1:
+				st.button(
+					label='Clear Instructions',
+					width='stretch',
+					on_click=_on_clear
+				)
+			
+			with btn_c2:
+				st.button( label='XML <-> Markdown', width='stretch',
+					on_click=_on_convert_system_instructions )
 		
 		# ------------------------------------------------------------------
 		# Tab Section
@@ -4126,7 +4193,7 @@ elif mode == "Images":
 						st.image( img_url )
 						
 						try:
-							_update_token_counters( getattr( image, 'response', None ) )
+							update_counters( getattr( image, 'response', None ) )
 						except Exception:
 							pass
 					
@@ -4197,7 +4264,7 @@ elif mode == "Images":
 									st.write( analysis_result )
 								
 								try:
-									_update_token_counters(
+									update_counters(
 										getattr( image, 'response', None )
 										or analysis_result
 									)
@@ -4269,7 +4336,7 @@ elif mode == "Images":
 									st.write( analysis_result )
 								
 								try:
-									_update_token_counters(
+									update_counters(
 										getattr( image, 'response', None )
 										or analysis_result
 									)
@@ -4509,12 +4576,13 @@ elif mode == 'Audio':
 		
 		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
 			if not prompt_names:
-				prompt_names = [ 'No Templates Found' ]
+				prompt_names = [ '' ]
 			
 			with in_left:
-				st.text_area( 'Enter Text', height=50, width='stretch',
+				st.text_area( label='Enter Text', height=50, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
 			
 			def _on_template_change( ) -> None:
@@ -4525,14 +4593,39 @@ elif mode == 'Audio':
 						st.session_state[ 'audio_system_instructions' ] = text
 			
 			with in_right:
-				st.selectbox( 'Select Template', prompt_names,
-					key='instructions', on_change=_on_template_change, index=None )
+				st.selectbox( label='Use Template', options=prompt_names, index=None,
+					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
 				st.session_state[ 'audio_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
-			st.button( 'Clear Instructions', width='stretch', on_click=_on_clear )
+			def _on_convert_system_instructions( ) -> None:
+				text = st.session_state.get( 'audio_system_instructions', '' )
+				if not isinstance( text, str ) or not text.strip( ):
+					return
+				
+				src = text.strip( )
+				if cfg.XML_BLOCK_PATTERN.search( src ):
+					converted = convert_xml( src )
+				
+				# Markdown headings <-> simple <hN> tags handled by existing helper
+				else:
+					converted = convert_markdown( src )
+				
+				st.session_state[ 'audio_system_instructions' ] = converted
+			
+			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+			with btn_c1:
+				st.button(
+					label='Clear Instructions',
+					width='stretch',
+					on_click=_on_clear
+				)
+			
+			with btn_c2:
+				st.button( label='XML <-> Markdown', width='stretch',
+					on_click=_on_convert_system_instructions )
 		
 		left_audio, center_audio, right_audio = st.columns( [ 0.33, 0.33, 0.33 ],
 			border=True, gap='medium' )
@@ -4550,7 +4643,7 @@ elif mode == 'Audio':
 								language=audio_language, )
 							st.text_area( 'Transcript', value=text, height=300 )
 							try:
-								_update_token_counters( getattr( transcriber, 'response', None ) )
+								update_counters( getattr( transcriber, 'response', None ) )
 							except Exception:
 								pass
 						except Exception as exc:
@@ -4565,7 +4658,7 @@ elif mode == 'Audio':
 							st.text_area( 'Translation', value=text, height=300 )
 							
 							try:
-								_update_token_counters( getattr( translator, 'response', None ) )
+								update_counters( getattr( translator, 'response', None ) )
 							except Exception:
 								pass
 						
@@ -4581,7 +4674,7 @@ elif mode == 'Audio':
 								audio_bytes = tts.create_speech( text, model=audio_model, voice=audio_voice )
 								st.audio( audio_bytes )
 								try:
-									_update_token_counters( getattr( tts, 'response', None ) )
+									update_counters( getattr( tts, 'response', None ) )
 								except Exception:
 									pass
 							
@@ -4738,7 +4831,7 @@ elif mode == 'Embedding':
 						# Token Counters
 						# ----------------------------------------------------------
 						try:
-							_update_token_counters( getattr( embedding, 'response', None ) )
+							update_counters( getattr( embedding, 'response', None ) )
 						except Exception:
 							pass
 					
@@ -5186,12 +5279,13 @@ elif mode == 'Document Q&A':
 		
 		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
 			if not prompt_names:
-				prompt_names = [ 'No Templates Found' ]
+				prompt_names = [ '' ]
 			
 			with in_left:
-				st.text_area( 'Enter Text', height=50, width='stretch',
+				st.text_area( label='Enter Text', height=50, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='docqna_system_instructions' )
 			
 			def _on_template_change( ) -> None:
@@ -5202,14 +5296,37 @@ elif mode == 'Document Q&A':
 						st.session_state[ 'docqna_system_instructions' ] = text
 			
 			with in_right:
-				st.selectbox( 'Select Template', prompt_names,
-					key='instructions', on_change=_on_template_change, index=None )
+				st.selectbox( label='Use Template', options=prompt_names, index=None,
+					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
 				st.session_state[ 'docqna_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
-			st.button( 'Clear Instructions', width='stretch', on_click=_on_clear )
+			def _on_convert_system_instructions( ) -> None:
+				text = st.session_state.get( 'docqna_system_instructions', '' )
+				if not isinstance( text, str ) or not text.strip( ):
+					return
+				
+				src = text.strip( )
+				
+				# XML-delimited prompt blocks -> Markdown headings
+				if cfg.XML_BLOCK_PATTERN.search( src ):
+					converted = convert_xml( src )
+				
+				# Markdown headings <-> simple <hN> tags handled by existing helper
+				else:
+					converted = convert_markdown( src )
+				
+				st.session_state[ 'docqna_system_instructions' ] = converted
+			
+			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+			with btn_c1:
+				st.button( label='Clear Instructions', width='stretch', on_click=_on_clear )
+			
+			with btn_c2:
+				st.button( label='XML <-> Markdown', width='stretch',
+					on_click=_on_convert_system_instructions )
 		
 		with st.expander( label='Document Loading', icon='📥', expanded=False, width='stretch' ):
 			doc_left, doc_right = st.columns( [ 0.2, 0.8 ], border=True )
