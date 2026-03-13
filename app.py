@@ -3282,6 +3282,7 @@ init_state( )
 with st.sidebar:
 	style_subheaders( )
 	st.logo( cfg.LOGO_PATH, size='large' )
+	st.text( 'Settings' )
 	st.divider( )
 	
 	# -----API KEY Expander------------------------------
@@ -3335,13 +3336,10 @@ with st.sidebar:
 		if google_cloud_location:
 			st.session_state.google_cloud_location = google_cloud_location
 			os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = google_cloud_location
-	
-	if st.button( 'Clear Chat' ):
-		reset_state( )
-		st.rerun( )
-	
-	st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0 )
+
+	st.divider( )
+	st.text( 'Select Mode' )
+	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0, label_visibility='collapsed' )
 
 # ======================================================================================
 # TEXT MODE
