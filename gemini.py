@@ -11,7 +11,7 @@
   <copyright file="gemini.py" company="Terry D. Eppler">
 
 	     gemini.py
-	     Copyright ©  2022  Terry Eppler
+	     Copyright ©  2024  Terry Eppler
 
      Permission is hereby granted, free of charge, to any person obtaining a copy
      of this software and associated documentation files (the “Software”),
