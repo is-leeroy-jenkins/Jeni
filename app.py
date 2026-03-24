@@ -3366,6 +3366,8 @@ if mode == 'Text':
 	text_media_resolution = st.session_state.get( 'text_media_resolution', '' )
 	text_response_format = st.session_state.get( 'text_response_format', '' )
 	text_tool_choice = st.session_state.get( 'text_tool_choice', '' )
+	text_response_schema = st.session_state.get( 'text_response_schema', '' )
+	text_safety_profile = st.session_state.get( 'text_safety_profile', '' )
 	text_content = st.session_state.get( 'text_content', '' )
 	text_tools = st.session_state.get( 'text_tools', [ ] )
 	text_modalities = st.session_state.get( 'text_modalities', [ ] )
@@ -3710,6 +3712,10 @@ if mode == 'Text':
 							media_resolution=st.session_state.get( 'text_media_resolution' ),
 							context=st.session_state.get( 'text_messages', [ ] )[ :-1 ],
 							content=st.session_state.get( 'text_content' ),
+							urls=st.session_state.get( 'text_urls', [ ] ),
+							max_urls=st.session_state.get( 'text_max_urls' ),
+							response_schema=st.session_state.get( 'text_response_schema' ),
+							safety_profile=st.session_state.get( 'text_safety_profile' ),
 						)
 					except Exception as exc:
 						err = Error( exc )

@@ -45,6 +45,7 @@ from google.genai.file_search_stores import FileSearchStores
 import config as cfg
 import base64
 from boogr import ErrorDialog, Error
+import json
 import os
 import requests
 import PIL.Image
@@ -57,10 +58,12 @@ from google.genai.pagers import Pager
 from google.genai.types import (Part, GenerateContentConfig, ImageConfig, FunctionCallingConfig,
                                 GenerateImagesConfig, GenerateVideosConfig, ThinkingConfig,
                                 GeneratedImage, EmbedContentConfig, Content, ContentEmbedding,
-                                Candidate, HttpOptions, GenerateImagesResponse, Field, FileSearchStore,
+                                Candidate, HttpOptions, GenerateImagesResponse, Field,
+                                FileSearchStore,
                                 GenerateContentResponse, GenerateVideosResponse, Image, File,
                                 SpeakerVoiceConfig, VoiceConfig, SpeechConfig, Tool, ToolConfig,
-                                GoogleSearch, UrlContext )
+                                GoogleSearch, UrlContext, SafetySetting, HarmCategory,
+                                HarmBlockThreshold)
 
 def throw_if( name: str, value: object ):
 	if value is None:
@@ -203,10 +206,12 @@ class Chat( Gemini ):
 	content: Optional[ str ]
 	context: Optional[ List[ Dict[ str, Any ] ] ]
 	urls: Optional[ List[ str ] ]
-	response_schema: Optional[ Dict[ str, str ] ] | Optional[ str]
+	response_schema: Optional[ Any ]
 	safety_profile: Optional[ str ]
+	safety_profile: Optional[ str ]
+	safety_settings: Optional[ List[ SafetySetting ] ]
 	
-	def __init__( self, model: str = 'gemini-2.5-flash-lite' ):
+	def __init__( self, model: str='gemini-2.5-flash-lite' ):
 		super( ).__init__( )
 		self.api_version = None
 		self.client = None
@@ -441,7 +446,8 @@ class Chat( Gemini ):
 			frequency: float = None, presence: float = None, max_tokens: int = None,
 			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
 			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
-			modalities: List[ str ] = None, media_resolution: str = None ) -> GenerateContentConfig:
+			modalities: List[ str ] = None, media_resolution: str = None,
+			response_schema: Any = None, safety_profile: str = None ) -> GenerateContentConfig:
 		"""
 		
 			Purpose:
@@ -471,13 +477,13 @@ class Chat( Gemini ):
 			self.stops = stops if stops is not None else [ ]
 			self.instructions = instruct
 			self.response_format = response_format
+			self.response_schema = self._parse_response_schema( response_schema=response_schema )
+			self.safety_settings = self._build_safety_settings( safety_profile=safety_profile )
 			self.tool_choice = tool_choice
 			self.media_resolution = media_resolution
 			self.tool_config = self._build_tools( tools=tools )
-			self.function_config = self._build_tool_config(
-				tool_choice=self.tool_choice,
-				tools=self.tool_config
-			)
+			self.function_config = self._build_tool_config( tool_choice=self.tool_choice,
+				tools=self.tool_config )
 			self.response_modalities = self._build_modalities( modalities=modalities )
 			self.thought_config = self._build_reasoning( reasoning=reasoning )
 			self.config_kwargs = { }
@@ -511,6 +517,9 @@ class Chat( Gemini ):
 			
 			if self.response_format is not None and str( self.response_format ).strip( ):
 				self.config_kwargs[ 'response_mime_type' ] = str( self.response_format ).strip( )
+				
+			if self.response_schema is not None:
+				self.config_kwargs[ 'response_schema' ] = self.response_schema
 			
 			if str( self.tool_choice ).strip( ).upper( ) != 'NONE':
 				if self.tool_config is not None and len( self.tool_config ) > 0:
@@ -518,6 +527,9 @@ class Chat( Gemini ):
 			
 			if self.function_config is not None:
 				self.config_kwargs[ 'tool_config' ] = self.function_config
+			
+			if self.safety_settings is not None and len( self.safety_settings ) > 0:
+				self.config_kwargs[ 'safety_settings' ] = self.safety_settings
 			
 			if self.response_modalities is not None and len( self.response_modalities ) > 0:
 				self.config_kwargs[ 'response_modalities' ] = self.response_modalities
@@ -715,6 +727,186 @@ class Chat( Gemini ):
 			                    'tools: List[ Tool ]=None )')
 			raise exception
 	
+	def _build_urls( self, urls: List[ str ] = None, max_urls: int = None ) -> List[ str ]:
+		"""
+		
+			Purpose:
+			--------
+			Normalizes URL inputs for URL Context style grounding.
+			
+			Parameters:
+			-----------
+			urls: List[ str ] - Candidate URLs from the UI.
+			max_urls: int - Maximum number of URLs to keep.
+			
+			Returns:
+			--------
+			List[ str ] - Filtered URL list.
+		
+		"""
+		try:
+			self.urls = [ ]
+			self.max_urls = max_urls
+			
+			if urls is None:
+				return self.urls
+			
+			for item in urls:
+				if item is None:
+					continue
+				
+				self.url = str( item ).strip( )
+				if not self.url:
+					continue
+				
+				if self.url.lower( ).startswith( 'http://' ) or self.url.lower( ).startswith( 'https://' ):
+					self.urls.append( self.url )
+			
+			if self.max_urls is not None and self.max_urls > 0:
+				self.urls = self.urls[ :self.max_urls ]
+			
+			return self.urls
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_build_urls( self, urls: List[ str ]=None, max_urls: int=None )'
+			raise exception
+
+	def _append_urls_to_content( self, content: str = None, urls: List[ str ] = None ) -> str | None:
+		"""
+		
+			Purpose:
+			--------
+			Appends URL context hints to the content block
+			for prompts using the URL Context tool.
+			
+			Parameters:
+			-----------
+			content: str - Existing content block.
+			urls: List[ str ] - URL inputs to append.
+			
+			Returns:
+			--------
+			Optional[ str ] - Updated content block.
+		
+		"""
+		try:
+			self.content = str( content ).strip( ) if content is not None else ''
+			self.urls = urls if urls is not None else [ ]
+			
+			if len( self.urls ) == 0:
+				return self.content if self.content else None
+			
+			self.url_block = 'Use the following URLs as grounding context:\\n' + '\\n'.join( self.urls )
+			if self.content:
+				return f'{self.content}\\n\\n{self.url_block}'
+			
+			return self.url_block
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_append_urls_to_content( self, content: str=None, urls: List[ str ]=None )'
+			raise exception
+	
+	def _build_safety_settings( self, safety_profile: str = None ) -> List[ SafetySetting ] | None:
+		"""
+		
+			Purpose:
+			--------
+			Builds Gemini safety settings from a named
+			safety profile.
+			
+			Parameters:
+			-----------
+			safety_profile: str - Named UI profile.
+			
+			Returns:
+			--------
+			Optional[ List[ SafetySetting ] ] - Safety settings list.
+		
+		"""
+		try:
+			self.safety_profile = str( safety_profile ).strip( ).lower( ) if safety_profile else ''
+			if not self.safety_profile:
+				return None
+			
+			self.threshold = None
+			if self.safety_profile == 'strict':
+				self.threshold = HarmBlockThreshold.BLOCK_LOW_AND_ABOVE
+			elif self.safety_profile == 'balanced':
+				self.threshold = HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
+			elif self.safety_profile == 'permissive':
+				self.threshold = HarmBlockThreshold.BLOCK_ONLY_HIGH
+			else:
+				return None
+			
+			self.safety_settings = [
+					SafetySetting(
+						category=HarmCategory.HARM_CATEGORY_HARASSMENT,
+						threshold=self.threshold
+					),
+					SafetySetting(
+						category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+						threshold=self.threshold
+					),
+					SafetySetting(
+						category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+						threshold=self.threshold
+					),
+					SafetySetting(
+						category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+						threshold=self.threshold
+					),
+			]
+			return self.safety_settings
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_build_safety_settings( self, safety_profile: str=None )'
+			raise exception
+	
+	def _parse_response_schema( self, response_schema: Any = None ) -> Any:
+		"""
+		
+			Purpose:
+			--------
+			Normalizes a structured-output schema passed
+			as a dict or JSON string.
+			
+			Parameters:
+			-----------
+			response_schema: Any - UI schema value.
+			
+			Returns:
+			--------
+			Any - Parsed schema object or None.
+		
+		"""
+		try:
+			if response_schema is None:
+				return None
+			
+			if isinstance( response_schema, dict ):
+				return response_schema if len( response_schema ) > 0 else None
+			
+			if isinstance( response_schema, str ):
+				self.schema_text = response_schema.strip( )
+				if not self.schema_text:
+					return None
+				
+				return json.loads( self.schema_text )
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_parse_response_schema( self, response_schema: Any=None )'
+			raise exception
+	
 	def get_output_text( self ) -> str | None:
 		"""
 		
@@ -763,13 +955,15 @@ class Chat( Gemini ):
 			exception.method = 'get_output_text( self ) -> str | None'
 			raise exception
 	
-	def generate_text( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			number: int=None, temperature: float=None, top_p: float=None, top_k: int=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
-			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
-			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
-			modalities: List[ str ]=None, media_resolution: str=None,
-			context: List[ Dict[ str, Any ] ]=None, content: str=None ) -> str | None:
+	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+			number: int = None, temperature: float = None, top_p: float = None, top_k: int = None,
+			frequency: float = None, presence: float = None, max_tokens: int = None,
+			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
+			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
+			modalities: List[ str ] = None, media_resolution: str = None,
+			context: List[ Dict[ str, Any ] ] = None, content: str = None,
+			urls: List[ str ] = None, max_urls: int = None, response_schema: Any=None,
+			safety_profile: str=None ) -> str | None:
 		"""
 		
 			Purpose:
@@ -788,12 +982,15 @@ class Chat( Gemini ):
 		try:
 			throw_if( 'prompt', prompt )
 			self.model = model
+			self.urls = self._build_urls( urls=urls, max_urls=max_urls )
+			self.content = self._append_urls_to_content( content=content, urls=self.urls )
 			self.contents = self._build_contents( prompt=prompt, context=context, content=content )
 			self.content_config = self._build_config( model=self.model, number=number,
 				temperature=temperature, top_p=top_p, top_k=top_k, frequency=frequency,
 				presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct,
 				response_format=response_format, tools=tools, tool_choice=tool_choice,
-				reasoning=reasoning, modalities=modalities, media_resolution=media_resolution )
+				reasoning=reasoning, modalities=modalities, media_resolution=media_resolution,
+				response_schema=response_schema, safety_profile=safety_profile )
 			self.client = genai.Client( api_key=self.gemini_api_key )
 			self.content_response = self.client.models.generate_content( model=self.model,
 				contents=self.contents, config=self.content_config )
