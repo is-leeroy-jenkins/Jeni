@@ -433,59 +433,105 @@ class Chat( Gemini ):
 			                    'content: str=None )')
 			raise exception
 	
-	def _build_tools( self, tools: List[ str ]=None ) -> List[ Tool ] | None:
+	def _build_config( self, model: str = 'gemini-2.5-flash-lite', number: int = None,
+			temperature: float = None, top_p: float = None, top_k: int = None,
+			frequency: float = None, presence: float = None, max_tokens: int = None,
+			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
+			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
+			modalities: List[ str ] = None, media_resolution: str=None ) -> GenerateContentConfig:
 		"""
 		
 			Purpose:
 			--------
-			Builds Gemini built-in tool objects from
-			selected tool names.
+			Builds the GenerateContentConfig object used
+			for Gemini text generation.
 			
 			Parameters:
 			-----------
-			tools: List[ str ] - Tool names selected in the UI.
+			model: str - Gemini model identifier.
 			
 			Returns:
 			--------
-			Optional[ List[ Tool ] ] - Tool collection or None.
+			GenerateContentConfig - Configured content settings.
 		
 		"""
 		try:
-			self.tools = tools if tools is not None else [ ]
-			self.tool_config = [ ]
+			self.model = model
+			self.number = number
+			self.candidate_count = number
+			self.temperature = temperature
+			self.top_p = top_p
+			self.top_k = top_k
+			self.frequency_penalty = frequency
+			self.presence_penalty = presence
+			self.max_tokens = max_tokens
+			self.stops = stops if stops is not None else [ ]
+			self.instructions = instruct
+			self.response_format = response_format
+			self.tool_choice = tool_choice
+			self.media_resolution = media_resolution
+			self.tool_config = self._build_tools( tools=tools )
+			self.function_config = self._build_tool_config(
+				tool_choice=self.tool_choice,
+				tools=self.tool_config
+			)
+			self.response_modalities = self._build_modalities( modalities=modalities )
+			self.thought_config = self._build_reasoning( reasoning=reasoning )
+			self.config_kwargs = { }
 			
-			for name in self.tools:
-				if not isinstance( name, str ):
-					continue
-				
-				self.name = str( name ).strip( )
-				if not self.name:
-					continue
-				
-				if self.name == 'google_search':
-					self.tool_config.append( Tool( google_search=GoogleSearch( ) ) )
-				
-				elif self.name == 'url_context':
-					self.tool_config.append( Tool( url_context=UrlContext( ) ) )
-				
-				elif self.name == 'code_execution':
-					self.tool_config.append( Tool( code_execution=types.ToolCodeExecution ) )
-				
-				elif self.name == 'google_maps':
-					self.tool_config.append( Tool( google_maps=types.GoogleMaps( ) ) )
-				
-				elif self.name == 'computer_use':
-					self.tool_config.append( Tool( computer_use=types.ComputerUse( ) ) )
-				
-				elif self.name == 'file_search':
-					pass
+			if self.temperature is not None:
+				self.config_kwargs[ 'temperature' ] = self.temperature
 			
-			return self.tool_config if len( self.tool_config ) > 0 else None
+			if self.top_p is not None:
+				self.config_kwargs[ 'top_p' ] = self.top_p
+			
+			if self.top_k is not None:
+				self.config_kwargs[ 'top_k' ] = self.top_k
+			
+			if self.max_tokens is not None:
+				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+			
+			if self.candidate_count is not None:
+				self.config_kwargs[ 'candidate_count' ] = self.candidate_count
+			
+			if self.instructions is not None and str( self.instructions ).strip( ):
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+			
+			if self.frequency_penalty is not None:
+				self.config_kwargs[ 'frequency_penalty' ] = self.frequency_penalty
+			
+			if self.presence_penalty is not None:
+				self.config_kwargs[ 'presence_penalty' ] = self.presence_penalty
+			
+			if self.stops is not None and len( self.stops ) > 0:
+				self.config_kwargs[ 'stop_sequences' ] = self.stops
+			
+			if self.response_format is not None and str( self.response_format ).strip( ):
+				self.config_kwargs[ 'response_mime_type' ] = str( self.response_format ).strip( )
+			
+			if str( self.tool_choice ).strip( ).upper( ) != 'NONE':
+				if self.tool_config is not None and len( self.tool_config ) > 0:
+					self.config_kwargs[ 'tools' ] = self.tool_config
+			
+			if self.function_config is not None:
+				self.config_kwargs[ 'tool_config' ] = self.function_config
+			
+			if self.response_modalities is not None and len( self.response_modalities ) > 0:
+				self.config_kwargs[ 'response_modalities' ] = self.response_modalities
+			
+			if self.thought_config is not None:
+				self.config_kwargs[ 'thinking_config' ] = self.thought_config
+			
+			if self.media_resolution is not None and str( self.media_resolution ).strip( ):
+				self.config_kwargs[ 'media_resolution' ] = self.media_resolution
+			
+			self.content_config = GenerateContentConfig( **self.config_kwargs )
+			return self.content_config
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_build_tools( self, tools: List[ str ]=None )'
+			exception.method = '_build_config( self, model ) -> GenerateContentConfig'
 			raise exception
 	
 	def _build_modalities( self, modalities: List[ str ]=None ) -> List[ str ] | None:
