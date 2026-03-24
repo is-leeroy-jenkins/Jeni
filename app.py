@@ -270,8 +270,8 @@ if 'text_max_calls' not in st.session_state:
 if 'text_top_k' not in st.session_state:
 	st.session_state[ 'text_top_k' ] = 0
 
-if 'text_max_searches' not in st.session_state:
-	st.session_state[ 'text_max_searches' ] = 0
+if 'text_max_urls' not in st.session_state:
+	st.session_state[ 'text_max_urls' ] = 0
 
 if 'text_max_tokens' not in st.session_state:
 	st.session_state[ 'text_max_tokens' ] = 0
@@ -320,7 +320,10 @@ if 'text_reasoning' not in st.session_state:
 
 if 'text_input' not in st.session_state:
 	st.session_state[ 'text_input' ] = ''
-	
+
+if 'text_response_schema' not in st.session_state:
+	st.session_state[ 'text_response_schema' ] = ''
+
 if 'text_messages' not in st.session_state:
 	st.session_state[ 'text_messages' ] = [ ]
 	
@@ -330,11 +333,8 @@ if 'text_stops' not in st.session_state:
 if 'text_modalities' not in st.session_state:
 	st.session_state[ 'text_modalities' ] = [ ]
 
-if 'text_include' not in st.session_state:
-	st.session_state[ 'text_include' ] = [ ]
-
-if 'text_domains' not in st.session_state:
-	st.session_state[ 'text_domains' ] = [ ]
+if 'text_urls' not in st.session_state:
+	st.session_state[ 'text_urls' ] = [ ]
 
 if 'text_tools' not in st.session_state:
 	st.session_state[ 'text_tools' ] = [ ]
@@ -3353,6 +3353,7 @@ if mode == 'Text':
 	text_model = st.session_state.get( 'text_model', '' )
 	text_number = st.session_state.get( 'text_number', 0 )
 	text_max_calls = st.session_state.get( 'text_max_calls', 0 )
+	text_max_urls = st.session_state.get( 'text_max_urls', 0 )
 	text_max_tokens = st.session_state.get( 'text_max_tokens', 0 )
 	text_top_percent = st.session_state.get( 'text_top_percent', 0.0 )
 	text_top_k = st.session_state.get( 'text_top_k', 0 )
@@ -3369,14 +3370,11 @@ if mode == 'Text':
 	text_tools = st.session_state.get( 'text_tools', [ ] )
 	text_modalities = st.session_state.get( 'text_modalities', [ ] )
 	text_context = st.session_state.get( 'text_context', [ ] )
-	text_domains = st.session_state.get( 'text_domains', [ ] )
+	text_urls = st.session_state.get( 'text_urls', [ ] )
 	text_stops = st.session_state.get( 'text_stops', [ ] )
 	text_messages = st.session_state.get( 'text_messages', [ ] )
 	text = Chat( )
 
-# NOTE:
-# Text-mode session-state collections are canonical state
-# for the controls in this mode and should not be deleted on entry.
 	
 	# ------------------------------------------------------------------
 	# Main Chat UI
@@ -3416,14 +3414,14 @@ if mode == 'Text':
 				
 				# ---------- Allowed Domains ------------
 				with llm_c3:
-					set_text_domains = st.text_input( label='Allowed Domains', key='text_domains_input',
-						value=','.join( st.session_state.get( 'text_domains', [ ] ) ),
+					set_text_urls = st.text_input( label='Allowed URLs', key='text_urls_input',
+						value=','.join( st.session_state.get( 'text_urls', [ ] ) ),
 						help=cfg.ALLOWED_DOMAINS, width='stretch', placeholder='Enter Domains' )
 					
-					text_domains = [ d.strip( ) for d in set_text_domains.split( ',' )
+					text_urls = [ d.strip( ) for d in set_text_urls.split( ',' )
 					                 if d.strip( ) ]
 					
-					st.session_state[ 'text_domains' ] = text_domains
+					st.session_state[ 'text_urls' ] = text_urls
 				
 				# ---------- Thinking Level ------------
 				with llm_c4:
@@ -3445,7 +3443,7 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_model_reset', width='stretch' ):
-					for key in [ 'text_model', 'text_include', 'text_domains',
+					for key in [ 'text_model', 'text_include', 'text_urls',
 					             'text_reasoning', 'text_media_resolution' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
@@ -3691,7 +3689,6 @@ if mode == 'Text':
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
-					
 					try:
 						response = text.generate_text(
 							prompt=prompt,

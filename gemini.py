@@ -202,6 +202,9 @@ class Chat( Gemini ):
 	files: Optional[ List[ str ] ]
 	content: Optional[ str ]
 	context: Optional[ List[ Dict[ str, Any ] ] ]
+	urls: Optional[ List[ str ] ]
+	response_schema: Optional[ Dict[ str, str ] ] | Optional[ str]
+	safety_profile: Optional[ str ]
 	
 	def __init__( self, model: str = 'gemini-2.5-flash-lite' ):
 		super( ).__init__( )
@@ -438,7 +441,7 @@ class Chat( Gemini ):
 			frequency: float = None, presence: float = None, max_tokens: int = None,
 			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
 			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
-			modalities: List[ str ] = None, media_resolution: str=None ) -> GenerateContentConfig:
+			modalities: List[ str ] = None, media_resolution: str = None ) -> GenerateContentConfig:
 		"""
 		
 			Purpose:
@@ -605,97 +608,111 @@ class Chat( Gemini ):
 			exception.method = '_build_reasoning( self, reasoning: str=None )'
 			raise exception
 	
-	def _build_config( self, model: str='gemini-2.5-flash-lite', number: int=None,
-			temperature: float=None, top_p: float=None, top_k: int=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
-			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
-			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
-			modalities: List[ str ]=None, media_resolution: str=None ) -> GenerateContentConfig:
+	def _build_tools( self, tools: List[ str ]=None ) -> List[ Tool ] | None:
 		"""
 		
 			Purpose:
 			--------
-			Builds the GenerateContentConfig object used
-			for Gemini text generation.
+			Builds Gemini built-in tool objects from
+			selected tool names.
 			
 			Parameters:
 			-----------
-			model: str - Gemini model identifier.
+			tools: List[ str ] - Tool names selected in the UI.
 			
 			Returns:
 			--------
-			GenerateContentConfig - Configured content settings.
+			Optional[ List[ Tool ] ] - Tool collection or None.
 		
 		"""
 		try:
-			self.model = model
-			self.number = number
-			self.candidate_count = number
-			self.temperature = temperature
-			self.top_p = top_p
-			self.top_k = top_k
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_tokens = max_tokens
-			self.stops = stops if stops is not None else [ ]
-			self.instructions = instruct
-			self.response_format = response_format
-			self.tool_choice = tool_choice
-			self.media_resolution = media_resolution
-			self.tool_config = self._build_tools( tools=tools )
-			self.response_modalities = self._build_modalities( modalities=modalities )
-			self.thought_config = self._build_reasoning( reasoning=reasoning )
-			self.config_kwargs = { }
+			self.tools = tools if tools is not None else [ ]
+			self.tool_config = [ ]
 			
-			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ] = self.temperature
+			for name in self.tools:
+				if not isinstance( name, str ):
+					continue
+				
+				self.name = str( name ).strip( )
+				if not self.name:
+					continue
+				
+				if self.name == 'google_search':
+					self.tool_config.append( Tool( google_search=GoogleSearch( ) ) )
+				
+				elif self.name == 'url_context':
+					self.tool_config.append( Tool( url_context=UrlContext( ) ) )
+				
+				elif self.name == 'code_execution':
+					self.tool_config.append( Tool( code_execution=types.ToolCodeExecution ) )
+				
+				elif self.name == 'google_maps':
+					self.tool_config.append( Tool( google_maps=types.GoogleMaps( ) ) )
+				
+				elif self.name == 'computer_use':
+					self.tool_config.append( Tool( computer_use=types.ComputerUse( ) ) )
+				
+				elif self.name == 'file_search':
+					pass
 			
-			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ] = self.top_p
-			
-			if self.top_k is not None:
-				self.config_kwargs[ 'top_k' ] = self.top_k
-			
-			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
-			
-			if self.candidate_count is not None:
-				self.config_kwargs[ 'candidate_count' ] = self.candidate_count
-			
-			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
-			
-			if self.frequency_penalty is not None:
-				self.config_kwargs[ 'frequency_penalty' ] = self.frequency_penalty
-			
-			if self.presence_penalty is not None:
-				self.config_kwargs[ 'presence_penalty' ] = self.presence_penalty
-			
-			if self.stops is not None and len( self.stops ) > 0:
-				self.config_kwargs[ 'stop_sequences' ] = self.stops
-			
-			if self.response_format is not None and str( self.response_format ).strip( ):
-				self.config_kwargs[ 'response_mime_type' ] = str( self.response_format ).strip( )
-			
-			if self.tool_config is not None and len( self.tool_config ) > 0:
-				self.config_kwargs[ 'tools' ] = self.tool_config
-			
-			if self.response_modalities is not None and len( self.response_modalities ) > 0:
-				self.config_kwargs[ 'response_modalities' ] = self.response_modalities
-			
-			if self.thought_config is not None:
-				self.config_kwargs[ 'thinking_config' ] = self.thought_config
-			
-			if self.media_resolution is not None and str( self.media_resolution ).strip( ):
-				self.config_kwargs[ 'media_resolution' ] = self.media_resolution
-			
-			self.content_config = GenerateContentConfig( **self.config_kwargs )
-			return self.content_config
+			return self.tool_config if len( self.tool_config ) > 0 else None
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_build_config( self, model ) -> GenerateContentConfig'
+			exception.method = '_build_tools( self, tools: List[ str ]=None )'
+			raise exception
+	
+	def _build_tool_config( self, tool_choice: str=None,
+			tools: List[ Tool ]=None ) -> ToolConfig | None:
+		"""
+		
+			Purpose:
+			--------
+			Builds Gemini ToolConfig for function-calling
+			selection modes when applicable.
+			
+			Parameters:
+			-----------
+			tool_choice: str - Tool selection mode from the UI.
+			tools: List[ Tool ] - Built tool objects.
+			
+			Returns:
+			--------
+			Optional[ ToolConfig ] - Gemini tool configuration.
+		
+		"""
+		try:
+			self.tool_choice = str( tool_choice ).strip( ).upper( ) if tool_choice else ''
+			self.tools = tools if tools is not None else [ ]
+			
+			if not self.tool_choice:
+				return None
+			
+			if self.tool_choice == 'AUTO':
+				return None
+			
+			if self.tool_choice == 'NONE':
+				return None
+			
+			self.has_functions = False
+			for tool in self.tools:
+				if hasattr( tool, 'function_declarations' ):
+					if getattr( tool, 'function_declarations', None ):
+						self.has_functions = True
+						break
+			
+			if not self.has_functions:
+				return None
+			
+			self.function_config = FunctionCallingConfig( mode=self.tool_choice )
+			return ToolConfig( function_calling_config=self.function_config )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('_build_tool_config( self, tool_choice: str=None, '
+			                    'tools: List[ Tool ]=None )')
 			raise exception
 	
 	def get_output_text( self ) -> str | None:
