@@ -294,12 +294,6 @@ if 'text_parallel_calls' not in st.session_state:
 if 'text_background' not in st.session_state:
 	st.session_state[ 'text_background' ] = False
 
-if 'text_store' not in st.session_state:
-	st.session_state[ 'text_store' ] = False
-
-if 'text_stream' not in st.session_state:
-	st.session_state[ 'text_stream' ] = False
-
 if 'text_response_format' not in st.session_state:
 	st.session_state[ 'text_response_format' ] = ''
 
@@ -317,9 +311,6 @@ if 'text_media_resolution' not in st.session_state:
 
 if 'text_reasoning' not in st.session_state:
 	st.session_state[ 'text_reasoning' ] = ''
-
-if 'text_input' not in st.session_state:
-	st.session_state[ 'text_input' ] = ''
 
 if 'text_response_schema' not in st.session_state:
 	st.session_state[ 'text_response_schema' ] = ''
@@ -3360,14 +3351,14 @@ if mode == 'Text':
 	text_frequency_penalty = st.session_state.get( 'text_frequency_penalty', 0.0 )
 	text_presence_penalty = st.session_state.get( 'text_presence_penalty', 0.0 )
 	text_temperature = st.session_state.get( 'text_temperature', 0.0 )
-	text_parallel_calls = st.session_state.get( 'text_parallel_calls', False )
 	text_background = st.session_state.get( 'text_background', False )
 	text_reasoning = st.session_state.get( 'text_reasoning', '' )
+	text_resolution = st.session_state.get( 'text_resolution', '' )
 	text_media_resolution = st.session_state.get( 'text_media_resolution', '' )
 	text_response_format = st.session_state.get( 'text_response_format', '' )
-	text_tool_choice = st.session_state.get( 'text_tool_choice', '' )
 	text_response_schema = st.session_state.get( 'text_response_schema', '' )
 	text_safety_profile = st.session_state.get( 'text_safety_profile', '' )
+	text_tool_choice = st.session_state.get( 'text_tool_choice', '' )
 	text_content = st.session_state.get( 'text_content', '' )
 	text_tools = st.session_state.get( 'text_tools', [ ] )
 	text_modalities = st.session_state.get( 'text_modalities', [ ] )
@@ -3376,7 +3367,6 @@ if mode == 'Text':
 	text_stops = st.session_state.get( 'text_stops', [ ] )
 	text_messages = st.session_state.get( 'text_messages', [ ] )
 	text = Chat( )
-
 	
 	# ------------------------------------------------------------------
 	# Main Chat UI
@@ -3403,27 +3393,27 @@ if mode == 'Text':
 					
 					text_model = st.session_state[ 'text_model' ]
 				
-				# ---------- Include ------------
+				# ---------- Response Schema ------------
 				with llm_c2:
-					include_options = list( text.include_options )
-					set_text_include = st.multiselect( label='Include', options=include_options,
-						key='text_include', help=cfg.INCLUDE, placeholder='Options' )
+					set_text_response_schema = st.text_area(
+						label='Response Schema',
+						key='text_response_schema',
+						value=st.session_state.get( 'text_response_schema', '' ),
+						help='Optional. JSON schema used when Response Format is application/json.',
+						width='stretch',
+						placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}'
+					)
 					
-					text_include = [ d.strip( ) for d in set_text_include
-					                 if d.strip( ) ]
-					
-					text_include = st.session_state[ 'text_include' ]
+					text_response_schema = st.session_state[ 'text_response_schema' ]
 				
-				# ---------- Allowed Domains ------------
+				# ---------- Max URLs ------------
 				with llm_c3:
-					set_text_urls = st.text_input( label='Allowed URLs', key='text_urls_input',
-						value=','.join( st.session_state.get( 'text_urls', [ ] ) ),
-						help=cfg.ALLOWED_DOMAINS, width='stretch', placeholder='Enter Domains' )
-					
-					text_urls = [ d.strip( ) for d in set_text_urls.split( ',' )
-					                 if d.strip( ) ]
-					
-					st.session_state[ 'text_urls' ] = text_urls
+					set_text_max_urls = st.slider( label='Max URLs', min_value=0, max_value=25,
+						value=int( st.session_state.get( 'text_max_urls', 0 ) ), step=1,
+						help='Optional. Maximum number of URLs from the URL list to include.',
+						width='stretch' )
+				
+				text_max_urls = st.session_state[ 'text_max_urls' ]
 				
 				# ---------- Thinking Level ------------
 				with llm_c4:
@@ -3434,14 +3424,20 @@ if mode == 'Text':
 					
 					text_reasoning = st.session_state[ 'text_reasoning' ]
 				
-				# ---------- Media Resolution ------------
-				with llm_c5:
-					media_options = list( text.media_options )
-					set_media_resolution = st.selectbox( label='Media Resolution',
-						options=media_options, key='text_media_resolution',
-						help=cfg.MEDIA_RESOLUTION, index=None, placeholder='Options' )
+				# ---------- Max URLs ------------
+				with llm_c3:
+					set_text_max_urls = st.slider(
+						label='Max URLs',
+						min_value=0,
+						max_value=25,
+						value=int( st.session_state.get( 'text_max_urls', 0 ) ),
+						step=1,
+						help='Optional. Maximum number of URLs from the URL list to include.',
+						width='stretch',
+						key='text_max_urls'
+					)
 					
-					media_resolution = st.session_state[ 'text_media_resolution' ]
+					text_max_urls = st.session_state[ 'text_max_urls' ]
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_model_reset', width='stretch' ):
@@ -3534,24 +3530,32 @@ if mode == 'Text':
 						key='text_tool_choice', help=cfg.CHOICE, index=None, placeholder='Options' )
 					
 					text_tool_choice = st.session_state[ 'text_tool_choice' ]
-				
-				# ---------- Tools ------------
-				with tool_c4:
-					tool_options = list( text.tool_options )
-					set_text_tools = st.multiselect( label='Tools', options=tool_options,
-						key='text_tools', help=cfg.TOOLS, placeholder='Options' )
 					
-					text_tools = [ d.strip( ) for d in set_text_tools
-					               if d.strip( ) ]
-					
-					text_tools = st.session_state[ 'text_tools' ]
+					# ---------- URLs ------------
+					with tool_c4:
+						set_text_urls = st.text_input(
+							label='URLs',
+							key='text_urls_input',
+							value='\n'.join( st.session_state.get( 'text_urls', [ ] ) ),
+							help='Optional. Enter URLs separated by semicolons for grounding.',
+							width='stretch',
+							placeholder='https://example.com/page-1;https://example.com/page-2'
+						)
+						
+						normalized_text_urls = [
+								line.strip( ) for line in set_text_urls.split( ';' )
+								if line.strip( )
+						]
+						
+						st.session_state[ 'text_urls' ] = normalized_text_urls
+						text_urls = st.session_state[ 'text_urls' ]
 				
 				# ---------- Modalities ------------
 				with tool_c5:
 					modality_options = list( text.modality_options )
-					set_text_modalities = st.multiselect( label='Response Modalities', options=modality_options,
-						key='text_modalities', help='Optional. Modality of the response',
-						placeholder='Options' )
+					set_text_modalities = st.multiselect( label='Response Modalities',
+						options=modality_options, key='text_modalities',
+						help='Optional. Modality of the response', placeholder='Options' )
 					
 					text_modalities = [ d.strip( ) for d in set_text_modalities
 					                    if d.strip( ) ]
@@ -3577,22 +3581,16 @@ if mode == 'Text':
 						help=cfg.STREAM )
 					
 					text_stream = st.session_state[ 'text_stream' ]
-				
-				# ---------- Store ------------
-				with resp_c2:
-					set_text_store = st.toggle( label='Store', key='text_store', help=cfg.STORE )
 					
-					text_store = st.session_state[ 'text_store' ]
-				
 				# ---------- Background ------------
-				with resp_c3:
+				with resp_c2:
 					set_text_background = st.toggle( label='Background', key='text_background',
 						help=cfg.BACKGROUND_MODE )
 					
 					text_background = st.session_state[ 'text_background' ]
 				
 				# ---------- Stops ------------
-				with resp_c4:
+				with resp_c3:
 					set_text_stops = st.text_input( label='Stop Sequences', key='text_stops',
 						help=cfg.STOP_SEQUENCE, width='stretch', placeholder='Enter Stops' )
 					
@@ -3600,13 +3598,23 @@ if mode == 'Text':
 					               if d.strip( ) ]
 				
 				# ---------- Max Tokens ------------
-				with resp_c5:
+				with resp_c4:
 					set_text_tokens = st.slider( label='Max Tokens', min_value=0, max_value=100000,
 						value=int( st.session_state.get( 'text_max_tokens', 0 ) ), step=500,
 						help=cfg.MAX_OUTPUT_TOKENS, key='text_max_tokens' )
 					
 					text_tokens = st.session_state[ 'text_max_tokens' ]
-				
+		
+				# ---------- Safety ------------
+				with resp_c5:
+					set_text_safety_profile = st.selectbox( label='Safety',
+						options=[ '', 'strict', 'balanced', 'permissive' ],
+						key='text_safety_profile',
+						help='Optional. Gemini safety profile for the request.',
+						index=None, placeholder='Options' )
+					
+					text_safety_profile = st.session_state[ 'text_safety_profile' ]
+	
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_response', width='stretch' ):
 					for key in [ 'text_stream', 'text_store', 'text_number', 'text_stops',
@@ -3692,8 +3700,7 @@ if mode == 'Text':
 				with st.spinner( 'Thinking…' ):
 					response = None
 					try:
-						response = text.generate_text(
-							prompt=prompt,
+						response = text.generate_text( prompt=prompt,
 							model=st.session_state.get( 'text_model' ),
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
@@ -3715,8 +3722,7 @@ if mode == 'Text':
 							urls=st.session_state.get( 'text_urls', [ ] ),
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
-							safety_profile=st.session_state.get( 'text_safety_profile' ),
-						)
+							safety_profile=st.session_state.get( 'text_safety_profile' ),)
 					except Exception as exc:
 						err = Error( exc )
 						st.error( f'Generation Failed: {err.info}' )
@@ -3854,16 +3860,16 @@ elif mode == "Images":
 						
 						image_model = st.session_state[ 'image_model' ]
 				
-				# ---------  Domains --------
+				# ---------- URLs ------------
 				with llm_c3:
-					set_image_domains = st.text_input( label='Allowed Domains', key='image_domains',
-						placeholder='Enter Domains',
-						help=cfg.ALLOWED_DOMAINS, width='stretch' )
+					set_image_urls = st.text_input( label='URLs', key='image_urls',
+						value='\n'.join( st.session_state.get( 'image_urls', [ ] ) ),
+						help='Optional. Enter URLs delimited by semi-colons for Context Grounding.',
+						width='stretch',
+						placeholder='https://example.com/page-1;https://example.com/page-2' )
 					
-					image_domains = [ d.strip( ) for d in set_image_domains.split( ',' )
-					                  if d.strip( ) ]
-					
-					image_domains = st.session_state[ 'image_domains' ]
+					image_urls = [ line.strip( ) for line in set_image_urls.split( ',')
+					               if line.strip( ) ]
 				
 				# ------------ Stops -------------
 				with llm_c4:
@@ -3887,7 +3893,7 @@ elif mode == "Images":
 					# Remove Image Model Settings session keys
 					# ----------------------------------------------------------
 					for key in [ 'image_mode', 'image_model', 'image_stops',
-					             'image_domains', 'image_reasoning', ]:
+					             'image_urls', 'image_reasoning', ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -4204,56 +4210,56 @@ elif mode == "Images":
 				chosen_model = st.selectbox( 'Model (analysis)', [ image_model, None ], index=0, )
 				chosen_model_arg = (image_model if chosen_model is None else chosen_model)
 				
-		# ---------------------------------------------------
-		#                   MESSAGES
-		# ---------------------------------------------------
-		if st.session_state[ 'image_input' ] is not None:
-			for msg in st.session_state.image_input:
-				with st.chat_message( msg[ 'role' ], avatar='' ):
-					st.markdown( msg[ 'content' ] )
+			# ---------------------------------------------------
+			#                   MESSAGES
+			# ---------------------------------------------------
+			if st.session_state[ 'image_input' ] is not None:
+				for msg in st.session_state.image_input:
+					with st.chat_message( msg[ 'role' ], avatar='' ):
+						st.markdown( msg[ 'content' ] )
+		
+			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 	
-		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-
-		prompt = st.chat_input( 'Enter image analysis prompt …' )
-		if prompt is not None:
-			st.session_state.image_messages.append( { 'role': 'user', 'content': prompt } )
-			with st.chat_message( 'assistant', avatar=cfg.JENI ):
-				
-				with st.spinner( 'Thinking…' ):
-					image_kwargs[ 'model' ] = st.session_state[ 'image_model' ]
-					image_kwargs[ 'top_percent' ] = st.session_state[ 'image_top_percent' ]
-					image_kwargs[ 'background' ] = st.session_state[ 'image_background' ]
-					image_kwargs[ 'max_tokens' ] = st.session_state[ 'image_max_tokens' ]
-					image_kwargs[ 'frequency' ] = st.session_state[ 'image_frequency_penalty' ]
-					image_kwargs[ 'presence' ] = st.session_state[ 'image_presence_penalty' ]
+			prompt = st.chat_input( 'Enter image analysis prompt …' )
+			if prompt is not None:
+				st.session_state.image_messages.append( { 'role': 'user', 'content': prompt } )
+				with st.chat_message( 'assistant', avatar=cfg.JENI ):
 					
-					if st.session_state[ 'image_stops' ]:
-						image_kwargs[ 'stops' ] = st.session_state[ 'image_stops' ]
-					
-					response = None
-					
-					try:
-						mdl = str( image_kwargs[ 'image_model' ] )
-						if mdl.startswith( 'gpt-5' ):
-							response = text.generate_text( prompt=prompt, model=image_kwargs[
-								'image_model' ] )
-						else:
-							response = text.generate_text( )
-					except Exception as exc:
-						err = Error( exc )
-						st.error( f'Generation Failed: {err.info}' )
+					with st.spinner( 'Thinking…' ):
+						image_kwargs[ 'model' ] = st.session_state[ 'image_model' ]
+						image_kwargs[ 'top_percent' ] = st.session_state[ 'image_top_percent' ]
+						image_kwargs[ 'background' ] = st.session_state[ 'image_background' ]
+						image_kwargs[ 'max_tokens' ] = st.session_state[ 'image_max_tokens' ]
+						image_kwargs[ 'frequency' ] = st.session_state[ 'image_frequency_penalty' ]
+						image_kwargs[ 'presence' ] = st.session_state[ 'image_presence_penalty' ]
+						
+						if st.session_state[ 'image_stops' ]:
+							image_kwargs[ 'stops' ] = st.session_state[ 'image_stops' ]
+						
 						response = None
-					
-					if response is not None and str( response ).strip( ):
-						st.markdown( response )
-						st.session_state.text_messages.append( { 'role': 'assistant',
-						                                         'content': response } )
-					else:
-						st.error( 'Generation Failed!.' )
+						
 						try:
-							update_counters( getattr( text, 'response', None ) or response )
-						except Exception:
-							pass
+							mdl = str( image_kwargs[ 'image_model' ] )
+							if mdl.startswith( 'gpt-5' ):
+								response = text.generate_text( prompt=prompt, model=image_kwargs[
+									'image_model' ] )
+							else:
+								response = text.generate_text( )
+						except Exception as exc:
+							err = Error( exc )
+							st.error( f'Generation Failed: {err.info}' )
+							response = None
+						
+						if response is not None and str( response ).strip( ):
+							st.markdown( response )
+							st.session_state.text_messages.append( { 'role': 'assistant',
+							                                         'content': response } )
+						else:
+							st.error( 'Generation Failed!.' )
+							try:
+								update_counters( getattr( text, 'response', None ) or response )
+							except Exception:
+								pass
 			
 			ana_c1, ana_c2, ana_c3 = st.columns( [ 0.2, 0.2, 0.8 ] )
 			with ana_c1:
@@ -4326,57 +4332,57 @@ elif mode == "Images":
 				chosen_model = st.selectbox( 'Model (edit)', [ image_model, None ], index=0, )
 				chosen_model_arg = (image_model if chosen_model is None else chosen_model)
 		
-				# ---------------------------------------------------
-				#                   MESSAGES
-				# ---------------------------------------------------
-				if st.session_state[ 'image_input' ] is not None:
-					for msg in st.session_state.image_input:
-						with st.chat_message( msg[ 'role' ], avatar='' ):
-							st.markdown( msg[ 'content' ] )
+			# ---------------------------------------------------
+			#                   MESSAGES
+			# ---------------------------------------------------
+			if st.session_state[ 'image_input' ] is not None:
+				for msg in st.session_state.image_input:
+					with st.chat_message( msg[ 'role' ], avatar='' ):
+						st.markdown( msg[ 'content' ] )
+		
+			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 			
-				st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-				
-				prompt = st.chat_input( 'Enter image editing prompt …' )
-				if prompt is not None:
-					st.session_state.image_messages.append( { 'role': 'user', 'content': prompt } )
-					with st.chat_message( 'assistant', avatar=cfg.JENI ):
-						image_kwargs = { }
+			prompt = st.chat_input( 'Enter image editing prompt …' )
+			if prompt is not None:
+				st.session_state.image_messages.append( { 'role': 'user', 'content': prompt } )
+				with st.chat_message( 'assistant', avatar=cfg.JENI ):
+					image_kwargs = { }
+					
+					with st.spinner( 'Thinking…' ):
+						image_kwargs[ 'model' ] = st.session_state[ 'image_model' ]
+						image_kwargs[ 'top_percent' ] = st.session_state[ 'image_top_percent' ]
+						image_kwargs[ 'background' ] = st.session_state[ 'image_background' ]
+						image_kwargs[ 'max_tokens' ] = st.session_state[ 'image_max_tokens' ]
+						image_kwargs[ 'frequency' ] = st.session_state[ 'image_frequency_penalty' ]
+						image_kwargs[ 'presence' ] = st.session_state[ 'image_presence_penalty' ]
 						
-						with st.spinner( 'Thinking…' ):
-							image_kwargs[ 'model' ] = st.session_state[ 'image_model' ]
-							image_kwargs[ 'top_percent' ] = st.session_state[ 'image_top_percent' ]
-							image_kwargs[ 'background' ] = st.session_state[ 'image_background' ]
-							image_kwargs[ 'max_tokens' ] = st.session_state[ 'image_max_tokens' ]
-							image_kwargs[ 'frequency' ] = st.session_state[ 'image_frequency_penalty' ]
-							image_kwargs[ 'presence' ] = st.session_state[ 'image_presence_penalty' ]
-							
-							if st.session_state[ 'image_stops' ]:
-								image_kwargs[ 'stops' ] = st.session_state[ 'image_stops' ]
-							
-							response = None
-							
-							try:
-								mdl = str( image_kwargs[ 'image_model' ] )
-								if mdl.startswith( 'gpt-5' ):
-									response = text.generate_text( prompt=prompt, model=image_kwargs[
-										'image_model' ] )
-								else:
-									response = text.generate_text( )
-							except Exception as exc:
-								err = Error( exc )
-								st.error( f'Generation Failed: {err.info}' )
-								response = None
-							
-							if response is not None and str( response ).strip( ):
-								st.markdown( response )
-								st.session_state.text_messages.append( { 'role': 'assistant',
-								                                         'content': response } )
+						if st.session_state[ 'image_stops' ]:
+							image_kwargs[ 'stops' ] = st.session_state[ 'image_stops' ]
+						
+						response = None
+						
+						try:
+							mdl = str( image_kwargs[ 'image_model' ] )
+							if mdl.startswith( 'gpt-5' ):
+								response = text.generate_text( prompt=prompt, model=image_kwargs[
+									'image_model' ] )
 							else:
-								st.error( 'Generation Failed!.' )
-								try:
-									update_counters( getattr( text, 'response', None ) or response )
-								except Exception:
-									pass
+								response = text.generate_text( )
+						except Exception as exc:
+							err = Error( exc )
+							st.error( f'Generation Failed: {err.info}' )
+							response = None
+						
+						if response is not None and str( response ).strip( ):
+							st.markdown( response )
+							st.session_state.text_messages.append( { 'role': 'assistant',
+							                                         'content': response } )
+						else:
+							st.error( 'Generation Failed!.' )
+							try:
+								update_counters( getattr( text, 'response', None ) or response )
+							except Exception:
+								pass
 				
 				edit_c1, edit_c2, edit_3 = st.columns( [ 0.2, 0.2, 0.8 ] )
 				with edit_c1:
@@ -4430,10 +4436,10 @@ elif mode == "Images":
 						reset_state( )
 						st.rerun( )
 		
+		# ---------------------------------------------------
+		#                   MESSAGES
+		# ---------------------------------------------------
 		with tab_gen:
-			# ---------------------------------------------------
-			#                   MESSAGES
-			# ---------------------------------------------------
 			if st.session_state[ 'image_input' ] is not None:
 				for msg in st.session_state.image_input:
 					with st.chat_message( msg[ 'role' ], avatar='' ):
@@ -4452,7 +4458,7 @@ elif mode == "Images":
 								image_kwargs[ 'quality' ] = st.session_state[ 'image_quality' ]
 							if image_output:
 								image_kwargs[ 'format' ] = st.session_state[ 'image_output' ]
-							img_url = image.generate( **kwargs )
+							img_url = image.generate( **image_kwargs )
 							st.image( img_url )
 							
 							try:
