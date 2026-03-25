@@ -3909,8 +3909,8 @@ elif mode == "Images":
 					st.rerun( )
 					
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
-				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
+				resp_c1, resp_c2, resp_c3, resp_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
+					border=True, gap='xxsmall' )
 				
 				# ---------- Max Tokens ------------
 				with resp_c1:
@@ -3928,17 +3928,17 @@ elif mode == "Images":
 				
 				# ---------- Number/Candidates ------------
 				with resp_c2:
-					set_text_number = st.slider( label='Candidates', min_value=0, max_value=50,
-						value=int( st.session_state.get( 'text_number', 0 ) ), step=1,
-						help='Optional. Upper limit on the responses returned by the model',
-						key='text_number' )
+					set_image_number = st.slider( label='Candidates', min_value=0, max_value=50,
+						value=int( st.session_state.get( 'image_number', 0 ) ), step=1,
+						help='Optional. Upper limit on the images returned by the model',
+						key='image_number' )
 					
-					text_number = st.session_state[ 'text_number' ]
+					image_number = st.session_state[ 'image_number' ]
 				
 				# ------------ Modality Options --------
-				with resp_c4:
+				with resp_c3:
 					modality_options = image.modality_options
-					set_image_modality = st.selectbox( label='Modality',
+					set_image_modality = st.selectbox( label='Response Mode',
 						options=modality_options,
 						key='image_modality',
 						help='Optional. Response Modality.',
@@ -3949,7 +3949,7 @@ elif mode == "Images":
 					image_modality = st.session_state[ 'image_modality' ]
 				
 				# ------------ Response Format Options --------
-				with resp_c5:
+				with resp_c4:
 					response_format_options = image.format_options
 					set_image_response_format = st.selectbox( label='Response Format',
 						options=response_format_options,
@@ -3959,19 +3959,19 @@ elif mode == "Images":
 						placeholder='Seclect Response Format' )
 					
 					image_response_format = st.session_state[ 'image_response_format' ]
-				
-				# ------- Reset Settings -----------
+			
+				# -------- Reset Settings ------------------
 				if st.button( label='Reset', key='image_response_reset', width='stretch' ):
 					for key in [ 'image_max_tokens', 'image_number',
-					             'image_mime_type', 'image_tools', 'image_response_format' ]:
+					             'image_modality', 'image_response_format' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
 					st.rerun( )
-					
+			
 			with st.expander( label='Visual Settings', icon='👁️', expanded=False, width='stretch' ):
-				img_c1, img_c2, img_c3, img_c4 = st.columns(
-					[ 0.25, 0.25, 0.25, 0.25  ], border=True, gap='xxsmall' )
+				img_c1, img_c2, img_c3, img_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25  ],
+					border=True, gap='xxsmall' )
 				
 				# ------------ Aspect Ratio -------
 				with img_c1:
@@ -4018,13 +4018,11 @@ elif mode == "Images":
 				# ------------ Tool Options --------
 				with img_c4:
 					tools = image.tool_options
-					set_image_tools = st.multiselectbox( label='Tools',
+					set_image_tools = st.multiselect( label='Tools',
 						options=tools,
 						key='image_tools',
 						help='Optional. Tool Options.',
-						index=None,
-						placeholder='Seclect Tools'
-					)
+						placeholder='Seclect Tools' )
 					
 					image_tools = [ d.strip( ) for d in set_image_tools if d.strip( ) ]
 					image_tools = st.session_state[ 'image_tools' ]
