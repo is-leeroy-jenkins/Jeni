@@ -3413,7 +3413,7 @@ if mode == 'Text':
 						help='Optional. Maximum number of URLs from the URL list to include.',
 						width='stretch' )
 				
-				text_max_urls = st.session_state[ 'text_max_urls' ]
+					text_max_urls = st.session_state[ 'text_max_urls' ]
 				
 				# ---------- Thinking Level ------------
 				with llm_c4:
@@ -3423,26 +3423,25 @@ if mode == 'Text':
 						help=cfg.REASONING, index=None, placeholder='Options' )
 					
 					text_reasoning = st.session_state[ 'text_reasoning' ]
-				
-				# ---------- Max URLs ------------
-				with llm_c3:
-					set_text_max_urls = st.slider(
-						label='Max URLs',
-						min_value=0,
-						max_value=25,
-						value=int( st.session_state.get( 'text_max_urls', 0 ) ),
-						step=1,
-						help='Optional. Maximum number of URLs from the URL list to include.',
-						width='stretch',
-						key='text_max_urls'
+					
+				# ---------- Tools ------------
+				with llm_c5:
+					tool_options = list( text.tool_options )
+					set_text_tools = st.multiselect(
+						label='Tools',
+						options=tool_options,
+						key='text_tools',
+						help=cfg.TOOLS,
+						placeholder='Options'
 					)
 					
-					text_max_urls = st.session_state[ 'text_max_urls' ]
+					text_tools = [ d.strip( ) for d in set_text_tools if d.strip( ) ]
+					text_tools = st.session_state[ 'text_tools' ]
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_model_reset', width='stretch' ):
-					for key in [ 'text_model', 'text_include', 'text_urls',
-					             'text_reasoning', 'text_media_resolution' ]:
+					for key in [ 'text_model', 'text_max_urls',
+					             'text_reasoning', 'text_response_schema', 'text_tools' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -3564,8 +3563,8 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_tools', width='stretch' ):
-					for key in [ 'text_max_calls', 'text_tool_choice', 'text_include',
-					             'text_tools', 'text_domains', 'text_parallel_calls' ]:
+					for key in [ 'text_number', 'text_max_calls', 'text_calling_mode,
+					             'text_modalities' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -3617,9 +3616,8 @@ if mode == 'Text':
 	
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_response', width='stretch' ):
-					for key in [ 'text_stream', 'text_store', 'text_number', 'text_stops',
-					             'text_max_tokens', 'text_modalities', 'text_background',
-					             'text_response_format' ]:
+					for key in [ 'text_stream', 'text_background',  'text_stops',
+					             'text_max_tokens', 'text_safety_profile' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
