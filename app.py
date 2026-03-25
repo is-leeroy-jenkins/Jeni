@@ -344,35 +344,17 @@ if 'image_max_calls' not in st.session_state:
 if 'image_max_searches' not in st.session_state:
 	st.session_state[ 'image_max_searches' ] = 0
 
-if 'image_top_k' not in st.session_state:
-	st.session_state[ 'image_top_k' ] = 0
-
 if 'image_temperature' not in st.session_state:
 	st.session_state[ 'image_temperature' ] = 0.0
 
 if 'image_top_percent' not in st.session_state:
 	st.session_state[ 'image_top_percent' ] = 0.0
 
-if 'image_frequency_penalty' not in st.session_state:
-	st.session_state[ 'image_frequency_penalty' ] = 0.0
-
-if 'image_presence_penalty' not in st.session_state:
-	st.session_state[ 'image_presence_penalty' ] = 0.0
-
 if 'image_number' not in st.session_state:
 	st.session_state[ 'image_number' ] = 0.0
 
 if 'image_parallel_tools' not in st.session_state:
 	st.session_state[ 'image_parallel_tools' ] = False
-
-if 'image_background' not in st.session_state:
-	st.session_state[ 'image_background' ] = False
-
-if 'image_store' not in st.session_state:
-	st.session_state[ 'image_store' ] = False
-
-if 'image_stream' not in st.session_state:
-	st.session_state[ 'image_stream' ] = False
 
 if 'image_tool_choice' not in st.session_state:
 	st.session_state[ 'image_tool_choice' ] = ''
@@ -388,12 +370,12 @@ if 'image_resolution' not in st.session_state:
 
 if 'image_aspect_ratio' not in st.session_state:
 	st.session_state[ 'image_aspect_ratio' ] = ''
+	
+if 'image_respoonse_format' not in st.session_state:
+	st.session_state[ 'image_response_format' ] = ''
 
 if 'image_mime_type' not in st.session_state:
 	st.session_state[ 'image_mime_type' ] = ''
-
-if 'image_response_format' not in st.session_state:
-	st.session_state[ 'image_response_format' ] = ''
 
 if 'image_input' not in st.session_state:
 	st.session_state[ 'image_input' ] = ''
@@ -410,8 +392,8 @@ if 'image_modalities' not in st.session_state:
 if 'image_context' not in st.session_state:
 	st.session_state.image_context: List[ Dict[ str, Any ] ] = [ ]
 
-if 'image_domains' not in st.session_state:
-	st.session_state[ 'image_domains' ] = [ ]
+if 'image_urls' not in st.session_state:
+	st.session_state[ 'image_durls' ] = [ ]
 
 if 'image_content' not in st.session_state:
 	st.session_state[ 'image_content' ] = [ ]
@@ -420,26 +402,11 @@ if 'image_content' not in st.session_state:
 if 'image_mode' not in st.session_state:
 	st.session_state[ 'image_mode' ] = ''
 
-if 'image_style' not in st.session_state:
-	st.session_state[ 'image_style' ] = ''
-
-if 'image_detail' not in st.session_state:
-	st.session_state[ 'image_detail' ] = ''
-
-if 'image_backcolor' not in st.session_state:
-	st.session_state[ 'image_backcolor' ] = ''
-
-if 'image_output' not in st.session_state:
-	st.session_state[ 'image_output' ] = ''
-
 if 'image_url' not in st.session_state:
 	st.session_state[ 'image_url' ] = ''
 
 if 'image_size' not in st.session_state:
 	st.session_state[ 'image_size' ] = ''
-
-if 'image_quality' not in st.session_state:
-	st.session_state[ 'image_quality' ] = ''
 
 # --------AUDIO-GENERATION PARAMETERS--------------------
 
@@ -3792,32 +3759,18 @@ elif mode == "Images":
 	image_max_searches = st.session_state.get( 'image_max_searches', 0 )
 	image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
 	image_top_percent = st.session_state.get( 'image_top_percent', 0.0 )
-	image_top_k = st.session_state.get( 'image_top_k', 0.0 )
-	image_frequency_penalty = st.session_state.get( 'image_frequency_penalty', 0.0 )
-	image_presence_penalty = st.session_state.get( 'image_presence_penalty', 0.0 )
 	image_temperature = st.session_state.get( 'image_temperature', 0.0 )
-	image_stream = st.session_state.get( 'image_stream', False )
-	image_store = st.session_state.get( 'image_store', False )
-	image_parallel_calls = st.session_state.get( 'image_parallel_calls', False )
-	image_background = st.session_state.get( 'image_background', False )
-	image_response_format = st.session_state.get( 'image_response_format', '' )
 	image_mime_type = st.session_state.get( 'image_mime_type', '' )
-	image_output = st.session_state.get( 'image_output', '' )
+	image_response_format = st.session_state.get( 'image_response_format', '' )
 	image_detail = st.session_state.get( 'image_detail', '' )
-	image_tool_choice = st.session_state.get( 'image_tool_choice', '' )
-	image_style = st.session_state.get( 'image_style', '' )
-	image_backcolor = st.session_state.get( 'image_backcolor', '' )
 	image_content = st.session_state.get( 'image_content', '' )
 	image_input = st.session_state.get( 'image_input', '' )
 	image_mode = st.session_state.get( 'image_mode', '' )
-	image_quality = st.session_state.get( 'image_quality', '' )
-	image_resolution = st.session_state.get( 'image_resolution', '' )
 	image_media_resolution = st.session_state.get( 'image_media_resolution', '' )
 	image_size = st.session_state.get( 'image_size', '' )
 	image_aspect_ratio = st.session_state.get( 'image_aspect_ratio', '' )
-	image_stops = st.session_state.get( 'image_stops', [ ] )
 	image_modalities = st.session_state.get( 'image_modalities', [ ] )
-	image_domains = st.session_state.get( 'image_domains', [ ] )
+	image_urls = st.session_state.get( 'image_urls', [ ] )
 	image_include = st.session_state.get( 'image_include', [ ] )
 	image_tools = st.session_state.get( 'image_tools', [ ] )
 	image_messages = st.session_state.get( 'image_messages', [ ] )
@@ -3847,8 +3800,8 @@ elif mode == "Images":
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
-				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
+				llm_c1, llm_c2, llm_c3, llm_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25, ],
+					border=True, gap='xxsmall' )
 				
 				# ---------  Mode  --------
 				with llm_c1:
@@ -3918,64 +3871,8 @@ elif mode == "Images":
 						
 						image_model = st.session_state[ 'image_model' ]
 				
-				# ---------- Workflow ------------
-				with llm_c3:
-					workflow = ''
-					if st.session_state.get( 'image_mode' ) == 'Generation':
-						workflow = 'Text -> Image'
-					elif st.session_state.get( 'image_mode' ) == 'Analysis':
-						workflow = 'Image + Prompt -> Text'
-					elif st.session_state.get( 'image_mode' ) == 'Editing':
-						workflow = 'Image + Prompt -> Image'
-					
-					st.text_input(
-						label='Workflow',
-						value=workflow,
-						help='Derived from the selected Gemini image task.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------- Input Source ------------
-				with llm_c4:
-					input_source = ''
-					if st.session_state.get( 'image_mode' ) == 'Generation':
-						input_source = 'Prompt'
-					elif st.session_state.get( 'image_mode' ) in [ 'Analysis', 'Editing' ]:
-						input_source = 'Prompt + Uploaded Image'
-					
-					st.text_input(
-						label='Input Source',
-						value=input_source,
-						help='Reflects the expected input contract for the selected image task.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# --------- Notes --------
-				with llm_c5:
-					st.text_input(
-						label='Notes',
-						value='Wrapper-managed',
-						help='Model routing is user-selected; multimodal request structure is handled by the Gemini wrapper.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------  Reset Settings --------
-				if st.button( label='Reset', key='image_model_reset', width='stretch' ):
-					for key in [ 'image_mode', 'image_model' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
-					st.rerun( )
-					
-			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
-				inf_c1, inf_c2, inf_c3, inf_c4, inf_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
-				
 				# ---------  Top-P --------
-				with inf_c1:
+				with llm_c3:
 					set_image_top_p = st.slider(
 						label='Top-P',
 						key='image_top_percent',
@@ -3989,7 +3886,7 @@ elif mode == "Images":
 					image_top_percent = st.session_state[ 'image_top_percent' ]
 				
 				# ---------  Temperature --------
-				with inf_c2:
+				with llm_c4:
 					set_image_temperature = st.slider(
 						label='Temperature',
 						key='image_temperature',
@@ -4002,103 +3899,10 @@ elif mode == "Images":
 					
 					image_temperature = st.session_state[ 'image_temperature' ]
 				
-				# ---------  Applied Settings --------
-				with inf_c3:
-					applied = 'Top-P, Temperature'
-					st.text_input(
-						label='Applied Settings',
-						value=applied,
-						help='These settings are currently consumed by the Gemini image wrapper.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------  Notes --------
-				with inf_c4:
-					st.text_input(
-						label='Notes',
-						value='Wrapper-managed',
-						help='Other generic inference fields are not currently applied in Image mode.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------  Reserved --------
-				with inf_c5:
-					st.text_input(
-						label='Reserved',
-						value='',
-						help='No additional Gemini image inference setting is used here.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# --------- Reset Settings --------
-				if st.button( label='Reset', key='image_inference_reset', width='stretch' ):
-					for key in [ 'image_top_percent', 'image_temperature' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
-					st.rerun( )
-					
-			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
-				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
-				
-				# ---------- Tooling Status ------------
-				with tool_c1:
-					st.text_input(
-						label='Tooling Status',
-						value='Disabled',
-						help='Gemini Image mode is currently operating without tool-grounded calls.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------- Workflow Scope ------------
-				with tool_c2:
-					st.text_input(
-						label='Workflow Scope',
-						value='Image Wrapper',
-						help='This mode uses the Gemini image wrapper directly.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------- Calling Mode ------------
-				with tool_c3:
-					st.text_input(
-						label='Calling Mode',
-						value='Internal',
-						help='Tool calling is not user-configured for the current Image mode contract.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------- Available Tools ------------
-				with tool_c4:
-					st.text_input(
-						label='Available Tools',
-						value='None',
-						help='No Gemini tool selections are currently applied in Image mode.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------- Media Resolution ------------
-				with tool_c5:
-					st.text_input(
-						label='Media Resolution',
-						value='Wrapper-managed',
-						help='Media/tool settings are not exposed for the current Image mode path.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# --------- Reset Settings --------
-				if st.button( label='Reset', key='image_tools_reset', width='stretch' ):
-					for key in [ 'image_parallel_tools', 'image_max_tools', 'image_tool_choice',
-					             'image_tools', 'image_include', 'image_media_resolution' ]:
+				# ---------  Reset Settings --------
+				if st.button( label='Reset', key='image_model_reset', width='stretch' ):
+					for key in [ 'image_mode', 'image_model',
+					             'image_top_percent', 'image_temperature' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -4120,67 +3924,55 @@ elif mode == "Images":
 						key='image_max_tokens'
 					)
 					
-					image_tokens = st.session_state[ 'image_max_tokens' ]
+					image_max_tokens = st.session_state[ 'image_max_tokens' ]
 				
-				# ---------- Active Output ------------
+				# ---------- Number/Candidates ------------
 				with resp_c2:
-					active_output = ''
-					if st.session_state.get( 'image_mode' ) == 'Generation':
-						active_output = 'IMAGE'
-					elif st.session_state.get( 'image_mode' ) == 'Analysis':
-						active_output = 'TEXT'
-					elif st.session_state.get( 'image_mode' ) == 'Editing':
-						active_output = 'IMAGE'
+					set_text_number = st.slider( label='Candidates', min_value=0, max_value=50,
+						value=int( st.session_state.get( 'text_number', 0 ) ), step=1,
+						help='Optional. Upper limit on the responses returned by the model',
+						key='text_number' )
 					
-					st.text_input(
-						label='Active Output',
-						value=active_output,
-						help='Derived from the selected image task.',
-						width='stretch',
-						disabled=True
-					)
+					text_number = st.session_state[ 'text_number' ]
 				
-				# ---------- Notes ------------
-				with resp_c3:
-					st.text_input(
-						label='Notes',
-						value='Managed by Gemini wrapper',
-						help='Response modality is set internally by the image wrapper.',
-						width='stretch',
-						disabled=True
-					)
-				
-				# ---------- Reserved ------------
+				# ------------ Modality Options --------
 				with resp_c4:
-					st.text_input(
-						label='Reserved',
-						value='',
-						help='No additional Gemini image response setting is used here.',
-						width='stretch',
-						disabled=True
+					modality_options = image.modality_options
+					set_image_tools = st.selectbox( label='Modality',
+						options=tool_options,
+						key='image_modality',
+						help='Optional. Response Modality.',
+						index=None,
+						placeholder='Seclect Modality'
 					)
+					
+					image_modality = st.session_state[ 'image_modality' ]
 				
-				# ---------- Reserved ------------
+				# ------------ Response Format Options --------
 				with resp_c5:
-					st.text_input(
-						label='Reserved',
-						value='',
-						help='No additional Gemini image response setting is used here.',
-						width='stretch',
-						disabled=True
+					reponse_format_options = image.format_options
+					set_image_response_format = st.selectbox( label='Response Format',
+						options=tool_options,
+						key='image_response_format',
+						help='Optional. Response Format.',
+						index=None,
+						placeholder='Seclect Response Format'
 					)
+					
+					image_response_format = st.session_state[ 'image_response_format' ]
 				
 				# ------- Reset Settings -----------
 				if st.button( label='Reset', key='image_response_reset', width='stretch' ):
-					for key in [ 'image_max_tokens' ]:
+					for key in [ 'image_max_tokens', 'image_number',
+					             'image_mime_type', 'image_tools', 'image_response_format' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
 					st.rerun( )
 					
 			with st.expander( label='Visual Settings', icon='👁️', expanded=False, width='stretch' ):
-				img_c1, img_c2, img_c3, img_c4, img_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
+				img_c1, img_c2, img_c3, img_c4 = st.columns(
+					[ 0.25, 0.25, 0.25, 0.25  ], border=True, gap='xxsmall' )
 				
 				# ------------ Aspect Ratio -------
 				with img_c1:
@@ -4210,40 +4002,37 @@ elif mode == "Images":
 					
 					image_size = st.session_state[ 'image_size' ]
 				
-				# ------------ Active Task --------
+				# ------- MIME Types ----------
 				with img_c3:
-					active_task = st.session_state.get( 'image_mode', '' )
-					st.text_input(
-						label='Active Task',
-						value=active_task,
-						help='Derived from the selected image mode.',
-						width='stretch',
-						disabled=True
+					mime_types = image.mime_options
+					set_image_mode = st.selectbox(
+						label='MIME Types',
+						options=mime_types,
+						key='image_mode',
+						help='Available Gemini image workflows.',
+						index=None,
+						placeholder='Options'
 					)
+					
+					image_mime_type = st.session_state[ 'image_mime_type' ]
 				
-				# ------------ Notes --------
+				# ------------ Tool Options --------
 				with img_c4:
-					st.text_input(
-						label='Notes',
-						value='Wrapper-managed',
-						help='Image output parsing is handled internally by the Gemini wrapper.',
-						width='stretch',
-						disabled=True
+					tool_options = image.tool_options
+					set_image_tools = st.multiselectbox( label='Tools',
+						options=tool_options,
+						key='image_tools',
+						help='Available Gemini image workflows.',
+						index=None,
+						placeholder='Seclect Tools'
 					)
-				
-				# ------------ Reserved --------
-				with img_c5:
-					st.text_input(
-						label='Reserved',
-						value='',
-						help='No additional Gemini visual setting is used here.',
-						width='stretch',
-						disabled=True
-					)
+					
+					image_tools = st.session_state[ 'image_tools' ]
 				
 				# -------- Reset Settings ------------------
 				if st.button( label='Reset', key='image_visual_reset', width='stretch' ):
-					for key in [ 'image_size', 'image_aspect_ratio' ]:
+					for key in [ 'image_size', 'image_aspect_ratio',
+					             'image_mime_type', 'image_tools' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					

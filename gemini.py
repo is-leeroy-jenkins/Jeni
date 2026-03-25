@@ -1142,6 +1142,7 @@ class Images( Gemini ):
 		self.tool_choice = None
 		self.content_response = None
 		self.response = None
+		self.grounding_metadata = None
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
@@ -1296,7 +1297,106 @@ class Images( Gemini ):
 		'''
 		return [ '1K', '2K', '4K' ]
 	
-	def _get_content_config( self, image_only: bool = False ) -> GenerateContentConfig:
+	def _supports_image_size( self, model: str = None ) -> bool:
+		"""
+			
+			Purpose:
+			-----------
+			Determines whether the selected model supports the image_size field.
+			
+			Parameters:
+			-----------
+			model: str - The Gemini image model identifier.
+			
+			Returns:
+			--------
+			bool - True when image_size is supported; otherwise False.
+			
+		"""
+		try:
+			self.model_name = str( model or self.model ).strip( )
+			return self.model_name in [ 'gemini-3.1-flash-image-preview',
+			                            'gemini-3-pro-image-preview' ]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_supports_image_size( self, model=None ) -> bool'
+			raise exception
+	
+	def _supports_search_grounding( self, model: str = None ) -> bool:
+		"""
+			
+			Purpose:
+			-----------
+			Determines whether the selected image model supports Google Search grounding.
+			
+			Parameters:
+			-----------
+			model: str - The Gemini image model identifier.
+			
+			Returns:
+			--------
+			bool - True when Search grounding is supported; otherwise False.
+			
+		"""
+		try:
+			self.model_name = str( model or self.model ).strip( )
+			return self.model_name in [ 'gemini-3.1-flash-image-preview',
+			                            'gemini-3-pro-image-preview' ]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_supports_search_grounding( self, model=None ) -> bool'
+			raise exception
+	
+	def _build_grounding_tool( self, image_search: bool = False ) -> Optional[ Tool ]:
+		"""
+			
+			Purpose:
+			-----------
+			Builds a Google Search grounding tool for supported image models.
+			
+			Parameters:
+			-----------
+			image_search: bool - Includes Google Image Search when supported by the model.
+			
+			Returns:
+			--------
+			Optional[ Tool ] - Search grounding tool or None.
+			
+		"""
+		try:
+			if not self._supports_search_grounding( self.model ):
+				return None
+			
+			self.use_image_search = bool( image_search )
+			self.model_name = str( self.model ).strip( )
+			
+			if self.model_name == 'gemini-3.1-flash-image-preview' and self.use_image_search:
+				try:
+					return Tool(
+						google_search=types.GoogleSearch(
+							search_types=types.SearchTypes(
+								web_search=types.WebSearch( ),
+								image_search=types.ImageSearch( )
+							)
+						)
+					)
+				except Exception:
+					return Tool( google_search=types.GoogleSearch( ) )
+			
+			return Tool( google_search=types.GoogleSearch( ) )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_build_grounding_tool( self, image_search=False ) -> Optional[ Tool ]'
+			raise exception
+	
+	def _get_content_config( self, image_only: bool = False, grounded: bool = False,
+			image_search: bool = False ) -> GenerateContentConfig:
 		"""
 			
 			Purpose:
@@ -1306,6 +1406,8 @@ class Images( Gemini ):
 			Parameters:
 			-----------
 			image_only: bool - Indicates whether only image output should be returned.
+			grounded: bool - Indicates whether Google Search grounding should be enabled.
+			image_search: bool - Indicates whether Google Image Search grounding should be used.
 			
 			Returns:
 			--------
@@ -1314,25 +1416,47 @@ class Images( Gemini ):
 		"""
 		try:
 			self.image_config = None
-			if self.aspect_ratio or self.size:
-				self.image_config = types.ImageConfig(
-					aspect_ratio=self.aspect_ratio if self.aspect_ratio else None,
-					image_size=self.size if self.size else None )
+			self.tool_config = None
+			self.grounding_metadata = None
+			
+			self.image_kwargs = { }
+			if self.aspect_ratio:
+				self.image_kwargs[ 'aspect_ratio' ] = self.aspect_ratio
+			
+			if self.size and self._supports_image_size( self.model ):
+				self.image_kwargs[ 'image_size' ] = self.size
+			
+			if len( self.image_kwargs ) > 0:
+				self.image_config = types.ImageConfig( **self.image_kwargs )
+			
+			if grounded:
+				self.grounding_tool = self._build_grounding_tool( image_search=image_search )
+				if self.grounding_tool is not None:
+					self.tool_config = [ self.grounding_tool ]
 			
 			self.response_modalities = [ 'IMAGE' ] if image_only else [ 'TEXT' ]
-			self.content_config = GenerateContentConfig(
-				temperature=self.temperature,
-				top_p=self.top_p,
-				max_output_tokens=self.max_output_tokens,
-				system_instruction=self.instructions,
-				response_modalities=self.response_modalities,
-				image_config=self.image_config )
+			self.config_kwargs = {
+					'temperature': self.temperature,
+					'top_p': self.top_p,
+					'max_output_tokens': self.max_output_tokens,
+					'system_instruction': self.instructions,
+					'response_modalities': self.response_modalities
+			}
+			
+			if self.image_config is not None:
+				self.config_kwargs[ 'image_config' ] = self.image_config
+			
+			if self.tool_config is not None and len( self.tool_config ) > 0:
+				self.config_kwargs[ 'tools' ] = self.tool_config
+			
+			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			return self.content_config
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_get_content_config( self, image_only ) -> GenerateContentConfig'
+			exception.method = ('_get_content_config( self, image_only=False, '
+			                    'grounded=False, image_search=False ) -> GenerateContentConfig')
 			raise exception
 	
 	def _open_image( self, path: str ) -> PIL.Image.Image:
@@ -1364,6 +1488,36 @@ class Images( Gemini ):
 			exception.cause = 'Images'
 			exception.method = '_open_image( self, path ) -> PIL.Image.Image'
 			raise exception
+	
+	def _capture_grounding_metadata( self ) -> None:
+		"""
+			
+			Purpose:
+			-----------
+			Captures grounding metadata from the most recent Gemini content response.
+			
+			Returns:
+			--------
+			None
+			
+		"""
+		try:
+			self.grounding_metadata = None
+			if self.content_response is None:
+				return
+			
+			self.candidates = getattr( self.content_response, 'candidates', None )
+			if self.candidates:
+				for candidate in self.candidates:
+					self.metadata = getattr( candidate, 'grounding_metadata', None )
+					if self.metadata is None:
+						self.metadata = getattr( candidate, 'groundingMetadata', None )
+					
+					if self.metadata is not None:
+						self.grounding_metadata = self.metadata
+						return
+		except Exception:
+			self.grounding_metadata = None
 	
 	def _get_first_image( self ) -> Optional[ PIL.Image.Image ]:
 		"""
@@ -1471,7 +1625,8 @@ class Images( Gemini ):
 	def generate( self, prompt: str, model: str = 'gemini-2.5-flash-image', aspect: str = None,
 			number: int = None, temperature: float = None, top_p: float = None,
 			frequency: float = None, presence: float = None, max_tokens: int = None,
-			resolution: str = None, instruct: str = None ) -> Optional[ PIL.Image.Image ]:
+			resolution: str = None, instruct: str = None, grounded: bool = False,
+			image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
 			Purpose:
@@ -1482,7 +1637,9 @@ class Images( Gemini ):
 			-----------
 			prompt: str - Image description.
 			aspect: str - Aspect ratio.
-			resolution: str - Output image size.
+			resolution: str - Output image size when supported by the selected model.
+			grounded: bool - Enables Google Search grounding when supported by the selected model.
+			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
 			
 			Returns:
 			--------
@@ -1503,12 +1660,14 @@ class Images( Gemini ):
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config( image_only=True )
+			self.content_config = self._get_content_config( image_only=True, grounded=grounded,
+				image_search=image_search )
 			self.content_response = self.client.models.generate_content(
 				model=self.model,
 				contents=[ self.prompt ],
 				config=self.content_config )
 			self.response = self.content_response
+			self._capture_grounding_metadata( )
 			return self._get_first_image( )
 		except Exception as e:
 			exception = Error( e )
@@ -1518,9 +1677,10 @@ class Images( Gemini ):
 			raise exception
 	
 	def analyze( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
-			aspect: str = None, number: int = None, temperature: float = None, top_p: float = None,
-			frequency: float = None, presence: float = None, max_tokens: int = None,
-			resolution: str = None, instruct: str = None ) -> Optional[ str ]:
+			aspect: str = None, number: int = None, temperature: float = None,
+			top_p: float = None, frequency: float = None, presence: float = None,
+			max_tokens: int = None, resolution: str = None, instruct: str = None,
+			grounded: bool = False, image_search: bool = False ) -> Optional[ str ]:
 		"""
 			
 			Purpose:
@@ -1532,7 +1692,9 @@ class Images( Gemini ):
 			prompt: str - Analysis instruction.
 			path: str - Path to the local image.
 			aspect: str - Aspect ratio.
-			resolution: str - Output image size.
+			resolution: str - Output image size when supported by the selected model.
+			grounded: bool - Enables Google Search grounding when supported by the selected model.
+			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
 			
 			Returns:
 			--------
@@ -1554,12 +1716,14 @@ class Images( Gemini ):
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config( image_only=False )
+			self.content_config = self._get_content_config( image_only=False, grounded=grounded,
+				image_search=image_search )
 			self.content_response = self.client.models.generate_content(
 				model=self.model,
 				contents=[ self.prompt, self._open_image( path ) ],
 				config=self.content_config )
 			self.response = self.content_response
+			self._capture_grounding_metadata( )
 			return self._get_output_text( )
 		except Exception as e:
 			exception = Error( e )
@@ -1569,9 +1733,10 @@ class Images( Gemini ):
 			raise exception
 	
 	def edit( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
-			aspect: str = None, number: int = None, temperature: float = None, top_p: float = None,
-			frequency: float = None, presence: float = None, max_tokens: int = None,
-			resolution: str = None, instruct: str = None ) -> Optional[ PIL.Image.Image ]:
+			aspect: str = None, number: int = None, temperature: float = None,
+			top_p: float = None, frequency: float = None, presence: float = None,
+			max_tokens: int = None, resolution: str = None, instruct: str = None,
+			grounded: bool = False, image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
 			Purpose:
@@ -1583,7 +1748,9 @@ class Images( Gemini ):
 			prompt: str - Editing instruction.
 			path: str - Path to the local image.
 			aspect: str - Aspect ratio.
-			resolution: str - Output image size.
+			resolution: str - Output image size when supported by the selected model.
+			grounded: bool - Enables Google Search grounding when supported by the selected model.
+			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
 			
 			Returns:
 			--------
@@ -1605,12 +1772,14 @@ class Images( Gemini ):
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config( image_only=True )
+			self.content_config = self._get_content_config( image_only=True, grounded=grounded,
+				image_search=image_search )
 			self.content_response = self.client.models.generate_content(
 				model=self.model,
 				contents=[ self.prompt, self._open_image( path ) ],
 				config=self.content_config )
 			self.response = self.content_response
+			self._capture_grounding_metadata( )
 			return self._get_first_image( )
 		except Exception as e:
 			exception = Error( e )
