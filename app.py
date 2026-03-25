@@ -3938,8 +3938,8 @@ elif mode == "Images":
 				# ------------ Modality Options --------
 				with resp_c4:
 					modality_options = image.modality_options
-					set_image_tools = st.selectbox( label='Modality',
-						options=tool_options,
+					set_image_modality = st.selectbox( label='Modality',
+						options=modality_options,
 						key='image_modality',
 						help='Optional. Response Modality.',
 						index=None,
@@ -3950,14 +3950,13 @@ elif mode == "Images":
 				
 				# ------------ Response Format Options --------
 				with resp_c5:
-					reponse_format_options = image.format_options
+					response_format_options = image.format_options
 					set_image_response_format = st.selectbox( label='Response Format',
-						options=tool_options,
+						options=response_format_options,
 						key='image_response_format',
 						help='Optional. Response Format.',
 						index=None,
-						placeholder='Seclect Response Format'
-					)
+						placeholder='Seclect Response Format' )
 					
 					image_response_format = st.session_state[ 'image_response_format' ]
 				
@@ -4008,7 +4007,7 @@ elif mode == "Images":
 					set_image_mode = st.selectbox(
 						label='MIME Types',
 						options=mime_types,
-						key='image_mode',
+						key='image_mime_type',
 						help='Available Gemini image workflows.',
 						index=None,
 						placeholder='Options'
@@ -4018,15 +4017,16 @@ elif mode == "Images":
 				
 				# ------------ Tool Options --------
 				with img_c4:
-					tool_options = image.tool_options
+					tools = image.tool_options
 					set_image_tools = st.multiselectbox( label='Tools',
-						options=tool_options,
+						options=tools,
 						key='image_tools',
-						help='Available Gemini image workflows.',
+						help='Optional. Tool Options.',
 						index=None,
 						placeholder='Seclect Tools'
 					)
 					
+					image_tools = [ d.strip( ) for d in set_image_tools if d.strip( ) ]
 					image_tools = st.session_state[ 'image_tools' ]
 				
 				# -------- Reset Settings ------------------
