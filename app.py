@@ -3243,12 +3243,13 @@ init_state( )
 with st.sidebar:
 	style_subheaders( )
 	st.logo( cfg.LOGO_PATH, size='large' )
-	st.text( 'Settings' )
 	st.divider( )
-	st.text( 'Mode' )
+	st.text( 'AI Mode' )
 	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0, label_visibility='collapsed' )
 	
 	st.divider( )
+	
+	st.text( 'API Settings' )
 	
 	# -----API KEY Expander------------------------------
 	with st.expander( label='Keys:', icon='🔑', expanded=False ):
