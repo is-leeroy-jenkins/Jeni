@@ -3563,65 +3563,97 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_tools', width='stretch' ):
-					for key in [ 'text_number', 'text_max_calls', 'text_calling_mode,
+					for key in [ 'text_number', 'text_max_calls', 'text_calling_mode',
 					             'text_modalities' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
 					st.rerun( )
-			
+					
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
-				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
+				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5, resp_c6 = st.columns(
+					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
 				
-				# ---------- Stream ------------
+				
+				# ---------- Max Tokens ------------
 				with resp_c1:
-					set_text_stream = st.toggle( label='Stream', key='text_stream',
-						help=cfg.STREAM )
+					set_text_tokens = st.slider(
+						label='Max Tokens',
+						min_value=0,
+						max_value=100000,
+						value=int( st.session_state.get( 'text_max_tokens', 0 ) ),
+						step=500,
+						help=cfg.MAX_OUTPUT_TOKENS,
+						key='text_max_tokens'
+					)
 					
-					text_stream = st.session_state[ 'text_stream' ]
-					
-				# ---------- Background ------------
+					text_tokens = st.session_state[ 'text_max_tokens' ]
+				
+				# ---------- Modalities ------------
 				with resp_c2:
-					set_text_background = st.toggle( label='Background', key='text_background',
-						help=cfg.BACKGROUND_MODE )
+					modality_options = list( text.modality_options )
+					set_text_modalities = st.multiselect(
+						label='Response Modalities',
+						options=modality_options,
+						key='text_modalities',
+						help='Optional. Modality of the response',
+						placeholder='Options'
+					)
 					
-					text_background = st.session_state[ 'text_background' ]
+					text_modalities = [ d.strip( ) for d in set_text_modalities if d.strip( ) ]
+					text_modalities = st.session_state[ 'text_modalities' ]
 				
 				# ---------- Stops ------------
 				with resp_c3:
-					set_text_stops = st.text_input( label='Stop Sequences', key='text_stops',
-						help=cfg.STOP_SEQUENCE, width='stretch', placeholder='Enter Stops' )
+					set_text_stops = st.text_input(
+						label='Stop Sequences',
+						key='text_stops_input',
+						value=','.join( st.session_state.get( 'text_stops', [ ] ) ),
+						help=cfg.STOP_SEQUENCE,
+						width='stretch',
+						placeholder='Enter Stop Strings'
+					)
 					
-					text_stops = [ d.strip( ) for d in set_text_stops.split( ',' )
-					               if d.strip( ) ]
+					text_stops = [ d.strip( ) for d in set_text_stops.split( ',' ) if d.strip( ) ]
+					st.session_state[ 'text_stops' ] = text_stops
 				
-				# ---------- Max Tokens ------------
-				with resp_c4:
-					set_text_tokens = st.slider( label='Max Tokens', min_value=0, max_value=100000,
-						value=int( st.session_state.get( 'text_max_tokens', 0 ) ), step=500,
-						help=cfg.MAX_OUTPUT_TOKENS, key='text_max_tokens' )
-					
-					text_tokens = st.session_state[ 'text_max_tokens' ]
-		
 				# ---------- Safety ------------
-				with resp_c5:
-					set_text_safety_profile = st.selectbox( label='Safety',
-						options=[ '', 'strict', 'balanced', 'permissive' ],
+				with resp_c4:
+					safety_options = list( text.safety_options )
+					set_text_safety_profile = st.selectbox(
+						label='Safety',
+						options=safety_options,
 						key='text_safety_profile',
 						help='Optional. Gemini safety profile for the request.',
-						index=None, placeholder='Options' )
+						index=None,
+						placeholder='Options'
+					)
 					
 					text_safety_profile = st.session_state[ 'text_safety_profile' ]
-	
-				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='reset_text_response', width='stretch' ):
-					for key in [ 'text_stream', 'text_background',  'text_stops',
-					             'text_max_tokens', 'text_safety_profile' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
+				
+				# ---------- Background ------------
+				with resp_c5:
+					set_text_background = st.toggle(
+						label='Background',
+						key='text_background',
+						help=cfg.BACKGROUND_MODE
+					)
 					
-					st.rerun( )
+					text_background = st.session_state[ 'text_background' ]
+				
+				# ---------- Response Format ------------
+				with resp_c6:
+					format_options = list( text.format_options )
+					set_text_response_format = st.selectbox(
+						label='Response Format',
+						options=format_options,
+						key='text_response_format',
+						help='Optional. Desired Gemini response MIME type.',
+						index=None,
+						placeholder='Options'
+					)
+					
+					text_response_format = st.session_state[ 'text_response_format' ]
 		
 		# ------------------------------------------------------------------
 		# Expander — Text System Instructions
@@ -3697,8 +3729,10 @@ if mode == 'Text':
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
+					
 					try:
-						response = text.generate_text( prompt=prompt,
+						response = text.generate_text(
+							prompt=prompt,
 							model=st.session_state.get( 'text_model' ),
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
@@ -3720,7 +3754,8 @@ if mode == 'Text':
 							urls=st.session_state.get( 'text_urls', [ ] ),
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
-							safety_profile=st.session_state.get( 'text_safety_profile' ),)
+							safety_profile=st.session_state.get( 'text_safety_profile' ),
+						)
 					except Exception as exc:
 						err = Error( exc )
 						st.error( f'Generation Failed: {err.info}' )
@@ -3740,9 +3775,12 @@ if mode == 'Text':
 		
 		# --------  Reset Button
 		if st.button( 'Clear Messages' ):
-			reset_state( )
+			st.session_state.text_messages = [ ]
+			st.session_state.last_answer = ''
+			st.session_state.last_sources = [ ]
 			st.rerun( )
-
+		
+		
 # ======================================================================================
 # IMAGES MODE
 # ======================================================================================
