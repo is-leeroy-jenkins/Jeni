@@ -920,7 +920,64 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = '_build_config( self, model ) -> GenerateContentConfig'
 			raise exception
-	
+		
+	def get_stream_output_text( self, stream_response: Any = None ) -> str | None:
+		"""
+		
+			Purpose:
+			--------
+			Aggregates text chunks returned from Gemini
+			streaming generation into a single string.
+			
+			Parameters:
+			-----------
+			stream_response: Any - Iterable Gemini stream response.
+			
+			Returns:
+			--------
+			Optional[ str ] - Joined response text or None.
+		
+		"""
+		try:
+			self.stream_response = stream_response
+			if self.stream_response is None:
+				return None
+			
+			self.text_blocks = [ ]
+			
+			for chunk in self.stream_response:
+				if chunk is None:
+					continue
+				
+				if hasattr( chunk, 'text' ):
+					self.chunk_text = getattr( chunk, 'text', None )
+					if self.chunk_text is not None and str( self.chunk_text ).strip( ):
+						self.text_blocks.append( str( self.chunk_text ) )
+						continue
+				
+				if hasattr( chunk, 'candidates' ) and chunk.candidates:
+					for candidate in chunk.candidates:
+						if not hasattr( candidate, 'content' ) or candidate.content is None:
+							continue
+						
+						if not hasattr( candidate.content, 'parts' ) or candidate.content.parts is None:
+							continue
+						
+						for part in candidate.content.parts:
+							if hasattr( part, 'text' ):
+								self.part_text = getattr( part, 'text', None )
+								if self.part_text is not None and str( self.part_text ).strip( ):
+									self.text_blocks.append( str( self.part_text ) )
+			
+			self.output_text = ''.join( self.text_blocks ).strip( )
+			return self.output_text if self.output_text else None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'get_stream_output_text( self, stream_response: Any=None )'
+			raise exception
+		
 	def get_output_text( self ) -> str | None:
 		"""
 		
@@ -968,7 +1025,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'get_output_text( self ) -> str | None'
 			raise exception
-	
+		
 	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
 			number: int = None, temperature: float = None, top_p: float = None, top_k: int = None,
 			frequency: float = None, presence: float = None, max_tokens: int = None,
@@ -977,7 +1034,7 @@ class Chat( Gemini ):
 			modalities: List[ str ] = None, media_resolution: str = None,
 			context: List[ Dict[ str, Any ] ] = None, content: str = None,
 			urls: List[ str ] = None, max_urls: int = None, response_schema: Any = None,
-			safety_profile: str = None ) -> str | None:
+			safety_profile: str = None, stream: bool = False ) -> str | None:
 		"""
 		
 			Purpose:
@@ -996,6 +1053,7 @@ class Chat( Gemini ):
 		try:
 			throw_if( 'prompt', prompt )
 			self.model = model
+			self.stream = bool( stream )
 			self.urls = self._build_urls( urls=urls, max_urls=max_urls )
 			self.content_block = self._append_urls_to_content( content=content, urls=self.urls )
 			self.contents = self._build_contents( prompt=prompt, context=context,
@@ -1007,6 +1065,16 @@ class Chat( Gemini ):
 				reasoning=reasoning, modalities=modalities, media_resolution=media_resolution,
 				response_schema=response_schema, safety_profile=safety_profile )
 			self.client = genai.Client( api_key=self.gemini_api_key )
+			
+			if self.stream:
+				self.stream_response = self.client.models.generate_content_stream(
+					model=self.model,
+					contents=self.contents,
+					config=self.content_config
+				)
+				
+				return self.get_stream_output_text( stream_response=self.stream_response )
+			
 			self.content_response = self.client.models.generate_content( model=self.model,
 				contents=self.contents, config=self.content_config )
 			return self.get_output_text( )
@@ -1022,7 +1090,7 @@ class Images( Gemini ):
 
 	    Purpose
 	    ___________
-	    Class for generating images from text using Google Imagen models.
+	    Class for generating, analyzing, and editing images with the Google Gemini SDK.
 
 	    Attributes:
 	    -----------
@@ -1032,7 +1100,9 @@ class Images( Gemini ):
 
 	    Methods:
 	    --------
-	    generate( prompt, aspect ) : Generates Imagen asset
+	    generate( prompt, aspect )        : Generates an image from text
+	    analyze( prompt, path, model )    : Analyzes an image using text + image input
+	    edit( prompt, path, model )       : Edits an image using text + image input
 
     """
 	client: Optional[ genai.Client ]
@@ -1041,7 +1111,7 @@ class Images( Gemini ):
 	resolution: Optional[ str ]
 	size: Optional[ str ]
 	
-	def __init__( self, model: str='gemini-2.5-flash-image' ):
+	def __init__( self, model: str = 'gemini-2.5-flash-image' ):
 		super( ).__init__( )
 		self.number = None
 		self.model = model
@@ -1070,6 +1140,8 @@ class Images( Gemini ):
 		self.use_vertex = None
 		self.media_resolution = None
 		self.tool_choice = None
+		self.content_response = None
+		self.response = None
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
@@ -1080,8 +1152,9 @@ class Images( Gemini ):
 			Returns list of image generation models.
 			
 		"""
-		return [ 'gemini-2.5-flash-image', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-		         'gemini-3-flash-preview', 'gemini-3.1-flash-image-preview', ]
+		return [ 'gemini-2.5-flash-image',
+		         'gemini-3-pro-image-preview',
+		         'gemini-3.1-flash-image-preview' ]
 	
 	@property
 	def include_options( self ) -> List[ str ] | None:
@@ -1106,8 +1179,7 @@ class Images( Gemini ):
 			Returns list of allowed aspect ratios.
 			
 		"""
-		return [ '1:1', '1:4', '1:8', '2:3', '3:2', '3:4', '4:1', '4:3', '4:5', '5:4', '8:1',
-		         '9:16', '16:9', '21:9' ]
+		return [ '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9' ]
 	
 	@property
 	def media_options( self ):
@@ -1222,12 +1294,184 @@ class Images( Gemini ):
 			Returns a list of resolution options
 			
 		'''
-		return [ '512px', '1K', '2K', '4K' ]
+		return [ '1K', '2K', '4K' ]
 	
-	def generate( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
-			number: int=None, temperature: float=None, top_p: float=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
-			instruct: str=None ) -> Optional[ Image ]:
+	def _get_content_config( self, image_only: bool = False ) -> GenerateContentConfig:
+		"""
+			
+			Purpose:
+			-----------
+			Creates a Gemini GenerateContentConfig for image workflows.
+			
+			Parameters:
+			-----------
+			image_only: bool - Indicates whether only image output should be returned.
+			
+			Returns:
+			--------
+			GenerateContentConfig - Configured content generation settings.
+			
+		"""
+		try:
+			self.image_config = None
+			if self.aspect_ratio or self.size:
+				self.image_config = types.ImageConfig(
+					aspect_ratio=self.aspect_ratio if self.aspect_ratio else None,
+					image_size=self.size if self.size else None )
+			
+			self.response_modalities = [ 'IMAGE' ] if image_only else [ 'TEXT' ]
+			self.content_config = GenerateContentConfig(
+				temperature=self.temperature,
+				top_p=self.top_p,
+				max_output_tokens=self.max_output_tokens,
+				system_instruction=self.instructions,
+				response_modalities=self.response_modalities,
+				image_config=self.image_config )
+			return self.content_config
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_get_content_config( self, image_only ) -> GenerateContentConfig'
+			raise exception
+	
+	def _open_image( self, path: str ) -> PIL.Image.Image:
+		"""
+			
+			Purpose:
+			-----------
+			Opens a local image file for Gemini multimodal requests.
+			
+			Parameters:
+			-----------
+			path: str - Path to the local image.
+			
+			Returns:
+			--------
+			PIL.Image.Image - Loaded PIL image.
+			
+		"""
+		try:
+			throw_if( 'path', path )
+			image = PIL.Image.open( path )
+			if image.mode not in ('RGB', 'RGBA'):
+				image = image.convert( 'RGB' )
+			
+			return image
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_open_image( self, path ) -> PIL.Image.Image'
+			raise exception
+	
+	def _get_first_image( self ) -> Optional[ PIL.Image.Image ]:
+		"""
+			
+			Purpose:
+			-----------
+			Extracts the first returned image from a Gemini content response.
+			
+			Returns:
+			--------
+			Optional[ PIL.Image.Image ] - The first returned image, if any.
+			
+		"""
+		try:
+			if self.content_response is None:
+				return None
+			
+			parts = getattr( self.content_response, 'parts', None )
+			if parts:
+				for part in parts:
+					try:
+						if getattr( part, 'inline_data', None ) is not None:
+							return part.as_image( )
+					except Exception:
+						continue
+			
+			candidates = getattr( self.content_response, 'candidates', None )
+			if candidates:
+				for candidate in candidates:
+					content = getattr( candidate, 'content', None )
+					if content is None:
+						continue
+					
+					candidate_parts = getattr( content, 'parts', None ) or [ ]
+					for part in candidate_parts:
+						try:
+							if getattr( part, 'inline_data', None ) is not None:
+								return part.as_image( )
+						except Exception:
+							continue
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_get_first_image( self ) -> Optional[ PIL.Image.Image ]'
+			raise exception
+	
+	def _get_output_text( self ) -> Optional[ str ]:
+		"""
+			
+			Purpose:
+			-----------
+			Extracts text output from a Gemini content response.
+			
+			Returns:
+			--------
+			Optional[ str ] - The returned text, if any.
+			
+		"""
+		try:
+			if self.content_response is None:
+				return None
+			
+			text = getattr( self.content_response, 'text', None )
+			if isinstance( text, str ) and text.strip( ):
+				return text
+			
+			parts = getattr( self.content_response, 'parts', None )
+			if parts:
+				output = [ ]
+				for part in parts:
+					part_text = getattr( part, 'text', None )
+					if isinstance( part_text, str ) and part_text.strip( ):
+						output.append( part_text.strip( ) )
+				
+				if output:
+					return '\n'.join( output )
+			
+			candidates = getattr( self.content_response, 'candidates', None )
+			if candidates:
+				for candidate in candidates:
+					content = getattr( candidate, 'content', None )
+					if content is None:
+						continue
+					
+					output = [ ]
+					for part in getattr( content, 'parts', None ) or [ ]:
+						part_text = getattr( part, 'text', None )
+						if isinstance( part_text, str ) and part_text.strip( ):
+							output.append( part_text.strip( ) )
+					
+					if output:
+						return '\n'.join( output )
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_get_output_text( self ) -> Optional[ str ]'
+			raise exception
+	
+	def generate( self, prompt: str, model: str = 'gemini-2.5-flash-image', aspect: str = None,
+			number: int = None, temperature: float = None, top_p: float = None,
+			frequency: float = None, presence: float = None, max_tokens: int = None,
+			resolution: str = None, instruct: str = None ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
 			Purpose:
@@ -1238,10 +1482,11 @@ class Images( Gemini ):
 			-----------
 			prompt: str - Image description.
 			aspect: str - Aspect ratio.
+			resolution: str - Output image size.
 			
 			Returns:
 			--------
-			Optional[ Image ] - The Image data object.
+			Optional[ PIL.Image.Image ] - The generated image.
 			
 		"""
 		try:
@@ -1250,205 +1495,128 @@ class Images( Gemini ):
 			self.model = model
 			self.number = number
 			self.aspect_ratio = aspect
+			self.size = resolution
 			self.top_p = top_p
 			self.temperature = temperature
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
-			self.max_tokens = max_tokens
+			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.genimg_config = GenerateImagesConfig( aspect_ratio=self.aspect_ratio,
-				number_of_images=self.number )
-			response = self.client.models.generate_images( model=self.model,
-				prompt=self.prompt, config=self.genimg_config )
-			return response.generated_images[ 0 ]
+			self.content_config = self._get_content_config( image_only=True )
+			self.content_response = self.client.models.generate_content(
+				model=self.model,
+				contents=[ self.prompt ],
+				config=self.content_config )
+			self.response = self.content_response
+			return self._get_first_image( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'generate( self, prompt, aspect ) -> Image'
+			exception.method = 'generate( self, prompt, aspect ) -> Optional[ PIL.Image.Image ]'
 			raise exception
 	
-	def analyze( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
-			number: int=None, temperature: float=None, top_p: float=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
-			instruct: str=None ) -> Optional[ Image ]:
+	def analyze( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
+			aspect: str = None, number: int = None, temperature: float = None, top_p: float = None,
+			frequency: float = None, presence: float = None, max_tokens: int = None,
+			resolution: str = None, instruct: str = None ) -> Optional[ str ]:
 		"""
 			
 			Purpose:
 			-----------
-			Generates a new image based on a descriptive text prompt.
+			Analyzes a local image using a text prompt and image input.
 			
 			Parameters:
 			-----------
-			prompt: str - Image description.
+			prompt: str - Analysis instruction.
+			path: str - Path to the local image.
 			aspect: str - Aspect ratio.
+			resolution: str - Output image size.
 			
 			Returns:
 			--------
-			Optional[ Image ] - The Image data object.
+			Optional[ str ] - The analysis text.
 			
 		"""
 		try:
 			throw_if( 'prompt', prompt )
+			throw_if( 'path', path )
 			self.prompt = prompt
 			self.model = model
 			self.number = number
 			self.aspect_ratio = aspect
+			self.size = resolution
 			self.top_p = top_p
 			self.temperature = temperature
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
-			self.max_tokens = max_tokens
+			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.genimg_config = GenerateImagesConfig( aspect_ratio=self.aspect_ratio,
-				number_of_images=self.number )
-			response = self.client.models.generate_images( model=self.model,
-				prompt=self.prompt, config=self.genimg_config )
-			return response.generated_images[ 0 ]
+			self.content_config = self._get_content_config( image_only=False )
+			self.content_response = self.client.models.generate_content(
+				model=self.model,
+				contents=[ self.prompt, self._open_image( path ) ],
+				config=self.content_config )
+			self.response = self.content_response
+			return self._get_output_text( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'generate( self, prompt, aspect ) -> Image'
+			exception.method = 'analyze( self, prompt, path, model ) -> Optional[ str ]'
 			raise exception
 	
-	def edit( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
-			number: int=None, temperature: float=None, top_p: float=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
-			instruct: str=None ) -> Optional[ Image ]:
+	def edit( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
+			aspect: str = None, number: int = None, temperature: float = None, top_p: float = None,
+			frequency: float = None, presence: float = None, max_tokens: int = None,
+			resolution: str = None, instruct: str = None ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
 			Purpose:
 			-----------
-			Generates a new image based on a descriptive text prompt.
+			Edits a local image using a text instruction and image input.
 			
 			Parameters:
 			-----------
-			prompt: str - Image description.
+			prompt: str - Editing instruction.
+			path: str - Path to the local image.
 			aspect: str - Aspect ratio.
+			resolution: str - Output image size.
 			
 			Returns:
 			--------
-			Optional[ Image ] - The Image data object.
+			Optional[ PIL.Image.Image ] - The edited image.
 			
 		"""
 		try:
 			throw_if( 'prompt', prompt )
+			throw_if( 'path', path )
 			self.prompt = prompt
 			self.model = model
 			self.number = number
 			self.aspect_ratio = aspect
+			self.size = resolution
 			self.top_p = top_p
 			self.temperature = temperature
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
-			self.max_tokens = max_tokens
+			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.genimg_config = GenerateImagesConfig( aspect_ratio=self.aspect_ratio,
-				number_of_images=self.number )
-			response = self.client.models.generate_images( model=self.model,
-				prompt=self.prompt, config=self.genimg_config )
-			return response.generated_images[ 0 ]
+			self.content_config = self._get_content_config( image_only=True )
+			self.content_response = self.client.models.generate_content(
+				model=self.model,
+				contents=[ self.prompt, self._open_image( path ) ],
+				config=self.content_config )
+			self.response = self.content_response
+			return self._get_first_image( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'edit( self, prompt, aspect ) -> Image'
-			raise exception
-	
-	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite', temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
-		"""
-		
-			Purpose:
-			--------
-			Generates a response grounded in Google Search results.
-			
-			Parameters:
-			-----------
-			prompt: str - The query for search-augmented generation.
-			model: str - The Gemini model identifier.
-			
-			Returns:
-			--------
-			Optional[ str ] - The grounded text response.
-		
-		"""
-		try:
-			throw_if( 'prompt', prompt )
-			self.contents = prompt;
-			self.model = model
-			self.contents = prompt;
-			self.top_p = top_p;
-			self.temperature = temperature
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_tokens = max_tokens
-			self.stops = stops
-			self.instructions = instruct
-			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
-			self.content_config = GenerateContentConfig( temperature=self.temperature,
-				tools=self.tool_config, system_instruction=self.instructions )
-			self.client = genai.Client( api_key=self.gemini_api_key )
-			response = self.client.models.generate_content( model=self.model,
-				contents=self.contents, config=self.content_config )
-			return response.text
-		except Exception as e:
-			exception = Error( e );
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = 'web_search( self, prompt, model ) -> Optional[ str ]'
-			error = ErrorDialog( exception )
-			error.show( )
-	
-	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite', temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
-		"""
-		
-			Purpose:
-			--------
-			Uses Google Search grounding specifically for location and place-based queries.
-			
-			Parameters:
-			-----------
-			prompt: str - The location or directions query.
-			model: str - The Gemini model identifier.
-			Returns:
-			--------
-			Optional[ str ] - The grounded response containing place data.
-			
-		"""
-		try:
-			throw_if( 'prompt', prompt )
-			self.contents = f"Using Google Search and Maps data, answer: {prompt}"
-			self.model = model
-			self.contents = prompt;
-			self.top_p = top_p;
-			self.temperature = temperature
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_tokens = max_tokens
-			self.stops = stops
-			self.instructions = instruct
-			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
-			self.content_config = GenerateContentConfig( temperature=self.temperature,
-				tools=self.tool_config )
-			self.client = genai.Client( api_key=self.gemini_api_key )
-			response = self.client.models.generate_content( model=self.model,
-				contents=self.contents, config=self.content_config )
-			return response.text
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = 'search_maps( self, prompt, model ) -> Optional[ str ]'
+			exception.method = 'edit( self, prompt, path, model ) -> Optional[ PIL.Image.Image ]'
 			raise exception
 
 class Embeddings( Gemini ):

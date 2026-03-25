@@ -137,7 +137,7 @@ if st.session_state.google_cloud_location == '':
 		os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = default
 
 if st.session_state.google_cloud_project_id == '':
-	default = cfg.GEOCODING_API_KEY
+	default = cfg.GOOGLE_CLOUD_PROJECT_ID
 	if default:
 		st.session_state.google_cloud_project_id = default
 		os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = default
@@ -264,9 +264,6 @@ if 'translation_model' not in st.session_state:
 if 'text_number' not in st.session_state:
 	st.session_state[ 'text_number' ] = 0
 
-if 'text_max_calls' not in st.session_state:
-	st.session_state[ 'text_max_calls' ] = 0
-
 if 'text_top_k' not in st.session_state:
 	st.session_state[ 'text_top_k' ] = 0
 
@@ -287,9 +284,9 @@ if 'text_frequency_penalty' not in st.session_state:
 
 if 'text_presence_penalty' not in st.session_state:
 	st.session_state[ 'text_presence_penalty' ] = 0.0
-	
-if 'text_parallel_calls' not in st.session_state:
-	st.session_state[ 'text_parallel_calls' ] = False
+
+if 'text_stream' not in st.session_state:
+	st.session_state[ 'text_stream' ] = False
 
 if 'text_background' not in st.session_state:
 	st.session_state[ 'text_background' ] = False
@@ -315,9 +312,12 @@ if 'text_reasoning' not in st.session_state:
 if 'text_response_schema' not in st.session_state:
 	st.session_state[ 'text_response_schema' ] = ''
 
+if 'text_safety_profile' not in st.session_state:
+	st.session_state[ 'text_safety_profile' ] = ''
+
 if 'text_messages' not in st.session_state:
 	st.session_state[ 'text_messages' ] = [ ]
-	
+
 if 'text_stops' not in st.session_state:
 	st.session_state[ 'text_stops' ] = [ ]
 
@@ -3278,10 +3278,13 @@ with st.sidebar:
 	st.logo( cfg.LOGO_PATH, size='large' )
 	st.text( 'Settings' )
 	st.divider( )
+	st.text( 'Mode' )
+	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0, label_visibility='collapsed' )
+	
+	st.divider( )
 	
 	# -----API KEY Expander------------------------------
 	with st.expander( label='Keys:', icon='🔑', expanded=False ):
-		
 		google_key = st.text_input( 'Google API Key', type='password',
 			value=st.session_state.google_api_key or '',
 			help='Overrides GOOGLE_API_KEY from config.py for this session only.' )
@@ -3297,7 +3300,6 @@ with st.sidebar:
 		if gemini_key:
 			st.session_state.gemini_key = gemini_key
 			os.environ[ 'GEMINI_KEY' ] = gemini_key
-		
 		
 		googlemaps_key = st.text_input( 'Google Maps API Key', type='password',
 			value=st.session_state.googlemaps_api_key or '',
@@ -3331,10 +3333,6 @@ with st.sidebar:
 			st.session_state.google_cloud_location = google_cloud_location
 			os.environ[ 'GOOGLE_CLOUD_LOCATION' ] = google_cloud_location
 
-	st.divider( )
-	st.text( 'Mode' )
-	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0, label_visibility='collapsed' )
-
 # ======================================================================================
 # TEXT MODE
 # ======================================================================================
@@ -3343,7 +3341,6 @@ if mode == 'Text':
 	st.divider( )
 	text_model = st.session_state.get( 'text_model', '' )
 	text_number = st.session_state.get( 'text_number', 0 )
-	text_max_calls = st.session_state.get( 'text_max_calls', 0 )
 	text_max_urls = st.session_state.get( 'text_max_urls', 0 )
 	text_max_tokens = st.session_state.get( 'text_max_tokens', 0 )
 	text_top_percent = st.session_state.get( 'text_top_percent', 0.0 )
@@ -3351,6 +3348,7 @@ if mode == 'Text':
 	text_frequency_penalty = st.session_state.get( 'text_frequency_penalty', 0.0 )
 	text_presence_penalty = st.session_state.get( 'text_presence_penalty', 0.0 )
 	text_temperature = st.session_state.get( 'text_temperature', 0.0 )
+	text_stream = st.session_state.get( 'text_stream', False )
 	text_background = st.session_state.get( 'text_background', False )
 	text_reasoning = st.session_state.get( 'text_reasoning', '' )
 	text_resolution = st.session_state.get( 'text_resolution', '' )
@@ -3395,14 +3393,13 @@ if mode == 'Text':
 				
 				# ---------- Response Schema ------------
 				with llm_c2:
-					set_text_response_schema = st.text_area(
+					set_text_response_schema = st.text_input(
 						label='Response Schema',
 						key='text_response_schema',
 						value=st.session_state.get( 'text_response_schema', '' ),
 						help='Optional. JSON schema used when Response Format is application/json.',
 						width='stretch',
-						placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}'
-					)
+						placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}' )
 					
 					text_response_schema = st.session_state[ 'text_response_schema' ]
 				
@@ -3500,7 +3497,7 @@ if mode == 'Text':
 							del st.session_state[ key ]
 					
 					st.rerun( )
-			
+					
 			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
 				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
@@ -3514,42 +3511,47 @@ if mode == 'Text':
 					
 					text_number = st.session_state[ 'text_number' ]
 				
-				# ---------- Max Calls ------------
-				with tool_c2:
-					set_text_calls = st.slider( label='Max Calls', min_value=0, max_value=10,
-						value=int( st.session_state.get( 'text_max_calls', 0 ) ), step=1,
-						help=cfg.MAX_TOOL_CALLS, key='text_max_calls' )
-					
-					text_max_calls = st.session_state[ 'text_max_calls' ]
-				
 				# ---------- Calling Mode ------------
-				with tool_c3:
+				with tool_c2:
 					choice_options = list( text.choice_options )
 					set_text_choice = st.selectbox( label='Calling Mode', options=choice_options,
 						key='text_tool_choice', help=cfg.CHOICE, index=None, placeholder='Options' )
 					
 					text_tool_choice = st.session_state[ 'text_tool_choice' ]
-					
-					# ---------- URLs ------------
-					with tool_c4:
-						set_text_urls = st.text_input(
-							label='URLs',
-							key='text_urls_input',
-							value='\n'.join( st.session_state.get( 'text_urls', [ ] ) ),
-							help='Optional. Enter URLs separated by semicolons for grounding.',
-							width='stretch',
-							placeholder='https://example.com/page-1;https://example.com/page-2'
-						)
-						
-						normalized_text_urls = [
-								line.strip( ) for line in set_text_urls.split( ';' )
-								if line.strip( )
-						]
-						
-						st.session_state[ 'text_urls' ] = normalized_text_urls
-						text_urls = st.session_state[ 'text_urls' ]
 				
-				#
+				# ---------- Resolution ------------
+				with tool_c3:
+					media_options = list( text.media_options )
+					set_text_media_resolution = st.selectbox(
+						label='Resolution',
+						options=media_options,
+						key='text_media_resolution',
+						help='Optional. Requested media resolution for supported outputs.',
+						index=None,
+						placeholder='Options'
+					)
+					
+					text_media_resolution = st.session_state[ 'text_media_resolution' ]
+				
+				# ---------- URLs ------------
+				with tool_c4:
+					set_text_urls = st.text_input(
+						label='URLs',
+						key='text_urls_input',
+						value=';'.join( st.session_state.get( 'text_urls', [ ] ) ),
+						help='Optional. Enter URLs separated by semicolons for grounding.',
+						width='stretch',
+						placeholder='https://example.com/page-1;https://example.com/page-2'
+					)
+					
+					normalized_text_urls = [
+							line.strip( ) for line in set_text_urls.split( ';' )
+							if line.strip( )
+					]
+					
+					st.session_state[ 'text_urls' ] = normalized_text_urls
+					text_urls = st.session_state[ 'text_urls' ]
+				
 				# ---------- Modalities ------------
 				with tool_c5:
 					modality_options = list( text.modality_options )
@@ -3566,8 +3568,8 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_tools', width='stretch' ):
-					for key in [ 'text_number', 'text_max_calls', 'text_calling_mode',
-					             'text_modalities' ]:
+					for key in [ 'text_number', 'text_tool_choice', 'text_media_resolution',
+					             'text_urls', 'text_urls_input', 'text_modalities' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -3576,7 +3578,6 @@ if mode == 'Text':
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
-				
 				
 				# ---------- Max Tokens ------------
 				with resp_c1:
@@ -3620,15 +3621,15 @@ if mode == 'Text':
 					
 					text_safety_profile = st.session_state[ 'text_safety_profile' ]
 				
-				# ---------- Background ------------
+				# ---------- Stream ------------
 				with resp_c4:
-					set_text_background = st.toggle(
-						label='Background',
-						key='text_background',
-						help=cfg.BACKGROUND_MODE
+					set_text_stream = st.toggle(
+						label='Stream',
+						key='text_stream',
+						help=cfg.STREAM
 					)
 					
-					text_background = st.session_state[ 'text_background' ]
+					text_stream = st.session_state[ 'text_stream' ]
 				
 				# ---------- Response Format ------------
 				with resp_c5:
@@ -3643,7 +3644,17 @@ if mode == 'Text':
 					)
 					
 					text_response_format = st.session_state[ 'text_response_format' ]
-		
+				
+				# ---------- Reset Settings ------------
+				if st.button( label='Reset', key='reset_text_response', width='stretch' ):
+					for key in [ 'text_max_tokens', 'text_stops', 'text_stops_input',
+					             'text_safety_profile', 'text_stream',
+					             'text_response_format' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
+					st.rerun( )
+				
 		# ------------------------------------------------------------------
 		# Expander — Text System Instructions
 		# ------------------------------------------------------------------
@@ -3720,8 +3731,7 @@ if mode == 'Text':
 					response = None
 					
 					try:
-						response = text.generate_text(
-							prompt=prompt,
+						response = text.generate_text( prompt=prompt,
 							model=st.session_state.get( 'text_model' ),
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
@@ -3744,7 +3754,7 @@ if mode == 'Text':
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
 							safety_profile=st.session_state.get( 'text_safety_profile' ),
-						)
+							stream=st.session_state.get( 'text_stream', False ), )
 					except Exception as exc:
 						err = Error( exc )
 						st.error( f'Generation Failed: {err.info}' )
@@ -3783,8 +3793,8 @@ elif mode == "Images":
 	image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
 	image_top_percent = st.session_state.get( 'image_top_percent', 0.0 )
 	image_top_k = st.session_state.get( 'image_top_k', 0.0 )
-	image_frequency = st.session_state.get( 'image_frequency_penalty', 0.0 )
-	image_presence = st.session_state.get( 'image_presence_penalty', 0.0 )
+	image_frequency_penalty = st.session_state.get( 'image_frequency_penalty', 0.0 )
+	image_presence_penalty = st.session_state.get( 'image_presence_penalty', 0.0 )
 	image_temperature = st.session_state.get( 'image_temperature', 0.0 )
 	image_stream = st.session_state.get( 'image_stream', False )
 	image_store = st.session_state.get( 'image_store', False )
@@ -3820,9 +3830,6 @@ elif mode == "Images":
 	model_options = [ ]
 	image = Images( )
 	
-	for key in [ 'image_domains', 'image_tools', 'image_stops', 'image_stops_input' ]:
-		if key in st.session_state and isinstance( st.session_state[ key ], list ):
-			del st.session_state[ key ]
 	
 	# ------------------------------------------------------------------
 	# Session State
@@ -3846,9 +3853,14 @@ elif mode == "Images":
 				# ---------  Mode  --------
 				with llm_c1:
 					_modes = [ 'Generation', 'Analysis', 'Editing' ]
-					set_image_mode = st.selectbox( label='Image Mode', options=_modes,
-						key='image_mode', help='Available Image API modes', index=None,
-						placeholder='Options' )
+					set_image_mode = st.selectbox(
+						label='Image Mode',
+						options=_modes,
+						key='image_mode',
+						help='Available Gemini image workflows.',
+						index=None,
+						placeholder='Options'
+					)
 					
 					image_mode = st.session_state[ 'image_mode' ]
 				
@@ -3856,294 +3868,382 @@ elif mode == "Images":
 				with llm_c2:
 					if st.session_state[ 'image_mode' ] == 'Generation':
 						generation = list( cfg.GEMINI_GENERATION )
-						set_image_model = st.selectbox( label='Select Model', options=generation,
-							help='REQUIRED. Images Generation model used by the AI', key='image_model',
-							placeholder='Options', index=None )
+						set_image_model = st.selectbox(
+							label='Select Model',
+							options=generation,
+							help='REQUIRED. Gemini model used for image generation.',
+							key='image_model',
+							placeholder='Options',
+							index=None
+						)
 						
 						image_model = st.session_state[ 'image_model' ]
 					
 					elif st.session_state[ 'image_mode' ] == 'Analysis':
 						analysis = list( cfg.GEMINI_ANALYSIS )
-						set_image_model = st.selectbox( label='Select Model', options=analysis,
-							help='REQUIRED. Images Generation model used by the AI', key='image_model',
-							placeholder='Options', index=None )
+						set_image_model = st.selectbox(
+							label='Select Model',
+							options=analysis,
+							help='REQUIRED. Gemini model used for image analysis.',
+							key='image_model',
+							placeholder='Options',
+							index=None
+						)
 						
 						image_model = st.session_state[ 'image_model' ]
 					
 					elif st.session_state[ 'image_mode' ] == 'Editing':
 						editing = list( cfg.GEMINI_EDITING )
-						set_image_model = st.selectbox( label='Select Model', options=editing,
-							help='REQUIRED. Images Generationmodel used by the AI', key='image_model',
-							placeholder='Options', index=None, )
+						set_image_model = st.selectbox(
+							label='Select Model',
+							options=editing,
+							help='REQUIRED. Gemini model used for image editing.',
+							key='image_model',
+							placeholder='Options',
+							index=None
+						)
 						
 						image_model = st.session_state[ 'image_model' ]
+					
 					elif st.session_state[ 'image_mode' ] is None:
-						all = list( image.model_options )
-						set_image_model = st.selectbox( label='Select Model', options=all,
-							help='REQUIRED. Images Generation model used by the AI', key='image_model',
-							placeholder='Options', index=None )
+						all_models = list( image.model_options )
+						set_image_model = st.selectbox(
+							label='Select Model',
+							options=all_models,
+							help='REQUIRED. Gemini model used by the image workflow.',
+							key='image_model',
+							placeholder='Options',
+							index=None
+						)
 						
 						image_model = st.session_state[ 'image_model' ]
 				
-				# ---------- URLs ------------
+				# ---------- Workflow ------------
 				with llm_c3:
-					set_image_urls = st.text_input( label='URLs', key='image_urls',
-						value='\n'.join( st.session_state.get( 'image_urls', [ ] ) ),
-						help='Optional. Enter URLs delimited by semi-colons for Context Grounding.',
+					workflow = ''
+					if st.session_state.get( 'image_mode' ) == 'Generation':
+						workflow = 'Text -> Image'
+					elif st.session_state.get( 'image_mode' ) == 'Analysis':
+						workflow = 'Image + Prompt -> Text'
+					elif st.session_state.get( 'image_mode' ) == 'Editing':
+						workflow = 'Image + Prompt -> Image'
+					
+					st.text_input(
+						label='Workflow',
+						value=workflow,
+						help='Derived from the selected Gemini image task.',
 						width='stretch',
-						placeholder='https://example.com/page-1;https://example.com/page-2' )
-					
-					image_urls = [ line.strip( ) for line in set_image_urls.split( ',')
-					               if line.strip( ) ]
+						disabled=True
+					)
 				
-				# ------------ Stops -------------
+				# ---------- Input Source ------------
 				with llm_c4:
-					set_image_stops = st.text_input( label='Stop Sequences', key='image_stops',
-						help=cfg.STOP_SEQUENCE, width='stretch', placeholder='Enter Stops' )
+					input_source = ''
+					if st.session_state.get( 'image_mode' ) == 'Generation':
+						input_source = 'Prompt'
+					elif st.session_state.get( 'image_mode' ) in [ 'Analysis', 'Editing' ]:
+						input_source = 'Prompt + Uploaded Image'
 					
-					image_stops = [ d.strip( ) for d in set_image_stops.split( ',' )
-					                if d.strip( ) ]
+					st.text_input(
+						label='Input Source',
+						value=input_source,
+						help='Reflects the expected input contract for the selected image task.',
+						width='stretch',
+						disabled=True
+					)
 				
-				# --------- Thinking Level --------
+				# --------- Notes --------
 				with llm_c5:
-					reasonings = list( image.reasoning_options )
-					set_image_reasoning = st.selectbox( label='Thinking Level', placeholder='Options',
-						options=reasonings, key='image_reasoning', help=cfg.REASONING, index=None )
-					
-					image_reasoning = st.session_state[ 'image_reasoning' ]
+					st.text_input(
+						label='Notes',
+						value='Wrapper-managed',
+						help='Model routing is user-selected; multimodal request structure is handled by the Gemini wrapper.',
+						width='stretch',
+						disabled=True
+					)
 				
 				# ---------  Reset Settings --------
 				if st.button( label='Reset', key='image_model_reset', width='stretch' ):
-					# ----------------------------------------------------------
-					# Remove Image Model Settings session keys
-					# ----------------------------------------------------------
-					for key in [ 'image_mode', 'image_model', 'image_stops',
-					             'image_urls', 'image_reasoning', ]:
+					for key in [ 'image_mode', 'image_model' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
 					st.rerun( )
-			
+					
 			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				inf_c1, inf_c2, inf_c3, inf_c4, inf_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
 				# ---------  Top-P --------
 				with inf_c1:
-					set_image_top_p = st.slider( label='Top-P', key='image_top_percent',
+					set_image_top_p = st.slider(
+						label='Top-P',
+						key='image_top_percent',
 						value=float( st.session_state.get( 'image_top_percent', 0.0 ) ),
-						min_value=0.0, max_value=1.0, step=0.01, help=cfg.TOP_P )
+						min_value=0.0,
+						max_value=1.0,
+						step=0.01,
+						help=cfg.TOP_P
+					)
 					
 					image_top_percent = st.session_state[ 'image_top_percent' ]
 				
-				# ---------  Frequency --------
-				with inf_c2:
-					set_image_freq = st.slider( label='Frequency Penalty',
-						key='image_frequency_penalty', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'image_frequency_penalty', 0.0 ) ),
-						step=0.01, help=cfg.FREQUENCY_PENALTY )
-					
-					image_fequency = st.session_state[ 'image_frequency_penalty' ]
-				
-				# ---------  Presense --------
-				with inf_c3:
-					set_image_presence = st.slider( label='Presence Penalty',
-						key='image_presence_penalty', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'image_presence_penalty', 0.0 ) ),
-						step=0.01, help=cfg.PRESENCE_PENALTY )
-					
-					image_presence = st.session_state[ 'image_presence_penalty' ]
-				
 				# ---------  Temperature --------
-				with inf_c4:
-					set_image_temperature = st.slider( label='Temperature', key='image_temperature',
+				with inf_c2:
+					set_image_temperature = st.slider(
+						label='Temperature',
+						key='image_temperature',
 						value=float( st.session_state.get( 'image_temperature', 0.0 ) ),
-						min_value=0.0, max_value=1.0, step=0.01, help=cfg.TEMPERATURE )
+						min_value=0.0,
+						max_value=1.0,
+						step=0.01,
+						help=cfg.TEMPERATURE
+					)
 					
 					image_temperature = st.session_state[ 'image_temperature' ]
 				
-				# ---------- Top-K ------------
+				# ---------  Applied Settings --------
+				with inf_c3:
+					applied = 'Top-P, Temperature'
+					st.text_input(
+						label='Applied Settings',
+						value=applied,
+						help='These settings are currently consumed by the Gemini image wrapper.',
+						width='stretch',
+						disabled=True
+					)
+				
+				# ---------  Notes --------
+				with inf_c4:
+					st.text_input(
+						label='Notes',
+						value='Wrapper-managed',
+						help='Other generic inference fields are not currently applied in Image mode.',
+						width='stretch',
+						disabled=True
+					)
+				
+				# ---------  Reserved --------
 				with inf_c5:
-					set_image_topK = st.slider( label='Top-K',
-						key='image_top_k', min_value=0, max_value=20,
-						value=int( st.session_state.get( 'image_top_k', 0 ) ),
-						step=1, help=cfg.TOP_K )
-					
-					image_top_k = st.session_state[ 'image_top_k' ]
+					st.text_input(
+						label='Reserved',
+						value='',
+						help='No additional Gemini image inference setting is used here.',
+						width='stretch',
+						disabled=True
+					)
 				
 				# --------- Reset Settings --------
 				if st.button( label='Reset', key='image_inference_reset', width='stretch' ):
-					for key in [ 'image_top_percent', 'image_frequency_penalty', 'image_top_k',
-					             'image_presence_penalty', 'image_temperature', ]:
+					for key in [ 'image_top_percent', 'image_temperature' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
-					if 'image_stops_input' in st.session_state:
-						del st.session_state[ 'image_stops_input' ]
-					
 					st.rerun( )
-			
+					
 			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
 				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
-				# ---------  Allow Parallel --------
+				# ---------- Tooling Status ------------
 				with tool_c1:
-					set_image_parallel = st.toggle( label='Allow Parallel', key='image_parallel_tools',
-						help=cfg.PARALLEL_TOOL_CALLS )
-					
-					image_parallel_tools = st.session_state[ 'image_parallel_tools' ]
+					st.text_input(
+						label='Tooling Status',
+						value='Disabled',
+						help='Gemini Image mode is currently operating without tool-grounded calls.',
+						width='stretch',
+						disabled=True
+					)
 				
-				# ---------  Max Tools --------
+				# ---------- Workflow Scope ------------
 				with tool_c2:
-					set_image_calls = st.slider( label='Max Tool Calls', min_value=0, max_value=6,
-						value=int( st.session_state.get( 'image_max_tools', 0 ) ),
-						step=1, help=cfg.MAX_TOOL_CALLS, key='image_max_tools' )
-					
-					image_max_tools = st.session_state[ 'image_max_tools' ]
+					st.text_input(
+						label='Workflow Scope',
+						value='Image Wrapper',
+						help='This mode uses the Gemini image wrapper directly.',
+						width='stretch',
+						disabled=True
+					)
 				
-				# ---------  Choice/Call Mode --------
+				# ---------- Calling Mode ------------
 				with tool_c3:
-					choice_options = list( image.choice_options )
-					set_image_choice = st.multiselect( label='Calling Mode',
-						options=choice_options, key='image_tool_choice',
-						help=cfg.INCLUDE, placeholder='Options' )
-					
-					image_include = st.session_state[ 'image_tool_choice' ]
+					st.text_input(
+						label='Calling Mode',
+						value='Internal',
+						help='Tool calling is not user-configured for the current Image mode contract.',
+						width='stretch',
+						disabled=True
+					)
 				
-				# ---------  Tool Options --------
+				# ---------- Available Tools ------------
 				with tool_c4:
-					tool_options = list( image.tool_options )
-					set_image_tools = st.multiselect( label='Available Tools', options=tool_options,
-						key='image_tools', help=cfg.TOOLS, placeholder='Options' )
-					
-					image_tools = st.session_state[ 'image_tools' ]
+					st.text_input(
+						label='Available Tools',
+						value='None',
+						help='No Gemini tool selections are currently applied in Image mode.',
+						width='stretch',
+						disabled=True
+					)
 				
 				# ---------- Media Resolution ------------
 				with tool_c5:
-					resolution_options = list( image.media_options )
-					set_media_options = st.selectbox( label='Media Resolution',
-						options=resolution_options, key='image_media_resolution',
-						help=cfg.REASONING, index=None, placeholder='Options' )
-					
-					media_resolution = st.session_state[ 'image_media_resolution' ]
+					st.text_input(
+						label='Media Resolution',
+						value='Wrapper-managed',
+						help='Media/tool settings are not exposed for the current Image mode path.',
+						width='stretch',
+						disabled=True
+					)
 				
 				# --------- Reset Settings --------
 				if st.button( label='Reset', key='image_tools_reset', width='stretch' ):
 					for key in [ 'image_parallel_tools', 'image_max_tools', 'image_tool_choice',
-					             'image_tools', 'image_include' ]:
+					             'image_tools', 'image_include', 'image_media_resolution' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
 					st.rerun( )
-			
+					
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
-				res_one, res_two, res_three, res_four, res_five = st.columns(
+				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
-				# ---------  Stream --------
-				with res_one:
-					set_image_stream = st.toggle( label='Stream', key='image_stream', help=cfg.STREAM )
-					
-					image_stream = st.session_state[ 'image_stream' ]
-				
-				# ---------  Store --------
-				with res_two:
-					set_image_store = st.toggle( label='Store', key='image_store', help=cfg.STORE )
-					
-					text_store = st.session_state[ 'image_store' ]
-				
-				# ---------  Modalities --------
-				with res_three:
-					modality_options = list( image.modality_options )
-					set_image_modalities = st.multiselect( label='Response Modalities',
-						options=modality_options, key='image_modalities',
-						help='Optional. Modality of the response',
-						placeholder='Options' )
-					
-					image_modalities = [ d.strip( ) for d in set_image_modalities
-					                     if d.strip( ) ]
-					
-					image_modalities = st.session_state[ 'image_modalities' ]
-				
-				# ---------  Response Format --------
-				with res_four:
-					formats = list( image.format_options )
-					set_image_reponse = st.selectbox( label='Response Format:',
-						options=formats, key='image_response_format',
-						help=cfg.IMAGE_RESPONSE, placeholder='Options', index=None )
-					
-					image_respose_format = st.session_state[ 'image_response_format' ]
-				
-				# ---------  Max Tokens --------
-				with res_five:
-					set_image_tokens = st.slider( label='Max Output Tokens', min_value=0, max_value=100000,
-						step=1000, help=cfg.MAX_OUTPUT_TOKENS, key='image_max_tokens' )
+				# ---------- Max Tokens ------------
+				with resp_c1:
+					set_image_tokens = st.slider(
+						label='Max Output Tokens',
+						min_value=0,
+						max_value=100000,
+						value=int( st.session_state.get( 'image_max_tokens', 0 ) ),
+						step=1000,
+						help=cfg.MAX_OUTPUT_TOKENS,
+						key='image_max_tokens'
+					)
 					
 					image_tokens = st.session_state[ 'image_max_tokens' ]
 				
+				# ---------- Active Output ------------
+				with resp_c2:
+					active_output = ''
+					if st.session_state.get( 'image_mode' ) == 'Generation':
+						active_output = 'IMAGE'
+					elif st.session_state.get( 'image_mode' ) == 'Analysis':
+						active_output = 'TEXT'
+					elif st.session_state.get( 'image_mode' ) == 'Editing':
+						active_output = 'IMAGE'
+					
+					st.text_input(
+						label='Active Output',
+						value=active_output,
+						help='Derived from the selected image task.',
+						width='stretch',
+						disabled=True
+					)
+				
+				# ---------- Notes ------------
+				with resp_c3:
+					st.text_input(
+						label='Notes',
+						value='Managed by Gemini wrapper',
+						help='Response modality is set internally by the image wrapper.',
+						width='stretch',
+						disabled=True
+					)
+				
+				# ---------- Reserved ------------
+				with resp_c4:
+					st.text_input(
+						label='Reserved',
+						value='',
+						help='No additional Gemini image response setting is used here.',
+						width='stretch',
+						disabled=True
+					)
+				
+				# ---------- Reserved ------------
+				with resp_c5:
+					st.text_input(
+						label='Reserved',
+						value='',
+						help='No additional Gemini image response setting is used here.',
+						width='stretch',
+						disabled=True
+					)
+				
 				# ------- Reset Settings -----------
 				if st.button( label='Reset', key='image_response_reset', width='stretch' ):
-					for key in [ 'image_stream', 'image_store', 'image_modalities',
-					             'image_response_format', 'image_max_tokens', ]:
+					for key in [ 'image_max_tokens' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
 					st.rerun( )
-			
+					
 			with st.expander( label='Visual Settings', icon='👁️', expanded=False, width='stretch' ):
 				img_c1, img_c2, img_c3, img_c4, img_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
-				# ------------ Image Resolution -------
+				# ------------ Aspect Ratio -------
 				with img_c1:
-					resolution_options = list( image.resolution_options )
-					set_image_resolution = st.selectbox( label='Image Resolution',
-						options=resolution_options, help='Optional. Image detail', key='image_resolution',
-						placeholder='Options', index=None )
-					
-					image_resolution = st.session_state[ 'image_resolution' ]
-				
-				# ------------ MIME Type --------
-				with img_c2:
-					mime_options = list( image.mime_options )
-					set_image_mime = st.selectbox( label='MIME Type', options=mime_options,
-						help='Optional. Image MIME Type', key='image_mime_type',
-						placeholder='Options', index=None, )
-					
-					image_mime_type = st.session_state[ 'image_mime_type' ]
-				
-				# ------------ Image Aspect Ratio -------
-				with img_c3:
 					ratios = list( image.aspect_options )
-					set_image_aspect = st.selectbox( label='Aspect Ratio',
-						options=ratios, help=cfg.IMAGE_BACKGROUND,
-						key='image_aspect_ratio', placeholder='Options', index=None )
+					set_image_aspect = st.selectbox(
+						label='Aspect Ratio',
+						options=ratios,
+						help='Optional. Output aspect ratio for Gemini image generation/editing.',
+						key='image_aspect_ratio',
+						placeholder='Options',
+						index=None
+					)
 					
 					image_aspect_ratio = st.session_state[ 'image_aspect_ratio' ]
 				
-				# ---------  Number/Candidates --------
-				with img_c4:
-					set_image_number = st.slider( label='Candidates Count', min_value=0, max_value=100,
-						value=int( st.session_state.get( 'image_number', 0 ) ),
-						step=1, help='Optional. A response candidate generated from the model',
-						key='image_number' )
-					
-					image_number = st.session_state[ 'image_number' ]
-				
-				# ---------  Image Size --------
-				with img_c5:
+				# ------------ Image Size --------
+				with img_c2:
 					size_options = list( image.size_options )
-					set_image_size = st.selectbox( label='Image Size',
-						options=size_options, help='Optional. Image sizes',
-						key='image_size', placeholder='Options', index=None )
+					set_image_size = st.selectbox(
+						label='Image Size',
+						options=size_options,
+						help='Optional. Output image size used by the Gemini image wrapper.',
+						key='image_size',
+						placeholder='Options',
+						index=None
+					)
 					
 					image_size = st.session_state[ 'image_size' ]
 				
+				# ------------ Active Task --------
+				with img_c3:
+					active_task = st.session_state.get( 'image_mode', '' )
+					st.text_input(
+						label='Active Task',
+						value=active_task,
+						help='Derived from the selected image mode.',
+						width='stretch',
+						disabled=True
+					)
+				
+				# ------------ Notes --------
+				with img_c4:
+					st.text_input(
+						label='Notes',
+						value='Wrapper-managed',
+						help='Image output parsing is handled internally by the Gemini wrapper.',
+						width='stretch',
+						disabled=True
+					)
+				
+				# ------------ Reserved --------
+				with img_c5:
+					st.text_input(
+						label='Reserved',
+						value='',
+						help='No additional Gemini visual setting is used here.',
+						width='stretch',
+						disabled=True
+					)
+				
 				# -------- Reset Settings ------------------
 				if st.button( label='Reset', key='image_visual_reset', width='stretch' ):
-					for key in [ 'image_resolution', 'image_mime_type', 'image_size',
-					             'image_number', 'image_aspect_ratio' ]:
+					for key in [ 'image_size', 'image_aspect_ratio' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -4163,8 +4263,8 @@ elif mode == "Images":
 				st.text_area( label='Enter Text', height=50, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
 			
-			def _on_template_change( ) -> None:
-				name = st.session_state.get( 'instructions' )
+			def _on_image_template_change( ) -> None:
+				name = st.session_state.get( 'image_instructions_template' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
 					if text is not None:
@@ -4172,13 +4272,13 @@ elif mode == "Images":
 			
 			with in_right:
 				st.selectbox( label='Use Template', options=prompt_names, index=None,
-					key='instructions', on_change=_on_template_change )
+					key='image_instructions_template', on_change=_on_image_template_change )
 			
-			def _on_clear( ) -> None:
+			def _on_clear_image_instructions( ) -> None:
 				st.session_state[ 'image_system_instructions' ] = ''
-				st.session_state[ 'instructions' ] = ''
+				st.session_state[ 'image_instructions_template' ] = ''
 			
-			def _on_convert_system_instructions( ) -> None:
+			def _on_convert_image_system_instructions( ) -> None:
 				text = st.session_state.get( 'image_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -4200,270 +4300,41 @@ elif mode == "Images":
 				st.button(
 					label='Clear Instructions',
 					width='stretch',
-					on_click=_on_clear
+					on_click=_on_clear_image_instructions
 				)
 			
 			with btn_c2:
 				st.button( label='XML <-> Markdown', width='stretch',
-					on_click=_on_convert_system_instructions )
+					on_click=_on_convert_image_system_instructions )
 		
 		# ------------------------------------------------------------------
 		# Tab Section
 		# ------------------------------------------------------------------
+		def _append_image_message( role: str, content: str ) -> None:
+			"""
+			
+				Purpose:
+				-----------
+				Appends an image-mode message to session state.
+				
+				Parameters:
+				-----------
+				role: str - Message role.
+				content: str - Message content.
+				
+			"""
+			try:
+				if 'image_input' not in st.session_state or not isinstance(
+						st.session_state[ 'image_input' ], list ):
+					st.session_state[ 'image_input' ] = [ ]
+				
+				st.session_state[ 'image_input' ].append(
+					{ 'role': role, 'content': content } )
+			except Exception:
+				pass
+		
 		tab_gen, tab_analyze, tab_edit = st.tabs( [ 'Generate', 'Analyze', 'Edit' ] )
-		with tab_analyze:
-			uploaded_img = st.file_uploader( 'Upload an image for analysis',
-				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
-				key='images_analyze_uploader', )
-			
-			if uploaded_img:
-				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', use_column_width=True, )
-				available_methods = [ ]
-				for candidate in ('analyze', 'describe_image', 'describe', 'classify',
-				                  'detect_objects', 'caption', 'image_analysis',):
-					if hasattr( image, candidate ):
-						available_methods.append( candidate )
-				
-				if available_methods:
-					chosen_method = st.selectbox( 'Method', available_methods, index=0, )
-				else:
-					chosen_method = None
-					st.info( 'No dedicated image analysis method found on Image object; '
-					         'attempting generic handlers.' )
-				
-				chosen_model = st.selectbox( 'Model (analysis)', [ image_model, None ], index=0, )
-				chosen_model_arg = (image_model if chosen_model is None else chosen_model)
-				
-			# ---------------------------------------------------
-			#                   MESSAGES
-			# ---------------------------------------------------
-			if st.session_state[ 'image_input' ] is not None:
-				for msg in st.session_state.image_input:
-					with st.chat_message( msg[ 'role' ], avatar='' ):
-						st.markdown( msg[ 'content' ] )
 		
-			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-	
-			prompt = st.chat_input( 'Enter image analysis prompt …' )
-			if prompt is not None:
-				st.session_state.image_messages.append( { 'role': 'user', 'content': prompt } )
-				with st.chat_message( 'assistant', avatar=cfg.JENI ):
-					
-					with st.spinner( 'Thinking…' ):
-						image_kwargs[ 'model' ] = st.session_state[ 'image_model' ]
-						image_kwargs[ 'top_percent' ] = st.session_state[ 'image_top_percent' ]
-						image_kwargs[ 'background' ] = st.session_state[ 'image_background' ]
-						image_kwargs[ 'max_tokens' ] = st.session_state[ 'image_max_tokens' ]
-						image_kwargs[ 'frequency' ] = st.session_state[ 'image_frequency_penalty' ]
-						image_kwargs[ 'presence' ] = st.session_state[ 'image_presence_penalty' ]
-						
-						if st.session_state[ 'image_stops' ]:
-							image_kwargs[ 'stops' ] = st.session_state[ 'image_stops' ]
-						
-						response = None
-						
-						try:
-							mdl = str( image_kwargs[ 'image_model' ] )
-							if mdl.startswith( 'gpt-5' ):
-								response = text.generate_text( prompt=prompt, model=image_kwargs[
-									'image_model' ] )
-							else:
-								response = text.generate_text( )
-						except Exception as exc:
-							err = Error( exc )
-							st.error( f'Generation Failed: {err.info}' )
-							response = None
-						
-						if response is not None and str( response ).strip( ):
-							st.markdown( response )
-							st.session_state.text_messages.append( { 'role': 'assistant',
-							                                         'content': response } )
-						else:
-							st.error( 'Generation Failed!.' )
-							try:
-								update_counters( getattr( text, 'response', None ) or response )
-							except Exception:
-								pass
-			
-			ana_c1, ana_c2, ana_c3 = st.columns( [ 0.2, 0.2, 0.8 ] )
-			with ana_c1:
-				if st.button( 'Analyze Image' ):
-					with st.spinner( 'Analyzing image…' ):
-						analysis_result = None
-						try:
-							if chosen_method:
-								func = getattr( image, chosen_method, None )
-								if func:
-									try:
-										analysis_result = func( tmp_path )
-									except TypeError:
-										analysis_result = func( tmp_path, model=chosen_model_arg )
-							else:
-								for fallback in ('analyze', 'describe_image', 'describe', 'caption'):
-									if hasattr( image, fallback ):
-										func = getattr( image, fallback )
-										try:
-											analysis_result = func( tmp_path )
-											break
-										except Exception:
-											continue
-							
-							if analysis_result is None:
-								st.warning( 'No analysis output returned by the available methods.' )
-							else:
-								if isinstance( analysis_result, (dict, list) ):
-									st.json( analysis_result )
-								else:
-									st.markdown( '**Analysis result:**' )
-									st.write( analysis_result )
-								
-								try:
-									update_counters(
-										getattr( image, 'response', None ) or analysis_result )
-								except Exception:
-									pass
-						
-						except Exception as exc:
-							st.error( f'Analysis Failed: {exc}' )
-			
-			# --------  Reset Button
-			with ana_c2:
-				if st.button( 'Clear Messages' ):
-					reset_state( )
-					st.rerun( )
-			
-		with tab_edit:
-			uploaded_img = st.file_uploader( 'Upload Image for Edit',
-				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
-				key='images_edit_uploader', )
-			
-			if uploaded_img:
-				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', use_column_width=True, )
-				available_methods = [ ]
-				for candidate in ('edit', 'describe_image', 'describe', 'classify',
-				                  'detect_objects', 'caption', 'image_edit',):
-					if hasattr( image, candidate ):
-						available_methods.append( candidate )
-				
-				if available_methods:
-					chosen_method = st.selectbox( 'Method', available_methods, index=0, )
-				else:
-					chosen_method = None
-					st.info( 'No dedicated image editing method found on Image object;'
-					         'attempting generic handlers.' )
-				
-				chosen_model = st.selectbox( 'Model (edit)', [ image_model, None ], index=0, )
-				chosen_model_arg = (image_model if chosen_model is None else chosen_model)
-		
-			# ---------------------------------------------------
-			#                   MESSAGES
-			# ---------------------------------------------------
-			if st.session_state[ 'image_input' ] is not None:
-				for msg in st.session_state.image_input:
-					with st.chat_message( msg[ 'role' ], avatar='' ):
-						st.markdown( msg[ 'content' ] )
-		
-			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-			
-			prompt = st.chat_input( 'Enter image editing prompt …' )
-			if prompt is not None:
-				st.session_state.image_messages.append( { 'role': 'user', 'content': prompt } )
-				with st.chat_message( 'assistant', avatar=cfg.JENI ):
-					image_kwargs = { }
-					
-					with st.spinner( 'Thinking…' ):
-						image_kwargs[ 'model' ] = st.session_state[ 'image_model' ]
-						image_kwargs[ 'top_percent' ] = st.session_state[ 'image_top_percent' ]
-						image_kwargs[ 'background' ] = st.session_state[ 'image_background' ]
-						image_kwargs[ 'max_tokens' ] = st.session_state[ 'image_max_tokens' ]
-						image_kwargs[ 'frequency' ] = st.session_state[ 'image_frequency_penalty' ]
-						image_kwargs[ 'presence' ] = st.session_state[ 'image_presence_penalty' ]
-						
-						if st.session_state[ 'image_stops' ]:
-							image_kwargs[ 'stops' ] = st.session_state[ 'image_stops' ]
-						
-						response = None
-						
-						try:
-							mdl = str( image_kwargs[ 'image_model' ] )
-							if mdl.startswith( 'gpt-5' ):
-								response = text.generate_text( prompt=prompt, model=image_kwargs[
-									'image_model' ] )
-							else:
-								response = text.generate_text( )
-						except Exception as exc:
-							err = Error( exc )
-							st.error( f'Generation Failed: {err.info}' )
-							response = None
-						
-						if response is not None and str( response ).strip( ):
-							st.markdown( response )
-							st.session_state.text_messages.append( { 'role': 'assistant',
-							                                         'content': response } )
-						else:
-							st.error( 'Generation Failed!.' )
-							try:
-								update_counters( getattr( text, 'response', None ) or response )
-							except Exception:
-								pass
-				
-				edit_c1, edit_c2, edit_3 = st.columns( [ 0.2, 0.2, 0.8 ] )
-				with edit_c1:
-					if st.button( 'Edit Image' ):
-						with st.spinner( 'Editing image…' ):
-							analysis_result = None
-							try:
-								if chosen_method:
-									func = getattr( image, chosen_method, None )
-									if func:
-										try:
-											analysis_result = func( tmp_path )
-										except TypeError:
-											analysis_result = func(
-												tmp_path, model=chosen_model_arg
-											)
-								else:
-									for fallback in ('analyze', 'describe_image',
-									                 'describe', 'caption',):
-										if hasattr( image, fallback ):
-											func = getattr( image, fallback )
-											try:
-												analysis_result = func( tmp_path )
-												break
-											except Exception:
-												continue
-								
-								if analysis_result is None:
-									st.warning( 'No editing output returned by the available methods.' )
-								else:
-									if isinstance( analysis_result, (dict, list) ):
-										st.json( analysis_result )
-									else:
-										st.markdown( '**Analysis result:**' )
-										st.write( analysis_result )
-									
-									try:
-										update_counters(
-											getattr( image, 'response', None )
-											or analysis_result
-										)
-									except Exception:
-										pass
-							
-							except Exception as exc:
-								st.error( f"Analysis Failed: {exc}" )
-		
-				with edit_c2:
-					# --------  Reset Button
-					if st.button( 'Clear Messages', key='clear_image_edit' ):
-						reset_state( )
-						st.rerun( )
-		
-		# ---------------------------------------------------
-		#                   MESSAGES
-		# ---------------------------------------------------
 		with tab_gen:
 			if st.session_state[ 'image_input' ] is not None:
 				for msg in st.session_state.image_input:
@@ -4472,34 +4343,172 @@ elif mode == "Images":
 			
 			prompt = st.chat_input( 'Enter image generation prompt...' )
 			gen_c1, gen_c2, gen_c3 = st.columns( [ 0.2, 0.2, 0.8 ] )
+			
 			with gen_c1:
 				if st.button( 'Generate Image' ):
 					with st.spinner( 'Generating…' ):
 						try:
-							image_kwargs: Dict[ str, Any ] = { 'prompt': prompt, 'model': image_model, }
-							if image_size:
-								image_kwargs[ 'size' ] = st.session_state[ 'image_size' ]
-							if image_quality:
-								image_kwargs[ 'quality' ] = st.session_state[ 'image_quality' ]
-							if image_output:
-								image_kwargs[ 'format' ] = st.session_state[ 'image_output' ]
-							img_url = image.generate( **image_kwargs )
-							st.image( img_url )
-							
-							try:
-								update_counters( getattr( image, 'response', None ) )
-							except Exception:
-								pass
-						
+							if not prompt or not str( prompt ).strip( ):
+								st.warning( 'Enter a prompt before generating an image.' )
+							else:
+								_append_image_message( 'user', prompt )
+								result = image.generate( prompt=prompt,
+									model=image_model,
+									aspect=image_aspect_ratio,
+									number=image_number,
+									temperature=image_temperature,
+									top_p=image_top_percent,
+									frequency=image_frequency_penalty,
+									presence=image_presence_penalty,
+									max_tokens=image_max_tokens,
+									resolution=image_size,
+									instruct=image_system_instructions )
+								
+								if result is not None:
+									st.image( result, use_column_width=True )
+									_append_image_message( 'assistant',
+										'Generated image returned successfully.' )
+								else:
+									st.warning( 'No image was returned by the model.' )
+								
+								try:
+									update_counters( getattr( image, 'response', None ) )
+								except Exception:
+									pass
 						except Exception as exc:
 							st.error( f'Image generation failed: {exc}' )
 			
 			with gen_c2:
-				# --------  Reset Button
 				if st.button( 'Clear Messages', key='clear_image_generation' ):
 					reset_state( )
 					st.rerun( )
-
+		
+		with tab_analyze:
+			uploaded_img = st.file_uploader( 'Upload an image for analysis',
+				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
+				key='images_analyze_uploader' )
+			
+			tmp_path = None
+			if uploaded_img:
+				tmp_path = save_temp( uploaded_img )
+				st.image( uploaded_img, caption='Uploaded image preview', use_column_width=True )
+			
+			if st.session_state[ 'image_input' ] is not None:
+				for msg in st.session_state.image_input:
+					with st.chat_message( msg[ 'role' ], avatar='' ):
+						st.markdown( msg[ 'content' ] )
+			
+			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+			
+			prompt = st.chat_input( 'Enter image analysis prompt …' )
+			ana_c1, ana_c2 = st.columns( [ 0.2, 0.8 ] )
+			
+			with ana_c1:
+				if st.button( 'Analyze Image' ):
+					with st.spinner( 'Analyzing image…' ):
+						try:
+							if not tmp_path:
+								st.warning( 'Upload an image before analyzing.' )
+							elif not prompt or not str( prompt ).strip( ):
+								st.warning( 'Enter an analysis prompt before analyzing the image.' )
+							else:
+								_append_image_message( 'user', prompt )
+								analysis_result = image.analyze(
+									prompt=prompt,
+									path=tmp_path,
+									model=image_model,
+									aspect=image_aspect_ratio,
+									number=image_number,
+									temperature=image_temperature,
+									top_p=image_top_percent,
+									frequency=image_frequency_penalty,
+									presence=image_presence_penalty,
+									max_tokens=image_max_tokens,
+									resolution=image_size,
+									instruct=image_system_instructions )
+								
+								if analysis_result is None:
+									st.warning( 'No analysis output returned by the model.' )
+								else:
+									st.markdown( '**Analysis result:**' )
+									st.write( analysis_result )
+									_append_image_message( 'assistant', str( analysis_result ) )
+								
+								try:
+									update_counters( getattr( image, 'response', None ) )
+								except Exception:
+									pass
+						except Exception as exc:
+							st.error( f'Analysis Failed: {exc}' )
+			
+			with ana_c2:
+				if st.button( 'Clear Messages', key='clear_image_analysis' ):
+					reset_state( )
+					st.rerun( )
+		
+		with tab_edit:
+			uploaded_img = st.file_uploader( 'Upload Image for Edit',
+				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
+				key='images_edit_uploader' )
+			
+			tmp_path = None
+			if uploaded_img:
+				tmp_path = save_temp( uploaded_img )
+				st.image( uploaded_img, caption='Uploaded image preview', use_column_width=True )
+			
+			if st.session_state[ 'image_input' ] is not None:
+				for msg in st.session_state.image_input:
+					with st.chat_message( msg[ 'role' ], avatar='' ):
+						st.markdown( msg[ 'content' ] )
+			
+			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+			
+			prompt = st.chat_input( 'Enter image editing prompt …' )
+			edit_c1, edit_c2 = st.columns( [ 0.2, 0.8 ] )
+			
+			with edit_c1:
+				if st.button( 'Edit Image' ):
+					with st.spinner( 'Editing image…' ):
+						try:
+							if not tmp_path:
+								st.warning( 'Upload an image before editing.' )
+							elif not prompt or not str( prompt ).strip( ):
+								st.warning( 'Enter an editing prompt before editing the image.' )
+							else:
+								_append_image_message( 'user', prompt )
+								edit_result = image.edit(
+									prompt=prompt,
+									path=tmp_path,
+									model=image_model,
+									aspect=image_aspect_ratio,
+									number=image_number,
+									temperature=image_temperature,
+									top_p=image_top_percent,
+									frequency=image_frequency_penalty,
+									presence=image_presence_penalty,
+									max_tokens=image_max_tokens,
+									resolution=image_size,
+									instruct=image_system_instructions )
+								
+								if edit_result is not None:
+									st.image( edit_result, use_column_width=True )
+									_append_image_message( 'assistant',
+										'Edited image returned successfully.' )
+								else:
+									st.warning( 'No edited image was returned by the model.' )
+								
+								try:
+									update_counters( getattr( image, 'response', None ) )
+								except Exception:
+									pass
+						except Exception as exc:
+							st.error( f'Image editing failed: {exc}' )
+			
+			with edit_c2:
+				if st.button( 'Clear Messages', key='clear_image_editing' ):
+					reset_state( )
+					st.rerun( )
+	
 # ======================================================================================
 # AUDIO MODE
 # ======================================================================================
@@ -6492,26 +6501,27 @@ if active_model is not None:
 if mode == 'Text':
 	temperature = st.session_state.get( 'text_temperature' )
 	top_p = st.session_state.get( 'text_top_percent' )
+	top_k = st.session_state.get( 'text_top_k' )
 	freq = st.session_state.get( 'text_frequency_penalty' )
 	presence = st.session_state.get( 'text_presence_penalty' )
 	number = st.session_state.get( 'text_number' )
 	stream = st.session_state.get( 'text_stream' )
-	parallel_tools = st.session_state.get( 'text_parallel_tools' )
-	max_calls = st.session_state.get( 'text_max_tools' )
-	store = st.session_state.get( 'text_store' )
 	tools = st.session_state.get( 'text_tools' )
-	include = st.session_state.get( 'text_include' )
-	domains = st.session_state.get( 'text_domains' )
-	input_mode = st.session_state.get( 'text_input' )
 	tool_choice = st.session_state.get( 'text_tool_choice' )
 	background = st.session_state.get( 'text_background' )
 	messages = st.session_state.get( 'text_messages' )
 	max_tokens = st.session_state.get( 'text_max_tokens' )
+	max_urls = st.session_state.get( 'text_max_urls' )
+	response_format = st.session_state.get( 'text_response_format' )
+	reasoning = st.session_state.get( 'text_reasoning' )
+	safety = st.session_state.get( 'text_safety_profile' )
 	
 	if temperature is not None:
 		right_parts.append( f'Temp: {temperature:.1%}' )
 	if top_p is not None:
 		right_parts.append( f'Top-P: {top_p:.1%}' )
+	if top_k is not None:
+		right_parts.append( f'Top-K: {top_k}' )
 	if freq is not None:
 		right_parts.append( f'Freq: {freq:.2f}' )
 	if presence is not None:
@@ -6520,29 +6530,25 @@ if mode == 'Text':
 		right_parts.append( f'N: {number}' )
 	if max_tokens is not None:
 		right_parts.append( f'Max Tokens: {max_tokens}' )
+	if max_urls is not None:
+		right_parts.append( f'Max URLs: {max_urls}' )
 	
+	if response_format:
+		right_parts.append( f'Format: {response_format}' )
 	if stream:
 		right_parts.append( 'Stream: On' )
-	if parallel_tools:
-		right_parts.append( 'Parallel Tools: On' )
-	if max_calls is not None:
-		right_parts.append( f'Max Calls: {max_calls}' )
-	if store:
-		right_parts.append( 'Store: On' )
 	if tools:
 		right_parts.append( f'Tools: {len( tools )}' )
-	if include:
-		right_parts.append( 'Include: On' )
-	if domains:
-		right_parts.append( 'Domains: Set' )
-	if input_mode:
-		right_parts.append( 'Input: Set' )
 	if tool_choice:
-		right_parts.append( f'Tool Choice: On' )
+		right_parts.append( f'Tool Choice: {tool_choice}' )
+	if reasoning:
+		right_parts.append( f'Reasoning: {reasoning}' )
+	if safety:
+		right_parts.append( f'Safety: {safety}' )
 	if background:
 		right_parts.append( 'Background: On' )
 	if messages:
-		right_parts.append( 'Messages: Set' )
+		right_parts.append( f'Messages: {len( messages )}' )
 
 elif mode == 'Images':
 	image_mode = st.session_state.get( 'image_mode' )
