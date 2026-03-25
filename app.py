@@ -3549,16 +3549,19 @@ if mode == 'Text':
 						st.session_state[ 'text_urls' ] = normalized_text_urls
 						text_urls = st.session_state[ 'text_urls' ]
 				
+				#
 				# ---------- Modalities ------------
 				with tool_c5:
 					modality_options = list( text.modality_options )
-					set_text_modalities = st.multiselect( label='Response Modalities',
-						options=modality_options, key='text_modalities',
-						help='Optional. Modality of the response', placeholder='Options' )
+					set_text_modalities = st.multiselect(
+						label='Response Modalities',
+						options=modality_options,
+						key='text_modalities',
+						help='Optional. Modality of the response',
+						placeholder='Options'
+					)
 					
-					text_modalities = [ d.strip( ) for d in set_text_modalities
-					                    if d.strip( ) ]
-					
+					text_modalities = [ d.strip( ) for d in set_text_modalities if d.strip( ) ]
 					text_modalities = st.session_state[ 'text_modalities' ]
 				
 				# ---------- Reset Settings ------------
@@ -3571,8 +3574,8 @@ if mode == 'Text':
 					st.rerun( )
 					
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
-				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5, resp_c6 = st.columns(
-					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
+				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
+					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
 				
 				# ---------- Max Tokens ------------
@@ -3589,22 +3592,8 @@ if mode == 'Text':
 					
 					text_tokens = st.session_state[ 'text_max_tokens' ]
 				
-				# ---------- Modalities ------------
-				with resp_c2:
-					modality_options = list( text.modality_options )
-					set_text_modalities = st.multiselect(
-						label='Response Modalities',
-						options=modality_options,
-						key='text_modalities',
-						help='Optional. Modality of the response',
-						placeholder='Options'
-					)
-					
-					text_modalities = [ d.strip( ) for d in set_text_modalities if d.strip( ) ]
-					text_modalities = st.session_state[ 'text_modalities' ]
-				
 				# ---------- Stops ------------
-				with resp_c3:
+				with resp_c2:
 					set_text_stops = st.text_input(
 						label='Stop Sequences',
 						key='text_stops_input',
@@ -3618,7 +3607,7 @@ if mode == 'Text':
 					st.session_state[ 'text_stops' ] = text_stops
 				
 				# ---------- Safety ------------
-				with resp_c4:
+				with resp_c3:
 					safety_options = list( text.safety_options )
 					set_text_safety_profile = st.selectbox(
 						label='Safety',
@@ -3632,7 +3621,7 @@ if mode == 'Text':
 					text_safety_profile = st.session_state[ 'text_safety_profile' ]
 				
 				# ---------- Background ------------
-				with resp_c5:
+				with resp_c4:
 					set_text_background = st.toggle(
 						label='Background',
 						key='text_background',
@@ -3642,7 +3631,7 @@ if mode == 'Text':
 					text_background = st.session_state[ 'text_background' ]
 				
 				# ---------- Response Format ------------
-				with resp_c6:
+				with resp_c5:
 					format_options = list( text.format_options )
 					set_text_response_format = st.selectbox(
 						label='Response Format',
