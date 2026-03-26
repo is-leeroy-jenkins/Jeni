@@ -3665,78 +3665,80 @@ if mode == 'Text':
 				self_avatar = cfg.JENI if msg.get( 'role' ) == 'assistant' else ''
 				with st.chat_message( msg.get( 'role', 'assistant' ), avatar=self_avatar ):
 					st.markdown( msg.get( 'content', '' ) )
-				
-				prompt = st.chat_input( 'Jeni Generate …' )
-				if prompt is not None and str( prompt ).strip( ):
-					prompt = str( prompt ).strip( )
-					_apply_gemini_runtime_config( )
+		
+		prompt = st.chat_input( 'Jeni Generate …' )
+		if prompt is not None and str( prompt ).strip( ):
+			prompt = str( prompt ).strip( )
+			_apply_gemini_runtime_config( )
+			
+			st.session_state.text_messages.append(
+				{
+						'role': 'user',
+						'content': prompt,
+				}
+			)
+			
+			with st.chat_message( 'assistant', avatar=cfg.JENI ):
+				with st.spinner( 'Thinking…' ):
+					response = None
+					stream_buffer: List[ str ] = [ ]
+					stream_placeholder = st.empty( )
 					
-					st.session_state.text_messages.append(
-						{
-								'role': 'user',
-								'content': prompt,
-						}
-					)
+					def _on_stream_chunk( chunk: str ) -> None:
+						if chunk is None:
+							return
+						
+						stream_buffer.append( str( chunk ) )
+						stream_placeholder.markdown( ''.join( stream_buffer ) + '▌' )
 					
-					with st.chat_message( 'assistant', avatar=cfg.JENI ):
-						with st.spinner( 'Thinking…' ):
-							response = None
-							stream_buffer: List[ str ] = [ ]
-							stream_placeholder = st.empty( )
-							
-							def _on_stream_chunk( chunk: str ) -> None:
-								if chunk is None:
-									return
-								
-								stream_buffer.append( str( chunk ) )
-								stream_placeholder.markdown( ''.join( stream_buffer ) + '▌' )
-							
-							try:
-								response = text.generate_text( prompt=prompt,
-									model=st.session_state.get( 'text_model' ),
-									number=st.session_state.get( 'text_number' ),
-									temperature=st.session_state.get( 'text_temperature' ),
-									top_p=st.session_state.get( 'text_top_percent' ),
-									top_k=st.session_state.get( 'text_top_k' ),
-									frequency=st.session_state.get( 'text_frequency_penalty' ),
-									presence=st.session_state.get( 'text_presence_penalty' ),
-									max_tokens=st.session_state.get( 'text_max_tokens' ),
-									stops=st.session_state.get( 'text_stops', [ ] ),
-									instruct=st.session_state.get( 'text_system_instructions' ),
-									response_format=st.session_state.get( 'text_response_format' ),
-									tools=st.session_state.get( 'text_tools', [ ] ),
-									tool_choice=st.session_state.get( 'text_tool_choice' ),
-									reasoning=st.session_state.get( 'text_reasoning' ),
-									modalities=st.session_state.get( 'text_modalities', [ ] ),
-									media_resolution=st.session_state.get( 'text_media_resolution' ),
-									context=st.session_state.get( 'text_messages', [ ] )[ :-1 ],
-									content=st.session_state.get( 'text_content' ),
-									urls=st.session_state.get( 'text_urls', [ ] ),
-									max_urls=st.session_state.get( 'text_max_urls' ),
-									response_schema=st.session_state.get( 'text_response_schema' ),
-									safety_profile=st.session_state.get( 'text_safety_profile' ),
-									stream=st.session_state.get( 'text_stream', False ),
-									stream_handler=_on_stream_chunk if st.session_state.get( 'text_stream', False ) else None )
-							except Exception as exc:
-								err = Error( exc )
-								st.error( f'Generation Failed: {err.info}' )
-								response = None
-							
-							if response is not None and str( response ).strip( ):
-								if st.session_state.get( 'text_stream', False ):
-									stream_placeholder.markdown( str( response ).strip( ) )
-								else:
-									st.markdown( response )
-								
-								st.session_state.text_messages.append(
-									{
-											'role': 'assistant',
-											'content': str( response ).strip( ),
-									}
-								)
-								st.session_state.last_answer = str( response ).strip( )
-							else:
-								st.error( 'Generation Failed!.' )
+					try:
+						response = text.generate_text(
+							prompt=prompt,
+							model=st.session_state.get( 'text_model' ),
+							number=st.session_state.get( 'text_number' ),
+							temperature=st.session_state.get( 'text_temperature' ),
+							top_p=st.session_state.get( 'text_top_percent' ),
+							top_k=st.session_state.get( 'text_top_k' ),
+							frequency=st.session_state.get( 'text_frequency_penalty' ),
+							presence=st.session_state.get( 'text_presence_penalty' ),
+							max_tokens=st.session_state.get( 'text_max_tokens' ),
+							stops=st.session_state.get( 'text_stops', [ ] ),
+							instruct=st.session_state.get( 'text_system_instructions' ),
+							response_format=st.session_state.get( 'text_response_format' ),
+							tools=st.session_state.get( 'text_tools', [ ] ),
+							tool_choice=st.session_state.get( 'text_tool_choice' ),
+							reasoning=st.session_state.get( 'text_reasoning' ),
+							modalities=st.session_state.get( 'text_modalities', [ ] ),
+							media_resolution=st.session_state.get( 'text_media_resolution' ),
+							context=st.session_state.get( 'text_messages', [ ] )[ :-1 ],
+							content=st.session_state.get( 'text_content' ),
+							urls=st.session_state.get( 'text_urls', [ ] ),
+							max_urls=st.session_state.get( 'text_max_urls' ),
+							response_schema=st.session_state.get( 'text_response_schema' ),
+							safety_profile=st.session_state.get( 'text_safety_profile' ),
+							stream=st.session_state.get( 'text_stream', False ),
+							stream_handler=_on_stream_chunk if st.session_state.get(
+								'text_stream', False ) else None )
+					except Exception as exc:
+						err = Error( exc )
+						st.error( f'Generation Failed: {err.info}' )
+						response = None
+					
+					if response is not None and str( response ).strip( ):
+						if st.session_state.get( 'text_stream', False ):
+							stream_placeholder.markdown( str( response ).strip( ) )
+						else:
+							st.markdown( response )
+						
+						st.session_state.text_messages.append(
+							{
+									'role': 'assistant',
+									'content': str( response ).strip( ),
+							}
+						)
+						st.session_state.last_answer = str( response ).strip( )
+					else:
+						st.error( 'Generation Failed!.' )
 		
 		# --------  Reset Button
 		if st.button( 'Clear Messages' ):
