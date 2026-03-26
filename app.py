@@ -3235,7 +3235,7 @@ with st.sidebar:
 		
 		if gemini_key:
 			st.session_state.gemini_key = gemini_key
-			os.environ[ 'GEMINI_KEY' ] = gemini_key
+			os.environ[ 'GEMINI_API_KEY' ] = gemini_key
 		
 		googlemaps_key = st.text_input( 'Google Maps API Key', type='password',
 			value=st.session_state.googlemaps_api_key or '',
@@ -6364,11 +6364,7 @@ elif mode == 'Images':
 	image_mode = st.session_state.get( 'image_mode' )
 	image_size = st.session_state.get( 'image_size' )
 	image_aspect_ratio = st.session_state.get( 'image_aspect_ratio' )
-	image_reasoning = st.session_state.get( 'image_reasoning' )
 	image_number = st.session_state.get( 'image_number' )
-	image_parallel_tools = st.session_state.get( 'image_parallel_tools' )
-	image_max_calls = st.session_state.get( 'image_max_calls' )
-	image_max_searches = st.session_state.get( 'image_max_searches' )
 	image_max_tokens = st.session_state.get( 'image_max_tokens' )
 	image_temperature = st.session_state.get( 'image_temperature' )
 	image_top_percent = st.session_state.get( 'image_top_percent' )
@@ -6376,7 +6372,6 @@ elif mode == 'Images':
 	image_modality = st.session_state.get( 'image_modality' )
 	image_grounded = st.session_state.get( 'image_grounded' )
 	image_image_search = st.session_state.get( 'image_image_search' )
-	image_include = st.session_state.get( 'image_include' )
 	image_tools = st.session_state.get( 'image_tools' )
 	image_input = st.session_state.get( 'image_input' )
 	
@@ -6390,34 +6385,31 @@ elif mode == 'Images':
 	
 	if image_temperature is not None:
 		right_parts.append( f'Temp: {image_temperature:.1%}' )
+	
 	if image_top_percent is not None:
 		right_parts.append( f'Top-P: {image_top_percent:.1%}' )
+	
 	if image_number is not None:
 		right_parts.append( f'N: {image_number}' )
+	
 	if image_max_tokens is not None:
 		right_parts.append( f'Max Tokens: {image_max_tokens}' )
-	if image_max_calls is not None:
-		right_parts.append( f'Max Calls: {image_max_calls}' )
-	if image_max_searches is not None:
-		right_parts.append( f'Max Searches: {image_max_searches}' )
 	
 	if image_mime_type is not None and str( image_mime_type ).strip( ):
 		right_parts.append( f'MIME: {image_mime_type}' )
+	
 	if image_modality is not None and str( image_modality ).strip( ):
 		right_parts.append( f'Modality: {image_modality}' )
-	if image_reasoning is not None and str( image_reasoning ).strip( ):
-		right_parts.append( f'Reasoning: {image_reasoning}' )
 	
-	if image_parallel_tools:
-		right_parts.append( 'Parallel Tools: On' )
 	if image_grounded:
 		right_parts.append( 'Grounded: On' )
+	
 	if image_image_search:
 		right_parts.append( 'Image Search: On' )
+	
 	if image_tools:
 		right_parts.append( f'Tools: {len( image_tools )}' )
-	if image_include:
-		right_parts.append( 'Include: On' )
+	
 	if image_input:
 		right_parts.append( f'Messages: {len( image_input )}' )
 
