@@ -289,6 +289,18 @@ class Chat( Gemini ):
 		         'code_execution',
 		         'computer_use' ]
 	
+	@property
+	def reasoning_options( self ) -> List[ str ] | None:
+		'''
+
+			Returns:
+			--------
+			A List[ str ] of thinking effort options
+
+		'''
+		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL',
+		         'LOW', 'MEDIUM', 'HIGH' ]
+	
 	def get_supported_tool_options( self, model: str = None ) -> List[ str ]:
 		"""
 		
@@ -528,7 +540,152 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = '_parse_response_schema( self, response_schema: Any=None )'
 			raise exception
+		
+	def _build_contents( self, prompt: str, context: List[ Any ] = None,
+			content: str=None ) -> str | List[ Content ]:
+		"""
+		
+			Purpose:
+			--------
+			Builds Gemini contents from the current
+			prompt and any prior conversational context.
+			
+			Parameters:
+			-----------
+			prompt: str - Current user prompt.
+			context: List[ Any ] - Prior chat messages or Gemini Content objects.
+			content: str - Optional prepended content block.
+			
+			Returns:
+			--------
+			Union[ str, List[ Content ] ] - Contents payload for Gemini.
+		
+		"""
+		try:
+			throw_if( 'prompt', prompt )
+			self.prompt = prompt
+			self.context = context if context is not None else [ ]
+			self.content_block = content
+			self.contents = [ ]
+			for item in self.context:
+				if item is None:
+					continue
+				
+				if isinstance( item, Content ):
+					self.contents.append( item )
+					continue
+				
+				if not isinstance( item, dict ):
+					continue
+				
+				role = item.get( 'role', 'user' )
+				text = item.get( 'content', None )
+				if text is None:
+					continue
+				
+				text = str( text ).strip( )
+				if not text:
+					continue
+				
+				if role == 'assistant':
+					self.contents.append(
+						Content(
+							role='model',
+							parts=[ Part.from_text( text=text ) ]
+						)
+					)
+				else:
+					self.contents.append(
+						Content(
+							role='user',
+							parts=[ Part.from_text( text=text ) ]
+						)
+					)
+			
+			self.user_text = str( self.prompt ).strip( )
+			if self.content_block is not None and str( self.content_block ).strip( ):
+				self.user_text = f"{str( self.content_block ).strip( )}\n\n{self.user_text}"
+			
+			self.contents.append(
+				Content(
+					role='user',
+					parts=[ Part.from_text( text=self.user_text ) ]
+				)
+			)
+			
+			return self.contents if len( self.contents ) > 0 else self.prompt
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('_build_contents( self, prompt: str, '
+			                    'context: List[ Any ]=None, '
+			                    'content: str=None )')
+			raise exception
+		
+	def _get_response_content( self ) -> Content | None:
+		"""
+		
+			Purpose:
+			--------
+			Extracts the structured Gemini model content
+			from the most recent response.
+			
+			Returns:
+			--------
+			Optional[ Content ] - The model content block.
+		
+		"""
+		try:
+			if self.content_response is None:
+				return None
+			
+			if hasattr( self.content_response, 'candidates' ) and self.content_response.candidates:
+				for candidate in self.content_response.candidates:
+					if hasattr( candidate, 'content' ) and candidate.content is not None:
+						return candidate.content
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_get_response_content( self ) -> Content | None'
+			raise exception
 	
+	def get_structured_history( self ) -> List[ Content ] | None:
+		"""
+		
+			Purpose:
+			--------
+			Builds the full structured conversation history
+			for reuse in a subsequent Gemini request.
+			
+			Returns:
+			--------
+			Optional[ List[ Content ] ] - Conversation history with model output.
+		
+		"""
+		try:
+			self.history = [ ]
+			
+			if self.contents is not None and isinstance( self.contents, list ):
+				for item in self.contents:
+					if isinstance( item, Content ):
+						self.history.append( item )
+			
+			self.response_content = self._get_response_content( )
+			if self.response_content is not None:
+				self.history.append( self.response_content )
+			
+			return self.history if len( self.history ) > 0 else None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'get_structured_history( self ) -> List[ Content ] | None'
+			raise exception
+		
 	def _build_config( self, model: str = 'gemini-2.5-flash-lite', number: int = None,
 			temperature: float = None, top_p: float = None, top_k: int = None,
 			frequency: float = None, presence: float = None, max_tokens: int = None,

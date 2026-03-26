@@ -332,7 +332,10 @@ if 'text_tools' not in st.session_state:
 
 if 'text_context' not in st.session_state:
 	st.session_state[ 'text_context' ] = [ ]
-
+	
+if 'text_gemini_history' not in st.session_state:
+	st.session_state[ 'text_gemini_history' ] = [ ]
+	
 # --------IMAGE-GENERATION PARAMETERS--------------------
 
 if 'image_max_tokens' not in st.session_state:
@@ -3373,17 +3376,10 @@ if mode == 'Text':
 				with llm_c5:
 					text.model = st.session_state.get( 'text_model' ) or text.model
 					tool_options = list( text.get_supported_tool_options( text.model ) )
-					set_text_tools = st.multiselect(
-						label='Tools',
-						options=tool_options,
-						key='text_tools',
-						help=cfg.TOOLS,
-						placeholder='Options'
-					)
+					set_text_tools = st.multiselect( label='Tools', options=tool_options,
+						key='text_tools', help=cfg.TOOLS, placeholder='Options' )
 					
 					text_tools = [ d.strip( ) for d in set_text_tools if d.strip( ) ]
-					st.session_state[ 'text_tools' ] = text_tools
-					text_tools = st.session_state[ 'text_tools' ]
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_model_reset', width='stretch' ):
@@ -3670,8 +3666,6 @@ if mode == 'Text':
 		prompt = st.chat_input( 'Jeni Generate …' )
 		if prompt is not None and str( prompt ).strip( ):
 			prompt = str( prompt ).strip( )
-			_apply_gemini_runtime_config( )
-			
 			st.session_state.text_messages.append(
 				{
 						'role': 'user',
@@ -3682,18 +3676,14 @@ if mode == 'Text':
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
-					stream_buffer: List[ str ] = [ ]
-					stream_placeholder = st.empty( )
-					
-					def _on_stream_chunk( chunk: str ) -> None:
-						if chunk is None:
-							return
-						
-						stream_buffer.append( str( chunk ) )
-						stream_placeholder.markdown( ''.join( stream_buffer ) + '▌' )
 					
 					try:
-						response = text.generate_text( prompt=prompt,
+						structured_context = st.session_state.get( 'text_gemini_history', [ ] )
+						if structured_context is None or len( structured_context ) == 0:
+							structured_context = st.session_state.get( 'text_messages', [ ] )[ :-1 ]
+						
+						response = text.generate_text(
+							prompt=prompt,
 							model=st.session_state.get( 'text_model' ),
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
@@ -3710,31 +3700,31 @@ if mode == 'Text':
 							reasoning=st.session_state.get( 'text_reasoning' ),
 							modalities=st.session_state.get( 'text_modalities', [ ] ),
 							media_resolution=st.session_state.get( 'text_media_resolution' ),
-							context=st.session_state.get( 'text_messages', [ ] )[ :-1 ],
+							context=structured_context,
 							content=st.session_state.get( 'text_content' ),
 							urls=st.session_state.get( 'text_urls', [ ] ),
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
 							safety_profile=st.session_state.get( 'text_safety_profile' ),
 							stream=st.session_state.get( 'text_stream', False ),
-							stream_handler=_on_stream_chunk if st.session_state.get(
-								'text_stream', False ) else None )
+						)
 					except Exception as exc:
 						err = Error( exc )
 						st.error( f'Generation Failed: {err.info}' )
 						response = None
 					
 					if response is not None and str( response ).strip( ):
-						if st.session_state.get( 'text_stream', False ):
-							stream_placeholder.markdown( str( response ).strip( ) )
-						else:
-							st.markdown( response )
-						
+						st.markdown( response )
 						st.session_state.text_messages.append(
-						{
-							'role': 'assistant',
-							'content': str( response ).strip( ),
-						} )
+							{
+									'role': 'assistant',
+									'content': str( response ).strip( ),
+							}
+						)
+						
+						structured_history = text.get_structured_history( )
+						if structured_history is not None and len( structured_history ) > 0:
+							st.session_state[ 'text_gemini_history' ] = structured_history
 						
 						st.session_state.last_answer = str( response ).strip( )
 					else:
@@ -3743,6 +3733,7 @@ if mode == 'Text':
 		# --------  Reset Button
 		if st.button( 'Clear Messages' ):
 			st.session_state.text_messages = [ ]
+			st.session_state.text_gemini_history = [ ]
 			st.session_state.last_answer = ''
 			st.session_state.last_sources = [ ]
 			st.rerun( )
