@@ -4692,7 +4692,7 @@ elif mode == 'Audio':
 		
 		with left_audio:
 			if audio_task in ('Transcribe', 'Translate'):
-				uploaded = st.file_uploader( 'Upload File', type=[ 'wav', 'mp3', 'm4a', 'flac' ] )
+				uploaded = st.file_uploader( 'Input File', type=[ 'wav', 'mp3', 'm4a', 'flac' ] )
 				if uploaded is not None:
 					if st.button( f'Run {audio_task}', key='audio_uploaded_run', width='stretch' ):
 						tmp_path = save_temp( uploaded )
@@ -4770,7 +4770,7 @@ elif mode == 'Audio':
 									pass
 		
 		with right_audio:
-			st.caption( 'Output' )
+			st.caption( 'Audio Output' )
 			
 			if st.session_state.get( 'audio_output_bytes' ) is not None:
 				st.audio( st.session_state[ 'audio_output_bytes' ],
@@ -4783,7 +4783,6 @@ elif mode == 'Audio':
 					st.text_area( label, value=st.session_state[ 'audio_output' ], height=300 )
 			else:
 				data = cfg.AUDIO_TEST_FILE
-				st.caption( 'Local Audio File' )
 				if data is not None:
 					if isinstance( audio_rate, int ) and audio_rate > 0:
 						st.audio( data, sample_rate=audio_rate, start_time=audio_start,
@@ -6493,7 +6492,7 @@ elif mode == 'Images':
 	
 	if image_input:
 		right_parts.append( f'Messages: {len( image_input )}' )
-	
+
 elif mode == 'Audio':
 	audio_task = st.session_state.get( 'audio_task' )
 	audio_format = st.session_state.get( 'audio_format' )
