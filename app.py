@@ -3692,8 +3692,7 @@ if mode == 'Text':
 						stream_placeholder.markdown( ''.join( stream_buffer ) + '▌' )
 					
 					try:
-						response = text.generate_text(
-							prompt=prompt,
+						response = text.generate_text( prompt=prompt,
 							model=st.session_state.get( 'text_model' ),
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
@@ -3731,11 +3730,11 @@ if mode == 'Text':
 							st.markdown( response )
 						
 						st.session_state.text_messages.append(
-							{
-									'role': 'assistant',
-									'content': str( response ).strip( ),
-							}
-						)
+						{
+							'role': 'assistant',
+							'content': str( response ).strip( ),
+						} )
+						
 						st.session_state.last_answer = str( response ).strip( )
 					else:
 						st.error( 'Generation Failed!.' )
