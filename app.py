@@ -4957,102 +4957,6 @@ elif mode == 'Embedding':
 					key='embedding_vectors' )
 
 # ======================================================================================
-# VECTORSTORES MODE
-# ======================================================================================
-elif mode == 'Vector Stores':
-	stores_model = st.session_state.get( 'stores_model', None )
-	stores_format = st.session_state.get( 'stores_response_format', None )
-	stores_top_percent = st.session_state.get( 'stores_top_percent', None )
-	stores_frequency = st.session_state.get( 'stores_frequency_penalty', None )
-	stores_presence = st.session_state.get( 'stores_presence_penalty', None )
-	stores_number = st.session_state.get( 'stores_number', None )
-	stores_temperature = st.session_state.get( 'stores_temperature', None )
-	stores_stream = st.session_state.get( 'stores_stream', None )
-	stores_store = st.session_state.get( 'stores_store', None )
-	stores_input = st.session_state.get( 'stores_input', None )
-	stores_reasoning = st.session_state.get( 'stores_reasoning', None )
-	stores_tool_choice = st.session_state.get( 'stores_tool_choice', None )
-	stores_messages = st.session_state.get( 'stores_messages', None )
-	stores_background = st.session_state.get( 'stores_background', None )
-	searcher = None
-	
-	# ------------------------------------------------------------------
-	# Main Chat UI
-	# ------------------------------------------------------------------
-	st.subheader( '🏛️ File Search Stores', help=cfg.VECTORSTORES_API )
-	st.divider( )
-	searcher = VectorStores( )
-	
-	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
-	with center:
-		st.caption( 'File Search Store Management' )
-		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
-		with stores_left:
-			# --------------------------------------------------------------
-			# Expander - Create File Search Store
-			# --------------------------------------------------------------
-			with st.expander( 'Create:', expanded=True ):
-				new_store_name = st.text_input( 'New File Search Store name' )
-				if st.button( '➕ Create' ):
-					if not new_store_name:
-						st.warning( 'Enter a File Search Store Name.' )
-					else:
-						try:
-							res = searcher.create( new_store_name )
-							st.success( f"Create call submitted for '{new_store_name}'." )
-						except Exception as exc:
-							st.error( f'Create store failed: {exc}' )
-		
-		with stores_right:
-			vs_map = getattr( searcher, 'collections', None )
-			# --------------------------------------------------------------
-			# Expander - Retreive Files
-			# --------------------------------------------------------------
-			with st.expander( 'Retreive:', expanded=True ):
-				options: List[ tuple ] = [ ]
-				if vs_map and isinstance( vs_map, dict ):
-					options = list( vs_map.items( ) )
-				
-				# --------------------------------------------------------------
-				# Select / Retrieve / Delete
-				# --------------------------------------------------------------
-				if options:
-					names = [ f'{n} — {i}' for n, i in options ]
-					sel = st.selectbox( 'Select File Search Store', options=names,
-						key='select_filestore' )
-					
-					sel_id: Optional[ str ] = None
-					for n, i in options:
-						if f'{n} — {i}' == sel:
-							sel_id = i
-							break
-					
-					c1, c2 = st.columns( [ 1, 1 ] )
-					
-					with c1:
-						if st.button( '📥 Retrieve File Search Store', key='retrieve_filestore' ):
-							if not sel_id:
-								st.warning( 'No File Search Store Selected!' )
-							else:
-								try:
-									vs = searcher.retrieve( store_id=sel_id )
-									st.write( 'Name:', vs.name )
-									st.write( 'Files:', vs.file_counts )
-									st.write( 'Size (MB):', round( vs.usage_bytes / 1_048_576, 2 ) )
-								except Exception as exc:
-									st.error( f'retrieve() failed: {exc}' )
-					
-					with c2:
-						if st.button( '❌ Delete File Search Store', key='delete_store' ):
-							if not sel_id:
-								st.warning( 'No File Search Store Selected.' )
-							else:
-								try:
-									vs = searcher.delete( store_id=sel_id )
-								except Exception as exc:
-									st.error( f'Delete failed: {exc}' )
-
-# ======================================================================================
 # DOCUMENTS MODE
 # ======================================================================================
 elif mode == 'Document Q&A':
@@ -5518,6 +5422,102 @@ elif mode == 'Files':
 		if st.button( 'Clear Messages' ):
 			reset_state( )
 			st.rerun( )
+
+# ======================================================================================
+# VECTORSTORES MODE
+# ======================================================================================
+elif mode == 'Vector Stores':
+	stores_model = st.session_state.get( 'stores_model', None )
+	stores_format = st.session_state.get( 'stores_response_format', None )
+	stores_top_percent = st.session_state.get( 'stores_top_percent', None )
+	stores_frequency = st.session_state.get( 'stores_frequency_penalty', None )
+	stores_presence = st.session_state.get( 'stores_presence_penalty', None )
+	stores_number = st.session_state.get( 'stores_number', None )
+	stores_temperature = st.session_state.get( 'stores_temperature', None )
+	stores_stream = st.session_state.get( 'stores_stream', None )
+	stores_store = st.session_state.get( 'stores_store', None )
+	stores_input = st.session_state.get( 'stores_input', None )
+	stores_reasoning = st.session_state.get( 'stores_reasoning', None )
+	stores_tool_choice = st.session_state.get( 'stores_tool_choice', None )
+	stores_messages = st.session_state.get( 'stores_messages', None )
+	stores_background = st.session_state.get( 'stores_background', None )
+	searcher = None
+	
+	# ------------------------------------------------------------------
+	# Main Chat UI
+	# ------------------------------------------------------------------
+	st.subheader( '🏛️ File Search Stores', help=cfg.VECTORSTORES_API )
+	st.divider( )
+	searcher = VectorStores( )
+	
+	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
+	with center:
+		st.caption( 'File Search Store Management' )
+		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
+		with stores_left:
+			# --------------------------------------------------------------
+			# Expander - Create File Search Store
+			# --------------------------------------------------------------
+			with st.expander( 'Create:', expanded=True ):
+				new_store_name = st.text_input( 'New File Search Store name' )
+				if st.button( '➕ Create' ):
+					if not new_store_name:
+						st.warning( 'Enter a File Search Store Name.' )
+					else:
+						try:
+							res = searcher.create( new_store_name )
+							st.success( f"Create call submitted for '{new_store_name}'." )
+						except Exception as exc:
+							st.error( f'Create store failed: {exc}' )
+		
+		with stores_right:
+			vs_map = getattr( searcher, 'collections', None )
+			# --------------------------------------------------------------
+			# Expander - Retreive Files
+			# --------------------------------------------------------------
+			with st.expander( 'Retreive:', expanded=True ):
+				options: List[ tuple ] = [ ]
+				if vs_map and isinstance( vs_map, dict ):
+					options = list( vs_map.items( ) )
+				
+				# --------------------------------------------------------------
+				# Select / Retrieve / Delete
+				# --------------------------------------------------------------
+				if options:
+					names = [ f'{n} — {i}' for n, i in options ]
+					sel = st.selectbox( 'Select File Search Store', options=names,
+						key='select_filestore' )
+					
+					sel_id: Optional[ str ] = None
+					for n, i in options:
+						if f'{n} — {i}' == sel:
+							sel_id = i
+							break
+					
+					c1, c2 = st.columns( [ 1, 1 ] )
+					
+					with c1:
+						if st.button( '📥 Retrieve File Search Store', key='retrieve_filestore' ):
+							if not sel_id:
+								st.warning( 'No File Search Store Selected!' )
+							else:
+								try:
+									vs = searcher.retrieve( store_id=sel_id )
+									st.write( 'Name:', vs.name )
+									st.write( 'Files:', vs.file_counts )
+									st.write( 'Size (MB):', round( vs.usage_bytes / 1_048_576, 2 ) )
+								except Exception as exc:
+									st.error( f'retrieve() failed: {exc}' )
+					
+					with c2:
+						if st.button( '❌ Delete File Search Store', key='delete_store' ):
+							if not sel_id:
+								st.warning( 'No File Search Store Selected.' )
+							else:
+								try:
+									vs = searcher.delete( store_id=sel_id )
+								except Exception as exc:
+									st.error( f'Delete failed: {exc}' )
 
 # ======================================================================================
 # PROMPT ENGINEERING MODE
