@@ -338,12 +338,6 @@ if 'text_context' not in st.session_state:
 if 'image_max_tokens' not in st.session_state:
 	st.session_state[ 'image_max_tokens' ] = 0
 
-if 'image_max_calls' not in st.session_state:
-	st.session_state[ 'image_max_calls' ] = 0
-
-if 'image_max_searches' not in st.session_state:
-	st.session_state[ 'image_max_searches' ] = 0
-
 if 'image_temperature' not in st.session_state:
 	st.session_state[ 'image_temperature' ] = 0.0
 
@@ -353,26 +347,8 @@ if 'image_top_percent' not in st.session_state:
 if 'image_number' not in st.session_state:
 	st.session_state[ 'image_number' ] = 1
 
-if 'image_parallel_tools' not in st.session_state:
-	st.session_state[ 'image_parallel_tools' ] = False
-
-if 'image_tool_choice' not in st.session_state:
-	st.session_state[ 'image_tool_choice' ] = ''
-
-if 'image_media_resolution' not in st.session_state:
-	st.session_state[ 'image_media_resolution' ] = ''
-
-if 'image_reasoning' not in st.session_state:
-	st.session_state[ 'image_reasoning' ] = ''
-
-if 'image_resolution' not in st.session_state:
-	st.session_state[ 'image_resolution' ] = ''
-
 if 'image_aspect_ratio' not in st.session_state:
 	st.session_state[ 'image_aspect_ratio' ] = ''
-
-if 'image_response_format' not in st.session_state:
-	st.session_state[ 'image_response_format' ] = ''
 
 if 'image_mime_type' not in st.session_state:
 	st.session_state[ 'image_mime_type' ] = ''
@@ -380,26 +356,11 @@ if 'image_mime_type' not in st.session_state:
 if 'image_input' not in st.session_state:
 	st.session_state[ 'image_input' ] = [ ]
 
-if 'image_include' not in st.session_state:
-	st.session_state[ 'image_include' ] = [ ]
-
 if 'image_tools' not in st.session_state:
 	st.session_state[ 'image_tools' ] = [ ]
 
 if 'image_modality' not in st.session_state:
 	st.session_state[ 'image_modality' ] = ''
-
-if 'image_modalities' not in st.session_state:
-	st.session_state[ 'image_modalities' ] = [ ]
-
-if 'image_context' not in st.session_state:
-	st.session_state[ 'image_context' ] = [ ]
-
-if 'image_urls' not in st.session_state:
-	st.session_state[ 'image_urls' ] = [ ]
-
-if 'image_content' not in st.session_state:
-	st.session_state[ 'image_content' ] = [ ]
 
 if 'image_grounded' not in st.session_state:
 	st.session_state[ 'image_grounded' ] = False
@@ -411,9 +372,6 @@ if 'image_image_search' not in st.session_state:
 
 if 'image_mode' not in st.session_state:
 	st.session_state[ 'image_mode' ] = ''
-
-if 'image_url' not in st.session_state:
-	st.session_state[ 'image_url' ] = ''
 
 if 'image_size' not in st.session_state:
 	st.session_state[ 'image_size' ] = ''
@@ -3765,20 +3723,13 @@ elif mode == "Images":
 	st.divider( )
 	image_model = st.session_state.get( 'image_model', '' )
 	image_number = st.session_state.get( 'image_number', 1 )
-	image_max_calls = st.session_state.get( 'image_max_calls', 0 )
-	image_max_searches = st.session_state.get( 'image_max_searches', 0 )
 	image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
 	image_top_percent = st.session_state.get( 'image_top_percent', 0.0 )
 	image_temperature = st.session_state.get( 'image_temperature', 0.0 )
 	image_mime_type = st.session_state.get( 'image_mime_type', '' )
-	image_content = st.session_state.get( 'image_content', '' )
 	image_mode = st.session_state.get( 'image_mode', '' )
-	image_media_resolution = st.session_state.get( 'image_media_resolution', '' )
 	image_size = st.session_state.get( 'image_size', '' )
 	image_aspect_ratio = st.session_state.get( 'image_aspect_ratio', '' )
-	image_modalities = st.session_state.get( 'image_modalities', [ ] )
-	image_urls = st.session_state.get( 'image_urls', [ ] )
-	image_include = st.session_state.get( 'image_include', [ ] )
 	image_tools = st.session_state.get( 'image_tools', [ ] )
 	image_input = st.session_state.get( 'image_input', [ ] )
 	image_modality = st.session_state.get( 'image_modality', '' )
