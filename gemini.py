@@ -1143,6 +1143,8 @@ class Images( Gemini ):
 		self.content_response = None
 		self.response = None
 		self.grounding_metadata = None
+		self.output_mime_type = None
+		self.response_mode = None
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
@@ -1154,7 +1156,6 @@ class Images( Gemini ):
 			
 		"""
 		return [ 'gemini-2.5-flash-image',
-		         'gemini-3-pro-image-preview',
 		         'gemini-3.1-flash-image-preview' ]
 	
 	@property
@@ -1204,7 +1205,7 @@ class Images( Gemini ):
 			A List[ str ] of available modality options
 
 		'''
-		return [ 'MODALITY_UNSPECIFIED', 'TEXT', 'IMAGE', 'AUDIO', 'DOCUMENT' ]
+		return [ 'TEXT', 'IMAGE', 'TEXT_AND_IMAGE' ]
 	
 	@property
 	def reasoning_options( self ) -> List[ str ] | None:
@@ -1238,11 +1239,7 @@ class Images( Gemini ):
 			A List[ str ] of available tools options
 
 		'''
-		return [ 'google_search',
-		         'google_maps',
-		         'file_search',
-		         'code_execution',
-		         'computer_use' ]
+		return [ 'google_search', 'image_search' ]
 	
 	@property
 	def choice_options( self ) -> List[ str ] | None:
@@ -1253,10 +1250,7 @@ class Images( Gemini ):
 			A List[ str ] of available tools options
 
 		'''
-		return [ 'AUTO',
-		         'ANY',
-		         'NONE',
-		         'VALIDATED' ]
+		return [ 'AUTO', 'ANY', 'NONE', 'VALIDATED' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
@@ -1282,9 +1276,7 @@ class Images( Gemini ):
 		'''
 		return [ 'image/jpeg',
 		         'image/png',
-		         'image/webp',
-		         'image/heic',
-		         'image/heif' ]
+		         'image/webp' ]
 	
 	@property
 	def resolution_options( self ) -> List[ str ] | None:
@@ -1298,38 +1290,33 @@ class Images( Gemini ):
 		return [ '1K', '2K', '4K' ]
 	
 	def _supports_image_size( self, model: str = None ) -> bool:
-		"""
-			
-			Purpose:
-			-----------
-			Determines whether the selected model supports the image_size field.
-			
-			Parameters:
-			-----------
-			model: str - The Gemini image model identifier.
-			
-			Returns:
-			--------
-			bool - True when image_size is supported; otherwise False.
-			
-		"""
 		try:
 			self.model_name = str( model or self.model ).strip( )
-			return self.model_name in [ 'gemini-3.1-flash-image-preview',
-			                            'gemini-3-pro-image-preview' ]
+			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = '_supports_image_size( self, model=None ) -> bool'
 			raise exception
-	
+
 	def _supports_search_grounding( self, model: str = None ) -> bool:
+		try:
+			self.model_name = str( model or self.model ).strip( )
+			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = '_supports_search_grounding( self, model=None ) -> bool'
+			raise exception
+	
+	def _supports_image_search( self, model: str = None ) -> bool:
 		"""
 			
 			Purpose:
 			-----------
-			Determines whether the selected image model supports Google Search grounding.
+			Determines whether the selected image model supports Google Image Search grounding.
 			
 			Parameters:
 			-----------
@@ -1337,18 +1324,56 @@ class Images( Gemini ):
 			
 			Returns:
 			--------
-			bool - True when Search grounding is supported; otherwise False.
+			bool - True when Google Image Search grounding is supported; otherwise False.
 			
 		"""
 		try:
 			self.model_name = str( model or self.model ).strip( )
-			return self.model_name in [ 'gemini-3.1-flash-image-preview',
-			                            'gemini-3-pro-image-preview' ]
+			return self.model_name == 'gemini-3.1-flash-image-preview'
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_supports_search_grounding( self, model=None ) -> bool'
+			exception.method = '_supports_image_search( self, model=None ) -> bool'
+			raise exception
+	
+	def _normalize_response_modalities( self, response_modalities: Optional[ str ],
+			image_only: bool = False ) -> List[ str ]:
+		"""
+			
+			Purpose:
+			-----------
+			Normalizes the UI response-mode selection into Gemini response modalities.
+			
+			Parameters:
+			-----------
+			response_modalities: Optional[ str ] - UI-selected response mode.
+			image_only: bool - Indicates whether the workflow defaults to image output.
+			
+			Returns:
+			--------
+			List[ str ] - Normalized Gemini response modalities.
+			
+		"""
+		try:
+			self.mode_name = str( response_modalities or '' ).strip( ).upper( )
+			
+			if self.mode_name == 'TEXT_AND_IMAGE':
+				return [ 'TEXT', 'IMAGE' ]
+			
+			if self.mode_name == 'TEXT':
+				return [ 'TEXT' ]
+			
+			if self.mode_name == 'IMAGE':
+				return [ 'IMAGE' ]
+			
+			return [ 'IMAGE' ] if image_only else [ 'TEXT' ]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = ('_normalize_response_modalities( self, response_modalities=None, '
+			                    'image_only=False ) -> List[ str ]')
 			raise exception
 	
 	def _build_grounding_tool( self, image_search: bool = False ) -> Optional[ Tool ]:
@@ -1374,7 +1399,7 @@ class Images( Gemini ):
 			self.use_image_search = bool( image_search )
 			self.model_name = str( self.model ).strip( )
 			
-			if self.model_name == 'gemini-3.1-flash-image-preview' and self.use_image_search:
+			if self.use_image_search and self._supports_image_search( self.model_name ):
 				try:
 					return Tool(
 						google_search=types.GoogleSearch(
@@ -1396,7 +1421,8 @@ class Images( Gemini ):
 			raise exception
 	
 	def _get_content_config( self, image_only: bool = False, grounded: bool = False,
-			image_search: bool = False ) -> GenerateContentConfig:
+			image_search: bool = False, response_modalities: Optional[ str ] = None,
+			output_mime_type: Optional[ str ] = None ) -> GenerateContentConfig:
 		"""
 			
 			Purpose:
@@ -1405,9 +1431,11 @@ class Images( Gemini ):
 			
 			Parameters:
 			-----------
-			image_only: bool - Indicates whether only image output should be returned.
+			image_only: bool - Indicates whether only image output should be returned by default.
 			grounded: bool - Indicates whether Google Search grounding should be enabled.
 			image_search: bool - Indicates whether Google Image Search grounding should be used.
+			response_modalities: Optional[ str ] - UI-selected response mode.
+			output_mime_type: Optional[ str ] - Desired output image MIME type.
 			
 			Returns:
 			--------
@@ -1418,13 +1446,15 @@ class Images( Gemini ):
 			self.image_config = None
 			self.tool_config = None
 			self.grounding_metadata = None
-			
 			self.image_kwargs = { }
 			if self.aspect_ratio:
 				self.image_kwargs[ 'aspect_ratio' ] = self.aspect_ratio
 			
 			if self.size and self._supports_image_size( self.model ):
 				self.image_kwargs[ 'image_size' ] = self.size
+			
+			if output_mime_type:
+				self.image_kwargs[ 'output_mime_type' ] = output_mime_type
 			
 			if len( self.image_kwargs ) > 0:
 				self.image_config = types.ImageConfig( **self.image_kwargs )
@@ -1434,10 +1464,14 @@ class Images( Gemini ):
 				if self.grounding_tool is not None:
 					self.tool_config = [ self.grounding_tool ]
 			
-			self.response_modalities = [ 'IMAGE' ] if image_only else [ 'TEXT' ]
+			self.response_modalities = self._normalize_response_modalities(
+				response_modalities=response_modalities,
+				image_only=image_only)
+			
 			self.config_kwargs = {
 					'temperature': self.temperature,
 					'top_p': self.top_p,
+					'candidate_count': self.number,
 					'max_output_tokens': self.max_output_tokens,
 					'system_instruction': self.instructions,
 					'response_modalities': self.response_modalities
@@ -1455,8 +1489,9 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = ('_get_content_config( self, image_only=False, '
-			                    'grounded=False, image_search=False ) -> GenerateContentConfig')
+			exception.method = ('_get_content_config( self, image_only=False, grounded=False, '
+			                    'image_search=False, response_modalities=None, '
+			                    'output_mime_type=None ) -> GenerateContentConfig')
 			raise exception
 	
 	def _open_image( self, path: str ) -> PIL.Image.Image:
@@ -1468,20 +1503,17 @@ class Images( Gemini ):
 			
 			Parameters:
 			-----------
-			path: str - Path to the local image.
+			path: str - Path to the local image file.
 			
 			Returns:
 			--------
-			PIL.Image.Image - Loaded PIL image.
+			PIL.Image.Image - Opened local image.
 			
 		"""
 		try:
 			throw_if( 'path', path )
-			image = PIL.Image.open( path )
-			if image.mode not in ('RGB', 'RGBA'):
-				image = image.convert( 'RGB' )
-			
-			return image
+			with PIL.Image.open( path ) as source:
+				return source.copy( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -1625,7 +1657,8 @@ class Images( Gemini ):
 	def generate( self, prompt: str, model: str = 'gemini-2.5-flash-image', aspect: str = None,
 			number: int = None, temperature: float = None, top_p: float = None,
 			frequency: float = None, presence: float = None, max_tokens: int = None,
-			resolution: str = None, instruct: str = None, grounded: bool = False,
+			resolution: str = None, instruct: str = None, output_mime_type: str = None,
+			response_modalities: str = None, grounded: bool = False,
 			image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
@@ -1638,6 +1671,8 @@ class Images( Gemini ):
 			prompt: str - Image description.
 			aspect: str - Aspect ratio.
 			resolution: str - Output image size when supported by the selected model.
+			output_mime_type: str - Requested output MIME type for returned image content.
+			response_modalities: str - UI-selected Gemini response mode.
 			grounded: bool - Enables Google Search grounding when supported by the selected model.
 			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
 			
@@ -1659,13 +1694,21 @@ class Images( Gemini ):
 			self.presence_penalty = presence
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
+			self.output_mime_type = output_mime_type
+			self.response_mode = response_modalities
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config( image_only=True, grounded=grounded,
-				image_search=image_search )
+			self.content_config = self._get_content_config(
+				image_only=True,
+				grounded=grounded,
+				image_search=image_search,
+				response_modalities=self.response_mode,
+				output_mime_type=self.output_mime_type
+			)
 			self.content_response = self.client.models.generate_content(
 				model=self.model,
 				contents=[ self.prompt ],
-				config=self.content_config )
+				config=self.content_config
+			)
 			self.response = self.content_response
 			self._capture_grounding_metadata( )
 			return self._get_first_image( )
@@ -1680,6 +1723,7 @@ class Images( Gemini ):
 			aspect: str = None, number: int = None, temperature: float = None,
 			top_p: float = None, frequency: float = None, presence: float = None,
 			max_tokens: int = None, resolution: str = None, instruct: str = None,
+			output_mime_type: str = None, response_modalities: str = None,
 			grounded: bool = False, image_search: bool = False ) -> Optional[ str ]:
 		"""
 			
@@ -1691,8 +1735,8 @@ class Images( Gemini ):
 			-----------
 			prompt: str - Analysis instruction.
 			path: str - Path to the local image.
-			aspect: str - Aspect ratio.
-			resolution: str - Output image size when supported by the selected model.
+			output_mime_type: str - Reserved for API consistency; not used for text analysis output.
+			response_modalities: str - UI-selected Gemini response mode.
 			grounded: bool - Enables Google Search grounding when supported by the selected model.
 			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
 			
@@ -1707,21 +1751,29 @@ class Images( Gemini ):
 			self.prompt = prompt
 			self.model = model
 			self.number = number
-			self.aspect_ratio = aspect
-			self.size = resolution
+			self.aspect_ratio = None
+			self.size = None
 			self.top_p = top_p
 			self.temperature = temperature
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
+			self.output_mime_type = None
+			self.response_mode = response_modalities or 'TEXT'
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config( image_only=False, grounded=grounded,
-				image_search=image_search )
+			self.content_config = self._get_content_config(
+				image_only=False,
+				grounded=grounded,
+				image_search=image_search,
+				response_modalities=self.response_mode,
+				output_mime_type=self.output_mime_type
+			)
 			self.content_response = self.client.models.generate_content(
 				model=self.model,
 				contents=[ self.prompt, self._open_image( path ) ],
-				config=self.content_config )
+				config=self.content_config
+			)
 			self.response = self.content_response
 			self._capture_grounding_metadata( )
 			return self._get_output_text( )
@@ -1736,6 +1788,7 @@ class Images( Gemini ):
 			aspect: str = None, number: int = None, temperature: float = None,
 			top_p: float = None, frequency: float = None, presence: float = None,
 			max_tokens: int = None, resolution: str = None, instruct: str = None,
+			output_mime_type: str = None, response_modalities: str = None,
 			grounded: bool = False, image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
@@ -1749,6 +1802,8 @@ class Images( Gemini ):
 			path: str - Path to the local image.
 			aspect: str - Aspect ratio.
 			resolution: str - Output image size when supported by the selected model.
+			output_mime_type: str - Requested output MIME type for returned image content.
+			response_modalities: str - UI-selected Gemini response mode.
 			grounded: bool - Enables Google Search grounding when supported by the selected model.
 			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
 			
@@ -1771,13 +1826,21 @@ class Images( Gemini ):
 			self.presence_penalty = presence
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
+			self.output_mime_type = output_mime_type
+			self.response_mode = response_modalities
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config( image_only=True, grounded=grounded,
-				image_search=image_search )
+			self.content_config = self._get_content_config(
+				image_only=True,
+				grounded=grounded,
+				image_search=image_search,
+				response_modalities=self.response_mode,
+				output_mime_type=self.output_mime_type
+			)
 			self.content_response = self.client.models.generate_content(
 				model=self.model,
 				contents=[ self.prompt, self._open_image( path ) ],
-				config=self.content_config )
+				config=self.content_config
+			)
 			self.response = self.content_response
 			self._capture_grounding_metadata( )
 			return self._get_first_image( )
