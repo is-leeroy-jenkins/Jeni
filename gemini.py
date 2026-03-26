@@ -267,197 +267,175 @@ class Chat( Gemini ):
 		"""
 		return [ 'gemini-2.5-flash',
 		         'gemini-2.5-flash-lite',
+		         'gemini-2.5-pro',
 		         'gemini-3-flash-preview',
 		         'gemini-3.1-flash-lite-preview',
+		         'gemini-3.1-pro-preview',
 		         'gemini-2.0-flash',
 		         'gemini-2.0-flash-lite' ]
 	
 	@property
-	def version_options( self ) -> List[ str ] | None:
-		"""
-			
-			Purpose:
-			--------
-			Returns list of available API versions.
-			
-		"""
-		return [ 'v1',
-		         'v1alpha',
-		         'v1beta1' ]
-	
-	@property
-	def format_options( self ):
-		'''
-			
-			Returns:
-			--------
-			A List[ str ] of mime types
-			
-		'''
-		return [ 'text/plain',
-		         'application/json',
-		         'text/x.enum' ]
-	
-	@property
 	def tool_options( self ) -> List[ str ] | None:
-		'''
-
+		"""
+	
 			Returns:
 			--------
 			A List[ str ] of available tools options
-
-		'''
+	
+		"""
 		return [ 'google_search',
 		         'google_maps',
 		         'url_context',
 		         'code_execution',
 		         'computer_use' ]
 	
-	@property
-	def media_options( self ):
-		'''
-		
-		Purpose:
-		--------
-		Returns a List[ str ] of media resolution options.
-		
-		'''
-		return [ 'media_resolution_high',
-		         'media_resolution_medium',
-		         'media_resolution_low' ]
-	
-	@property
-	def choice_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available tools options
-
-		'''
-		return [ 'AUTO',
-		         'ANY',
-		         'NONE',
-		         'VALIDATED' ]
-	
-	@property
-	def reasoning_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of thinking effort options
-
-		'''
-		return [ 'THINKING_LEVEL_UNSPECIFIED',
-		         'MINIMAL',
-		         'LOW',
-		         'MEDIUM',
-		         'HIGH' ]
-	
-	@property
-	def modality_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available modality options
-
-		'''
-		return [ 'MODALITY_UNSPECIFIED',
-		         'TEXT',
-		         'IMAGE',
-		         'AUDIO' ]
-	
-	@property
-	def safety_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of safety profile options
-
-		'''
-		return [ '',
-		         'strict',
-		         'balanced',
-		         'permissive' ]
-	
-	def _build_contents( self, prompt: str, context: List[ Dict[ str, Any ] ] = None,
-			content: str = None ) -> str | List[ Content ]:
+	def get_supported_tool_options( self, model: str = None ) -> List[ str ]:
 		"""
 		
 			Purpose:
 			--------
-			Builds Gemini contents from the current
-			prompt and any prior conversational context.
+			Returns the subset of built-in Gemini tools supported by the selected model.
 			
 			Parameters:
 			-----------
-			prompt: str - Current user prompt.
-			context: List[ Dict[ str, Any ] ] - Prior chat messages.
-			content: str - Optional prepended content block.
+			model: str - Optional Gemini model identifier.
 			
 			Returns:
 			--------
-			Union[ str, List[ Content ] ] - Contents payload for Gemini.
+			List[ str ] - Supported tool names.
 		
 		"""
 		try:
-			throw_if( 'prompt', prompt )
-			self.prompt = prompt
-			self.context = context if context is not None else [ ]
-			self.content_block = content
-			self.contents = [ ]
+			self.model_name = str( model or self.model or '' ).strip( )
+			self.options = [ 'google_search', 'url_context', 'code_execution' ]
 			
-			for item in self.context:
-				if not isinstance( item, dict ):
-					continue
-				
-				role = item.get( 'role', 'user' )
-				text = item.get( 'content', None )
-				if text is None:
-					continue
-				
-				text = str( text ).strip( )
-				if not text:
-					continue
-				
-				if role == 'assistant':
-					self.contents.append(
-						Content(
-							role='model',
-							parts=[ Part.from_text( text=text ) ]
-						)
-					)
-				else:
-					self.contents.append(
-						Content(
-							role='user',
-							parts=[ Part.from_text( text=text ) ]
-						)
-					)
+			if self._supports_google_maps( self.model_name ):
+				self.options.append( 'google_maps' )
 			
-			self.user_text = str( self.prompt ).strip( )
-			if self.content_block is not None and str( self.content_block ).strip( ):
-				self.user_text = f"{str( self.content_block ).strip( )}\n\n{self.user_text}"
+			if self._supports_computer_use( self.model_name ):
+				self.options.append( 'computer_use' )
 			
-			self.contents.append(
-				Content(
-					role='user',
-					parts=[ Part.from_text( text=self.user_text ) ]
-				)
-			)
-			
-			return self.contents if len( self.contents ) > 0 else self.prompt
+			return self.options
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = ('_build_contents( self, prompt: str, '
-			                    'context: List[ Dict[ str, Any ] ]=None, '
-			                    'content: str=None )')
+			exception.method = 'get_supported_tool_options( self, model: str=None )'
 			raise exception
+	
+	def _resolve_api_key( self ) -> str | None:
+		"""
+		
+			Purpose:
+			--------
+			Resolves the Gemini developer API key at call-time.
+			
+			Returns:
+			--------
+			Optional[ str ] - Resolved API key.
+		
+		"""
+		try:
+			self.api_key = os.environ.get( 'GEMINI_API_KEY' )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = os.environ.get( 'GOOGLE_API_KEY' )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = getattr( cfg, 'GEMINI_API_KEY', None )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = getattr( cfg, 'GOOGLE_API_KEY', None )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_resolve_api_key( self ) -> str | None'
+			raise exception
+	
+	def _supports_google_maps( self, model: str = None ) -> bool:
+		"""
+		
+			Purpose:
+			--------
+			Determines whether the selected model should expose Google Maps grounding.
+			
+			Parameters:
+			-----------
+			model: str - Gemini model identifier.
+			
+			Returns:
+			--------
+			bool
+			
+		"""
+		try:
+			self.model_name = str( model or self.model or '' ).strip( ).lower( )
+			return self.model_name.startswith( 'gemini-3' )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_supports_google_maps( self, model: str=None ) -> bool'
+			raise exception
+	
+	def _supports_computer_use( self, model: str = None ) -> bool:
+		"""
+		
+			Purpose:
+			--------
+			Determines whether the selected model should expose Computer Use.
+			
+			Parameters:
+			-----------
+			model: str - Gemini model identifier.
+			
+			Returns:
+			--------
+			bool
+			
+		"""
+		try:
+			self.model_name = str( model or self.model or '' ).strip( ).lower( )
+			return self.model_name == 'gemini-3-flash-preview'
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = '_supports_computer_use( self, model: str=None ) -> bool'
+			raise exception
+	
+	def _normalize_positive_int( self, value: Any = None ) -> int | None:
+		"""
+		
+			Purpose:
+			--------
+			Normalizes positive integer request parameters. Zero and invalid values are omitted.
+			
+			Parameters:
+			-----------
+			value: Any - Candidate integer value.
+			
+			Returns:
+			--------
+			Optional[ int ]
+		
+		"""
+		try:
+			if value is None:
+				return None
+			
+			self.int_value = int( value )
+			return self.int_value if self.int_value > 0 else None
+		except Exception:
+			return None
 	
 	def _build_tools( self, tools: List[ str ] = None ) -> List[ Tool ] | None:
 		"""
@@ -479,13 +457,14 @@ class Chat( Gemini ):
 		try:
 			self.tools = tools if tools is not None else [ ]
 			self.tool_objects = [ ]
+			self.supported_tools = set( self.get_supported_tool_options( self.model ) )
 			
 			for name in self.tools:
 				if not isinstance( name, str ):
 					continue
 				
 				self.name = str( name ).strip( )
-				if not self.name:
+				if not self.name or self.name not in self.supported_tools:
 					continue
 				
 				if self.name == 'google_search':
@@ -511,277 +490,13 @@ class Chat( Gemini ):
 			exception.method = '_build_tools( self, tools: List[ str ]=None )'
 			raise exception
 	
-	def _build_tool_config( self, tool_choice: str = None,
-			tools: List[ Tool ] = None ) -> ToolConfig | None:
-		"""
-		
-			Purpose:
-			--------
-			Builds Gemini ToolConfig for function-calling
-			selection modes when applicable.
-			
-			Parameters:
-			-----------
-			tool_choice: str - Tool selection mode from the UI.
-			tools: List[ Tool ] - Built tool objects.
-			
-			Returns:
-			--------
-			Optional[ ToolConfig ] - Gemini tool configuration.
-		
-		"""
-		try:
-			self.tool_choice = str( tool_choice ).strip( ).upper( ) if tool_choice else ''
-			self.tools = tools if tools is not None else [ ]
-			
-			if not self.tool_choice:
-				return None
-			
-			if self.tool_choice == 'AUTO':
-				return None
-			
-			if self.tool_choice == 'NONE':
-				return None
-			
-			self.has_functions = False
-			for tool in self.tools:
-				if hasattr( tool, 'function_declarations' ):
-					if getattr( tool, 'function_declarations', None ):
-						self.has_functions = True
-						break
-			
-			if not self.has_functions:
-				return None
-			
-			self.function_calling_config = FunctionCallingConfig( mode=self.tool_choice )
-			return ToolConfig( function_calling_config=self.function_calling_config )
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = ('_build_tool_config( self, tool_choice: str=None, '
-			                    'tools: List[ Tool ]=None )')
-			raise exception
-	
-	def _build_modalities( self, modalities: List[ str ] = None ) -> List[ str ] | None:
-		"""
-		
-			Purpose:
-			--------
-			Normalizes Gemini response modalities.
-			
-			Parameters:
-			-----------
-			modalities: List[ str ] - Requested output modalities.
-			
-			Returns:
-			--------
-			Optional[ List[ str ] ] - Modalities or None.
-		
-		"""
-		try:
-			self.response_modalities = [ ]
-			if modalities is None or len( modalities ) == 0:
-				return None
-			
-			for modality in modalities:
-				if not isinstance( modality, str ):
-					continue
-				
-				self.modality = str( modality ).strip( ).upper( )
-				if self.modality and self.modality != 'MODALITY_UNSPECIFIED':
-					self.response_modalities.append( self.modality )
-			
-			return self.response_modalities if len( self.response_modalities ) > 0 else None
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = '_build_modalities( self, modalities: List[ str ]=None )'
-			raise exception
-	
-	def _build_reasoning( self, reasoning: str = None ) -> ThinkingConfig | None:
-		"""
-		
-			Purpose:
-			--------
-			Builds Gemini thinking configuration from
-			the selected reasoning level.
-			
-			Parameters:
-			-----------
-			reasoning: str - Thinking level string.
-			
-			Returns:
-			--------
-			Optional[ ThinkingConfig ] - Thinking configuration.
-		
-		"""
-		try:
-			if reasoning is None:
-				return None
-			
-			self.reasoning = str( reasoning ).strip( ).upper( )
-			if not self.reasoning or self.reasoning == 'THINKING_LEVEL_UNSPECIFIED':
-				return None
-			
-			self.thought_config = ThinkingConfig( thinking_level=self.reasoning )
-			return self.thought_config
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = '_build_reasoning( self, reasoning: str=None )'
-			raise exception
-	
-	def _build_urls( self, urls: List[ str ] = None, max_urls: int = None ) -> List[ str ]:
-		"""
-		
-			Purpose:
-			--------
-			Normalizes URL inputs for URL Context style grounding.
-			
-			Parameters:
-			-----------
-			urls: List[ str ] - Candidate URLs from the UI.
-			max_urls: int - Maximum number of URLs to keep.
-			
-			Returns:
-			--------
-			List[ str ] - Filtered URL list.
-		
-		"""
-		try:
-			self.urls = [ ]
-			self.max_urls = max_urls
-			
-			if urls is None:
-				return self.urls
-			
-			for item in urls:
-				if item is None:
-					continue
-				
-				self.url = str( item ).strip( )
-				if not self.url:
-					continue
-				
-				if self.url.lower( ).startswith( 'http://' ) or self.url.lower( ).startswith( 'https://' ):
-					self.urls.append( self.url )
-			
-			if self.max_urls is not None and self.max_urls > 0:
-				self.urls = self.urls[ :self.max_urls ]
-			
-			return self.urls
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = '_build_urls( self, urls: List[ str ]=None, max_urls: int=None )'
-			raise exception
-	
-	def _append_urls_to_content( self, content: str = None, urls: List[ str ]=None ) -> str | None:
-		"""
-		
-			Purpose:
-			--------
-			Appends URL context hints to the content block
-			for prompts using the URL Context tool.
-			
-			Parameters:
-			-----------
-			content: str - Existing content block.
-			urls: List[ str ] - URL inputs to append.
-			
-			Returns:
-			--------
-			Optional[ str ] - Updated content block.
-		
-		"""
-		try:
-			self.content_block = str( content ).strip( ) if content is not None else ''
-			self.urls = urls if urls is not None else [ ]
-			
-			if len( self.urls ) == 0:
-				return self.content_block if self.content_block else None
-			
-			self.url_block = 'Use the following URLs as grounding context:\n' + '\n'.join( self.urls )
-			if self.content_block:
-				return f'{self.content_block}\n\n{self.url_block}'
-			
-			return self.url_block
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = '_append_urls_to_content( self, content: str=None, urls: List[ str ]=None )'
-			raise exception
-	
-	def _build_safety_settings( self, safety_profile: str = None ) -> List[ SafetySetting ] | None:
-		"""
-		
-			Purpose:
-			--------
-			Builds Gemini safety settings from a named
-			safety profile.
-			
-			Parameters:
-			-----------
-			safety_profile: str - Named UI profile.
-			
-			Returns:
-			--------
-			Optional[ List[ SafetySetting ] ] - Safety settings list.
-		
-		"""
-		try:
-			self.safety_profile = str( safety_profile ).strip( ).lower( ) if safety_profile else ''
-			if not self.safety_profile:
-				return None
-			
-			self.threshold = None
-			if self.safety_profile == 'strict':
-				self.threshold = HarmBlockThreshold.BLOCK_LOW_AND_ABOVE
-			elif self.safety_profile == 'balanced':
-				self.threshold = HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE
-			elif self.safety_profile == 'permissive':
-				self.threshold = HarmBlockThreshold.BLOCK_ONLY_HIGH
-			else:
-				return None
-			
-			self.safety_settings = [
-					SafetySetting(
-						category=HarmCategory.HARM_CATEGORY_HARASSMENT,
-						threshold=self.threshold
-					),
-					SafetySetting(
-						category=HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-						threshold=self.threshold
-					),
-					SafetySetting(
-						category=HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-						threshold=self.threshold
-					),
-					SafetySetting(
-						category=HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-						threshold=self.threshold
-					),
-			]
-			return self.safety_settings
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = '_build_safety_settings( self, safety_profile: str=None )'
-			raise exception
-	
 	def _parse_response_schema( self, response_schema: Any = None ) -> Any:
 		"""
 		
 			Purpose:
 			--------
 			Normalizes a structured-output schema passed
-			as a dict or JSON string.
+			as a dict, JSON string, or schema class.
 			
 			Parameters:
 			-----------
@@ -806,7 +521,7 @@ class Chat( Gemini ):
 				
 				return json.loads( self.schema_text )
 			
-			return None
+			return response_schema
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -838,27 +553,26 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			self.model = model
-			self.number = number
-			self.candidate_count = number
+			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
+			self.number = self._normalize_positive_int( number )
+			self.candidate_count = self.number
 			self.temperature = temperature
 			self.top_p = top_p
-			self.top_k = top_k
+			self.top_k = self._normalize_positive_int( top_k )
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
-			self.max_tokens = max_tokens
+			self.max_tokens = self._normalize_positive_int( max_tokens )
 			self.stops = stops if stops is not None else [ ]
 			self.instructions = instruct
 			self.response_mime_type = response_format
 			self.response_schema = self._parse_response_schema( response_schema=response_schema )
 			self.safety_settings = self._build_safety_settings( safety_profile=safety_profile )
 			self.tool_choice = tool_choice
-			self.media_resolution = media_resolution
+			self.media_resolution = str( media_resolution ).strip( ) if media_resolution else None
 			self.tool_objects = self._build_tools( tools=tools )
 			self.function_tool_config = self._build_tool_config(
 				tool_choice=self.tool_choice,
-				tools=self.tool_objects
-			)
+				tools=self.tool_objects )
 			self.response_modalities = self._build_modalities( modalities=modalities )
 			self.thought_config = self._build_reasoning( reasoning=reasoning )
 			self.config_kwargs = { }
@@ -894,11 +608,16 @@ class Chat( Gemini ):
 				self.config_kwargs[ 'response_mime_type' ] = str( self.response_mime_type ).strip( )
 			
 			if self.response_schema is not None:
-				self.config_kwargs[ 'response_schema' ] = self.response_schema
+				if isinstance( self.response_schema, dict ):
+					self.config_kwargs[ 'response_json_schema' ] = self.response_schema
+				else:
+					self.config_kwargs[ 'response_schema' ] = self.response_schema
 			
-			if str( self.tool_choice ).strip( ).upper( ) != 'NONE':
-				if self.tool_objects is not None and len( self.tool_objects ) > 0:
-					self.config_kwargs[ 'tools' ] = self.tool_objects
+			if self.media_resolution is not None and self.media_resolution:
+				self.config_kwargs[ 'media_resolution' ] = self.media_resolution
+			
+			if self.tool_objects is not None and len( self.tool_objects ) > 0:
+				self.config_kwargs[ 'tools' ] = self.tool_objects
 			
 			if self.function_tool_config is not None:
 				self.config_kwargs[ 'tool_config' ] = self.function_tool_config
@@ -920,112 +639,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = '_build_config( self, model ) -> GenerateContentConfig'
 			raise exception
-		
-	def get_stream_output_text( self, stream_response: Any = None ) -> str | None:
-		"""
-		
-			Purpose:
-			--------
-			Aggregates text chunks returned from Gemini
-			streaming generation into a single string.
-			
-			Parameters:
-			-----------
-			stream_response: Any - Iterable Gemini stream response.
-			
-			Returns:
-			--------
-			Optional[ str ] - Joined response text or None.
-		
-		"""
-		try:
-			self.stream_response = stream_response
-			if self.stream_response is None:
-				return None
-			
-			self.text_blocks = [ ]
-			
-			for chunk in self.stream_response:
-				if chunk is None:
-					continue
-				
-				if hasattr( chunk, 'text' ):
-					self.chunk_text = getattr( chunk, 'text', None )
-					if self.chunk_text is not None and str( self.chunk_text ).strip( ):
-						self.text_blocks.append( str( self.chunk_text ) )
-						continue
-				
-				if hasattr( chunk, 'candidates' ) and chunk.candidates:
-					for candidate in chunk.candidates:
-						if not hasattr( candidate, 'content' ) or candidate.content is None:
-							continue
-						
-						if not hasattr( candidate.content, 'parts' ) or candidate.content.parts is None:
-							continue
-						
-						for part in candidate.content.parts:
-							if hasattr( part, 'text' ):
-								self.part_text = getattr( part, 'text', None )
-								if self.part_text is not None and str( self.part_text ).strip( ):
-									self.text_blocks.append( str( self.part_text ) )
-			
-			self.output_text = ''.join( self.text_blocks ).strip( )
-			return self.output_text if self.output_text else None
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = 'get_stream_output_text( self, stream_response: Any=None )'
-			raise exception
-		
-	def get_output_text( self ) -> str | None:
-		"""
-		
-			Purpose:
-			--------
-			Extracts the text output from the most recent
-			Gemini content response.
-			
-			Parameters:
-			-----------
-			self
-			
-			Returns:
-			--------
-			Optional[ str ] - Response text if available.
-		
-		"""
-		try:
-			if self.content_response is None:
-				return None
-			
-			if hasattr( self.content_response, 'text' ):
-				return self.content_response.text
-			
-			if hasattr( self.content_response, 'candidates' ) and self.content_response.candidates:
-				for candidate in self.content_response.candidates:
-					if not hasattr( candidate, 'content' ) or candidate.content is None:
-						continue
-					
-					if not hasattr( candidate.content, 'parts' ) or candidate.content.parts is None:
-						continue
-					
-					self.blocks = [ ]
-					for part in candidate.content.parts:
-						if hasattr( part, 'text' ) and part.text is not None:
-							self.blocks.append( str( part.text ) )
-					
-					if len( self.blocks ) > 0:
-						return '\n'.join( self.blocks ).strip( )
-			
-			return None
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = 'get_output_text( self ) -> str | None'
-			raise exception
-		
+	
 	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
 			number: int = None, temperature: float = None, top_p: float = None, top_k: int = None,
 			frequency: float = None, presence: float = None, max_tokens: int = None,
@@ -1034,7 +648,8 @@ class Chat( Gemini ):
 			modalities: List[ str ] = None, media_resolution: str = None,
 			context: List[ Dict[ str, Any ] ] = None, content: str = None,
 			urls: List[ str ] = None, max_urls: int = None, response_schema: Any = None,
-			safety_profile: str = None, stream: bool = False ) -> str | None:
+			safety_profile: str = None, stream: bool = False,
+			stream_handler: Any = None ) -> str | None:
 		"""
 		
 			Purpose:
@@ -1052,31 +667,67 @@ class Chat( Gemini ):
 		"""
 		try:
 			throw_if( 'prompt', prompt )
-			self.model = model
+			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
 			self.stream = bool( stream )
 			self.urls = self._build_urls( urls=urls, max_urls=max_urls )
 			self.content_block = self._append_urls_to_content( content=content, urls=self.urls )
-			self.contents = self._build_contents( prompt=prompt, context=context,
+			self.contents = self._build_contents(
+				prompt=prompt,
+				context=context,
 				content=self.content_block )
-			self.content_config = self._build_config( model=self.model, number=number,
-				temperature=temperature, top_p=top_p, top_k=top_k, frequency=frequency,
-				presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct,
-				response_format=response_format, tools=tools, tool_choice=tool_choice,
-				reasoning=reasoning, modalities=modalities, media_resolution=media_resolution,
-				response_schema=response_schema, safety_profile=safety_profile )
-			self.client = genai.Client( api_key=self.gemini_api_key )
+			self.content_config = self._build_config(
+				model=self.model,
+				number=number,
+				temperature=temperature,
+				top_p=top_p,
+				top_k=top_k,
+				frequency=frequency,
+				presence=presence,
+				max_tokens=max_tokens,
+				stops=stops,
+				instruct=instruct,
+				response_format=response_format,
+				tools=tools,
+				tool_choice=tool_choice,
+				reasoning=reasoning,
+				modalities=modalities,
+				media_resolution=media_resolution,
+				response_schema=response_schema,
+				safety_profile=safety_profile )
+			
+			self.api_key = self._resolve_api_key( )
+			throw_if( 'api_key', self.api_key )
+			self.client = genai.Client( api_key=self.api_key )
 			
 			if self.stream:
 				self.stream_response = self.client.models.generate_content_stream(
 					model=self.model,
 					contents=self.contents,
-					config=self.content_config
-				)
+					config=self.content_config )
+				
+				if stream_handler is not None:
+					self.text_blocks = [ ]
+					for chunk in self.stream_response:
+						if chunk is None:
+							continue
+						
+						self.chunk_text = getattr( chunk, 'text', None )
+						if self.chunk_text is None or not str( self.chunk_text ):
+							continue
+						
+						self.text_blocks.append( str( self.chunk_text ) )
+						stream_handler( str( self.chunk_text ) )
+					
+					self.output_text = ''.join( self.text_blocks ).strip( )
+					return self.output_text if self.output_text else None
 				
 				return self.get_stream_output_text( stream_response=self.stream_response )
 			
-			self.content_response = self.client.models.generate_content( model=self.model,
-				contents=self.contents, config=self.content_config )
+			self.content_response = self.client.models.generate_content(
+				model=self.model,
+				contents=self.contents,
+				config=self.content_config )
+			
 			return self.get_output_text( )
 		except Exception as e:
 			exception = Error( e )
@@ -1751,15 +1402,15 @@ class Images( Gemini ):
 			self.prompt = prompt
 			self.model = model
 			self.number = number
-			self.aspect_ratio = None
-			self.size = None
+			self.aspect_ratio = aspect
+			self.media_resolution = resolution
 			self.top_p = top_p
 			self.temperature = temperature
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
-			self.output_mime_type = None
+			self.output_mime_type = output_mime_type
 			self.response_mode = response_modalities or 'TEXT'
 			self.client = genai.Client( api_key=self.gemini_api_key )
 			self.content_config = self._get_content_config(
