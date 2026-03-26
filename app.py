@@ -3387,11 +3387,11 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_model_reset', width='stretch' ):
-					for key in [ 'text_model', 'text_max_urls',
-					             'text_reasoning', 'text_response_schema', 'text_tools' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
+					st.session_state[ 'text_model' ] = ''
+					st.session_state[ 'text_max_urls' ] = 0
+					st.session_state[ 'text_reasoning' ] = ''
+					st.session_state[ 'text_response_schema' ] = ''
+					st.session_state[ 'text_tools' ] = [ ]
 					st.rerun( )
 			
 			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
@@ -3441,11 +3441,11 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_inference_reset', width='stretch' ):
-					for key in [ 'text_top_percent', 'text_frequency_penalty',
-					             'text_presence_penalty', 'text_temperature', 'text_top_k', ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
+					st.session_state[ 'text_top_percent' ] = 0.0
+					st.session_state[ 'text_frequency_penalty' ] = 0.0
+					st.session_state[ 'text_presence_penalty' ] = 0.0
+					st.session_state[ 'text_temperature' ] = 0.0
+					st.session_state[ 'text_top_k' ] = 0
 					st.rerun( )
 					
 			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
@@ -3518,11 +3518,12 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_tools', width='stretch' ):
-					for key in [ 'text_number', 'text_tool_choice', 'text_media_resolution',
-					             'text_urls', 'text_urls_input', 'text_modalities' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
+					st.session_state[ 'text_number' ] = 0
+					st.session_state[ 'text_tool_choice' ] = ''
+					st.session_state[ 'text_media_resolution' ] = ''
+					st.session_state[ 'text_urls' ] = [ ]
+					st.session_state[ 'text_urls_input' ] = ''
+					st.session_state[ 'text_modalities' ] = [ ]
 					st.rerun( )
 					
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
@@ -3597,12 +3598,12 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_response', width='stretch' ):
-					for key in [ 'text_max_tokens', 'text_stops', 'text_stops_input',
-					             'text_safety_profile', 'text_stream',
-					             'text_response_format' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
+					st.session_state[ 'text_max_tokens' ] = 0
+					st.session_state[ 'text_stops' ] = [ ]
+					st.session_state[ 'text_stops_input' ] = ''
+					st.session_state[ 'text_safety_profile' ] = ''
+					st.session_state[ 'text_stream' ] = False
+					st.session_state[ 'text_response_format' ] = ''
 					st.rerun( )
 				
 		# ------------------------------------------------------------------
@@ -6357,38 +6358,52 @@ if mode == 'Text':
 	reasoning = st.session_state.get( 'text_reasoning' )
 	safety = st.session_state.get( 'text_safety_profile' )
 	
-	if temperature is not None:
-		right_parts.append( f'Temp: {temperature:.1%}' )
-	if top_p is not None:
-		right_parts.append( f'Top-P: {top_p:.1%}' )
-	if top_k is not None:
-		right_parts.append( f'Top-K: {top_k}' )
-	if freq is not None:
-		right_parts.append( f'Freq: {freq:.2f}' )
-	if presence is not None:
-		right_parts.append( f'Presence: {presence:.2f}' )
-	if number is not None:
-		right_parts.append( f'N: {number}' )
-	if max_tokens is not None:
-		right_parts.append( f'Max Tokens: {max_tokens}' )
-	if max_urls is not None:
-		right_parts.append( f'Max URLs: {max_urls}' )
+	if temperature is not None and float( temperature ) != 0.0:
+		right_parts.append( f'Temp: {float( temperature ): .1%}'.replace( ': ', ':' ) )
 	
-	if response_format:
-		right_parts.append( f'Format: {response_format}' )
+	if top_p is not None and float( top_p ) > 0.0:
+		right_parts.append( f'Top-P: {float( top_p ): .1%}'.replace( ': ', ':' ) )
+	
+	if top_k is not None and int( top_k ) > 0:
+		right_parts.append( f'Top-K: {int( top_k )}' )
+	
+	if freq is not None and float( freq ) != 0.0:
+		right_parts.append( f'Freq: {float( freq ):.2f}' )
+	
+	if presence is not None and float( presence ) != 0.0:
+		right_parts.append( f'Presence: {float( presence ):.2f}' )
+	
+	if number is not None and int( number ) > 0:
+		right_parts.append( f'N: {int( number )}' )
+	
+	if max_tokens is not None and int( max_tokens ) > 0:
+		right_parts.append( f'Max Tokens: {int( max_tokens )}' )
+	
+	if max_urls is not None and int( max_urls ) > 0:
+		right_parts.append( f'Max URLs: {int( max_urls )}' )
+	
+	if response_format is not None and str( response_format ).strip( ):
+		right_parts.append( f'Format: {str( response_format ).strip( )}' )
+	
 	if stream:
 		right_parts.append( 'Stream: On' )
-	if tools:
+	
+	if tools is not None and len( tools ) > 0:
 		right_parts.append( f'Tools: {len( tools )}' )
-	if tool_choice:
-		right_parts.append( f'Tool Choice: {tool_choice}' )
-	if reasoning:
-		right_parts.append( f'Reasoning: {reasoning}' )
-	if safety:
-		right_parts.append( f'Safety: {safety}' )
+	
+	if tool_choice is not None and str( tool_choice ).strip( ):
+		right_parts.append( f'Tool Choice: {str( tool_choice ).strip( )}' )
+	
+	if reasoning is not None and str( reasoning ).strip( ):
+		right_parts.append( f'Reasoning: {str( reasoning ).strip( )}' )
+	
+	if safety is not None and str( safety ).strip( ):
+		right_parts.append( f'Safety: {str( safety ).strip( )}' )
+	
 	if background:
 		right_parts.append( 'Background: On' )
-	if messages:
+	
+	if messages is not None and len( messages ) > 0:
 		right_parts.append( f'Messages: {len( messages )}' )
 
 elif mode == 'Images':
