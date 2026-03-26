@@ -3357,10 +3357,10 @@ if mode == 'Text':
 				# ---------- Max URLs ------------
 				with llm_c3:
 					set_text_max_urls = st.slider( label='Max URLs', min_value=0, max_value=25,
-						value=int( st.session_state.get( 'text_max_urls', 0 ) ), step=1,
+						key='text_max_urls', step=1,
 						help='Optional. Maximum number of URLs from the URL list to include.',
 						width='stretch' )
-				
+					
 					text_max_urls = st.session_state[ 'text_max_urls' ]
 				
 				# ---------- Thinking Level ------------
@@ -3666,6 +3666,8 @@ if mode == 'Text':
 		prompt = st.chat_input( 'Jeni Generate …' )
 		if prompt is not None and str( prompt ).strip( ):
 			prompt = str( prompt ).strip( )
+			_apply_gemini_runtime_config( )
+			
 			st.session_state.text_messages.append(
 				{
 						'role': 'user',
@@ -3676,14 +3678,18 @@ if mode == 'Text':
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
+					stream_buffer: List[ str ] = [ ]
+					stream_placeholder = st.empty( )
+					
+					def _on_stream_chunk( chunk: str ) -> None:
+						if chunk is None:
+							return
+						
+						stream_buffer.append( str( chunk ) )
+						stream_placeholder.markdown( ''.join( stream_buffer ) + '▌' )
 					
 					try:
-						structured_context = st.session_state.get( 'text_gemini_history', [ ] )
-						if structured_context is None or len( structured_context ) == 0:
-							structured_context = st.session_state.get( 'text_messages', [ ] )[ :-1 ]
-						
-						response = text.generate_text(
-							prompt=prompt,
+						response = text.generate_text( prompt=prompt,
 							model=st.session_state.get( 'text_model' ),
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
@@ -3700,32 +3706,32 @@ if mode == 'Text':
 							reasoning=st.session_state.get( 'text_reasoning' ),
 							modalities=st.session_state.get( 'text_modalities', [ ] ),
 							media_resolution=st.session_state.get( 'text_media_resolution' ),
-							context=structured_context,
+							context=st.session_state.get( 'text_messages', [ ] )[ :-1 ],
 							content=st.session_state.get( 'text_content' ),
 							urls=st.session_state.get( 'text_urls', [ ] ),
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
 							safety_profile=st.session_state.get( 'text_safety_profile' ),
 							stream=st.session_state.get( 'text_stream', False ),
-						)
+							stream_handler=_on_stream_chunk if st.session_state.get(
+								'text_stream', False ) else None )
 					except Exception as exc:
 						err = Error( exc )
 						st.error( f'Generation Failed: {err.info}' )
 						response = None
 					
 					if response is not None and str( response ).strip( ):
-						st.markdown( response )
+						if st.session_state.get( 'text_stream', False ):
+							stream_placeholder.markdown( str( response ).strip( ) )
+						else:
+							st.markdown( response )
+						
 						st.session_state.text_messages.append(
 							{
 									'role': 'assistant',
 									'content': str( response ).strip( ),
 							}
 						)
-						
-						structured_history = text.get_structured_history( )
-						if structured_history is not None and len( structured_history ) > 0:
-							st.session_state[ 'text_gemini_history' ] = structured_history
-						
 						st.session_state.last_answer = str( response ).strip( )
 					else:
 						st.error( 'Generation Failed!.' )
@@ -3733,7 +3739,6 @@ if mode == 'Text':
 		# --------  Reset Button
 		if st.button( 'Clear Messages' ):
 			st.session_state.text_messages = [ ]
-			st.session_state.text_gemini_history = [ ]
 			st.session_state.last_answer = ''
 			st.session_state.last_sources = [ ]
 			st.rerun( )

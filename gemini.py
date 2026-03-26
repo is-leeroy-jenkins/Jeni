@@ -273,21 +273,20 @@ class Chat( Gemini ):
 		         'gemini-3.1-pro-preview',
 		         'gemini-2.0-flash',
 		         'gemini-2.0-flash-lite' ]
-	
+		
 	@property
 	def tool_options( self ) -> List[ str ] | None:
-		"""
-	
+		'''
+
 			Returns:
 			--------
 			A List[ str ] of available tools options
-	
-		"""
+
+		'''
 		return [ 'google_search',
 		         'google_maps',
 		         'url_context',
-		         'code_execution',
-		         'computer_use' ]
+		         'code_execution' ]
 	
 	@property
 	def reasoning_options( self ) -> List[ str ] | None:
@@ -300,6 +299,85 @@ class Chat( Gemini ):
 		'''
 		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL',
 		         'LOW', 'MEDIUM', 'HIGH' ]
+	
+	@property
+	def media_options( self ):
+		'''
+		
+		Purpose:
+		--------
+		Returns a List[ str ] of media resolution options.
+		
+		'''
+		return [ 'media_resolution_high',
+		         'media_resolution_medium',
+		         'media_resolution_low' ]
+	
+	@property
+	def choice_options( self ) -> List[ str ] | None:
+		'''
+
+			Returns:
+			--------
+			A List[ str ] of available tools options
+
+		'''
+		return [ 'AUTO',
+		         'ANY',
+		         'NONE',
+		         'VALIDATED' ]
+	
+	@property
+	def include_options( self ) -> List[ str ] | None:
+		'''
+
+			Returns:
+			--------
+			A List[ str ] of the includeable options
+
+		'''
+		return [ 'file_search_call.results',
+		         'message.input_image.image_url',
+		         'message.output_text.logprobs',
+		         'reasoning.encrypted_content' ]
+	
+	@property
+	def modality_options( self ) -> List[ str ] | None:
+		'''
+
+			Returns:
+			--------
+			A List[ str ] of available modality options
+
+		'''
+		return [ 'MODALITY_UNSPECIFIED', 'TEXT', 'IMAGE', 'AUDIO' ]
+	
+	@property
+	def format_options( self ):
+		'''
+			
+			Returns:
+			--------
+			A List[ str ] of mime types
+			
+		'''
+		return [ 'text/plain',
+		         'application/json',
+		         'text/x.enum' ]
+	
+	@property
+	def safety_options( self ) -> List[ str ] | None:
+		'''
+
+			Returns:
+			--------
+			A List[ str ] of safety profile options
+
+		'''
+		return [ '',
+		         'strict',
+		         'balanced',
+		         'permissive' ]
 	
 	def get_supported_tool_options( self, model: str = None ) -> List[ str ]:
 		"""
@@ -318,14 +396,11 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			self.model_name = str( model or self.model or '' ).strip( )
+			self.model_name = str( model or self.model or '' ).strip( ).lower( )
 			self.options = [ 'google_search', 'url_context', 'code_execution' ]
 			
 			if self._supports_google_maps( self.model_name ):
 				self.options.append( 'google_maps' )
-			
-			if self._supports_computer_use( self.model_name ):
-				self.options.append( 'computer_use' )
 			
 			return self.options
 		except Exception as e:
@@ -390,7 +465,16 @@ class Chat( Gemini ):
 		"""
 		try:
 			self.model_name = str( model or self.model or '' ).strip( ).lower( )
-			return self.model_name.startswith( 'gemini-3' )
+			self.maps_models = {
+					'gemini-3.1-pro-preview',
+					'gemini-3.1-flash-lite-preview',
+					'gemini-3-flash-preview',
+					'gemini-2.5-pro',
+					'gemini-2.5-flash',
+					'gemini-2.5-flash-lite',
+					'gemini-2.0-flash'
+			}
+			return self.model_name in self.maps_models
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -415,8 +499,7 @@ class Chat( Gemini ):
 			
 		"""
 		try:
-			self.model_name = str( model or self.model or '' ).strip( ).lower( )
-			return self.model_name == 'gemini-3-flash-preview'
+			return False
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -490,9 +573,6 @@ class Chat( Gemini ):
 				
 				elif self.name == 'google_maps':
 					self.tool_objects.append( Tool( google_maps=types.GoogleMaps( ) ) )
-				
-				elif self.name == 'computer_use':
-					self.tool_objects.append( Tool( computer_use=types.ComputerUse( ) ) )
 			
 			return self.tool_objects if len( self.tool_objects ) > 0 else None
 		except Exception as e:
