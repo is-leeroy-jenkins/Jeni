@@ -1874,7 +1874,7 @@ class TTS( Gemini ):
 
 	    Purpose
 	    ___________
-	    Class for conversion of text to speech using Gemini multimodal output.
+	    Class for conversion of text to speech using Gemini TTS output.
 
 	    Attributes:
 	    -----------
@@ -1885,59 +1885,54 @@ class TTS( Gemini ):
 	    audio_path      : str - Target path
 	    response_format : str - Audio format
 	    input_text      : str - Original text
-	    use_vertex      : bool - Integration flag
 
 	    Methods:
 	    --------
-	    create_audio( text, path, format, speed, voice ) : Saves multimodal audio to file
+	    create_speech( text, filepath, model, format, speed, voice ) : Generates speech audio
 
     """
 	speed: Optional[ float ]
 	voice: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	voice_config: Optional[ VoiceConfig ]
-	speaker_config: Optional[ SpeakerVoiceConfig ]
 	speech_config: Optional[ SpeechConfig ]
 	client: Optional[ genai.Client ]
-	language_code: Optional[ str ]
 	audio_path: Optional[ str ]
 	response_format: Optional[ str ]
-	response_modalities = Optional[ List[ str ] ]
 	input_text: Optional[ str ]
+	audio_bytes: Optional[ bytes ]
 	
-	def __init__( self, model: str='gemini-2.5-flash-preview-tts'  ):
+	def __init__( self, model: str = 'gemini-2.5-flash-preview-tts' ):
 		super( ).__init__( )
 		self.number = None
 		self.model = model
-		self.speech_client = None
 		self.temperature = None
 		self.top_p = None
 		self.frequency_penalty = None
 		self.presence_penalty = None
 		self.max_tokens = None
 		self.instructions = None
-		self.language_code = None
 		self.voice_config = None
-		self.speaker_config = None
 		self.speech_config = None
 		self.content_config = None
 		self.client = None
 		self.voice = None
 		self.speed = None
+		self.response = None
 		self.response_format = None
 		self.audio_path = None
 		self.input_text = None
+		self.audio_bytes = None
 		self.response_modalities = [ ]
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
 		"""
-			
+
 			Purpose:
 			--------
-			Returns list of models supporting audio output.
-			
-			
+			Returns list of TTS-capable Gemini models.
+
 		"""
 		return [ 'gemini-2.5-flash-preview-tts',
 		         'gemini-2.5-pro-preview-tts' ]
@@ -1945,11 +1940,11 @@ class TTS( Gemini ):
 	@property
 	def voice_options( self ) -> List[ str ] | None:
 		"""
-			
+
 			Purpose:
 			--------
-			Returns list of available voice personas.
-			
+			Returns list of available prebuilt voices.
+
 		"""
 		return [ 'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede', 'Callirhoe',
 		         'Autonoe', 'Enceladus', 'Iapetus', 'Umbriel', 'Algieba', 'Despina', 'Erinome',
@@ -1958,112 +1953,144 @@ class TTS( Gemini ):
 		         'Sadaltager', 'Sulafar' ]
 	
 	@property
-	def language_options( self ) -> List[ str ] | None:
-		'''
-			
-			Purpose:
-			--------
-			Returns a list of language options
-			
-		'''
-		return [ 'de-DE',
-		         'en-AU',
-		         'en-GB',
-		         'en-IN',
-		         'en-US',
-		         'es-US',
-		         'fr-FR',
-		         'hi-IN',
-		         'pt-BR',
-		         'ar-XA',
-		         'es-ES',
-		         'fr-CA',
-		         'id-ID',
-		         'it-IT',
-		         'ja-JP',
-		         'tr-TR',
-		         'vi-VN',
-		         'bn-IN',
-		         'gu-IN',
-		         'kn-IN',
-		         'ml-IN',
-		         'mr-IN',
-		         'ta-IN',
-		         'te-IN',
-		         'nl-NL',
-		         'ko-KR',
-		         'cmn-CN',
-		         'pl-PL',
-		         'ru-RU',
-		         'th-TH' ]
-	
-	@property
 	def format_options( self ) -> List[ str ] | None:
-		'''
-			
-			Purpose:
-			---------
-			Returns a list of audio mime types
-			
-		'''
-		return [ 'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac' ]
-	
-	def create_speech( self, text: str, filepath: str, model: str='gemini-2.5-flash-preview-tts',
-			format: str=None, speed: float=None, voice: str=None, frequency: float=None,
-			presense: float=None, max_tokens: int=None, instruct: str=None ) -> str | None:
 		"""
-		
+
 			Purpose:
 			--------
-			Converts text to speech and writes the data to a local file.
+			Returns the supported output container formats for this wrapper.
+
+		"""
+		return [ 'audio/wav' ]
+	
+	def _to_wave_bytes( self, pcm_data: bytes, rate: int = 24000, channels: int = 1,
+			sample_width: int = 2 ) -> bytes:
+		"""
+
+			Purpose:
+			--------
+			Wraps raw PCM bytes returned by Gemini TTS into a WAV container.
+
+			Parameters:
+			-----------
+			pcm_data: bytes - Raw PCM audio bytes.
+			rate: int - Sample rate.
+			channels: int - Number of channels.
+			sample_width: int - Sample width in bytes.
+
+			Returns:
+			--------
+			bytes - WAV file bytes.
+
+		"""
+		import io
+		import wave
+		
+		with io.BytesIO( ) as buffer:
+			with wave.open( buffer, 'wb' ) as wf:
+				wf.setnchannels( channels )
+				wf.setsampwidth( sample_width )
+				wf.setframerate( rate )
+				wf.writeframes( pcm_data )
 			
+			return buffer.getvalue( )
+	
+	def create_speech( self, text: str, filepath: str = None,
+			model: str = 'gemini-2.5-flash-preview-tts', format: str = 'audio/wav',
+			speed: float = None, voice: str = None, frequency: float = None,
+			presense: float = None, max_tokens: int = None, instruct: str = None,
+			temperature: float = None, top_p: float = None ) -> bytes | str | None:
+		"""
+
+			Purpose:
+			--------
+			Converts text to speech using Gemini TTS. If filepath is provided,
+			the generated WAV is written to disk; otherwise WAV bytes are returned.
+
 			Parameters:
 			-----------
 			text: str - Input text string.
-			filepath: str - Target local path.
-			format: str - File format.
-			speed: float - Playback rate.
+			filepath: str - Optional target local path.
+			model: str - Gemini TTS model identifier.
+			format: str - Output audio format.
+			speed: float - Playback rate hint.
 			voice: str - Persona name.
-			
+			frequency: float - Frequency penalty.
+			presense: float - Presence penalty.
+			max_tokens: int - Maximum output tokens.
+			instruct: str - Optional system instruction.
+			temperature: float - Sampling temperature.
+			top_p: float - Nucleus sampling threshold.
+
 			Returns:
 			--------
-			Optional[ str ] - Local path to the created file or None.
-		
+			bytes | str | None - WAV bytes or local path to the created file.
+
 		"""
 		try:
 			throw_if( 'text', text )
-			throw_if( 'filepath', filepath )
-			throw_if( 'model', model )
 			self.input_text = text
 			self.audio_path = filepath
-			self.response_format = format
+			self.response_format = str( format or 'audio/wav' ).strip( )
 			self.speed = speed
-			self.voice = voice
+			self.voice = str( voice or 'Kore' ).strip( )
 			self.max_tokens = max_tokens
-			self.model = model
+			self.model = str( model or self.model or 'gemini-2.5-flash-preview-tts' ).strip( )
 			self.frequency_penalty = frequency
 			self.presence_penalty = presense
 			self.instructions = instruct
-			self.response_modalities.append( 'AUDIO' )
-			self.voice_config = VoiceConfig( )
-			self.speaker_config = SpeakerVoiceConfig( )
-			self.speech_config = SpeechConfig( )
-			prompt = f"Read the following aloud with a {self.voice} persona: {self.input_text}"
-			self.content_config = GenerateContentConfig( response_modalities=self.response_modalities,
-				temperature=self.temperature )
+			self.temperature = temperature
+			self.top_p = top_p
+			self.response_modalities = [ 'AUDIO' ]
+			self.voice_config = VoiceConfig(
+				prebuilt_voice_config=types.PrebuiltVoiceConfig(
+					voice_name=self.voice ) )
+			self.speech_config = SpeechConfig( voice_config=self.voice_config )
+			self.config_kwargs = {
+					'response_modalities': self.response_modalities,
+					'speech_config': self.speech_config
+			}
+			
+			if self.temperature is not None:
+				self.config_kwargs[ 'temperature' ] = self.temperature
+			
+			if self.top_p is not None:
+				self.config_kwargs[ 'top_p' ] = self.top_p
+			
+			if self.max_tokens is not None:
+				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+			
+			if self.instructions is not None and str( self.instructions ).strip( ):
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+			
+			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.response = self.client.models.generate_content( model=self.model,
-				contents=prompt, config=self.content_config )
+			self.response = self.client.models.generate_content(
+				model=self.model,
+				contents=self.input_text,
+				config=self.content_config )
+			
+			self.audio_bytes = None
 			for part in self.response.candidates[ 0 ].content.parts:
-				if part.inline_data:
-					with open( self.audio_path, 'wb' ) as f:
-						f.write( part.inline_data.data )
-			return self.audio_path
+				if getattr( part, 'inline_data', None ) is not None and part.inline_data.data:
+					self.audio_bytes = self._to_wave_bytes( part.inline_data.data )
+					break
+			
+			if self.audio_bytes is None:
+				raise ValueError( 'No audio bytes were returned by Gemini TTS.' )
+			
+			if self.audio_path is not None and str( self.audio_path ).strip( ):
+				with open( self.audio_path, 'wb' ) as f:
+					f.write( self.audio_bytes )
+				
+				return self.audio_path
+			
+			return self.audio_bytes
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'TTS'
-			exception.method = 'create_speech( self, text, filepath, format, speed, voice ) -> str'
+			exception.method = 'create_speech( self, text, filepath, model, format, speed, voice )'
 			error = ErrorDialog( exception )
 			error.show( )
 
@@ -2072,14 +2099,14 @@ class Transcription( Gemini ):
 
 	    Purpose
 	    ___________
-	    Class handling audio-to-text transcription using Gemini audio processing.
+	    Class handling audio-to-text transcription using Gemini audio understanding.
 
 	    Attributes:
 	    -----------
 	    client     : Client - GenAI instance
 	    transcript : str - Text result
 	    file_path  : str - Path to audio file
-	    use_vertex : bool - Integration flag
+	    response   : GenerateContentResponse - Raw response
 
 	    Methods:
 	    --------
@@ -2089,10 +2116,11 @@ class Transcription( Gemini ):
 	client: Optional[ genai.Client ]
 	transcript: Optional[ str ]
 	file_path: Optional[ str ]
+	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
-			top_p: float=0.9, frequency: float=0.0, presence: float=0.0,
-			max_tokens: int=10000, instruct: str=None ):
+	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
+			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0,
+			max_tokens: int = 10000, instruct: str = None ):
 		super( ).__init__( )
 		self.number = n
 		self.model = model
@@ -2105,29 +2133,32 @@ class Transcription( Gemini ):
 		self.client = genai.Client( api_key=self.gemini_api_key )
 		self.transcript = None
 		self.file_path = None
+		self.response = None
 		self.content_config = None
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
 		"""
-			
+
 			Purpose:
 			--------
 			Returns list of models supporting audio input.
-			
+
 		"""
-		return [ 'gemini-3-flash-preview', 'gemini-2.0-flash',  ]
+		return [ 'gemini-3-flash-preview',
+		         'gemini-2.0-flash' ]
 	
 	@property
 	def language_options( self ) -> List[ str ] | None:
 		"""
-			
+
 			Purpose:
 			--------
-			Returns list of available target languages.
-			
+			Returns list of language hints.
+
 		"""
-		return [ 'English',
+		return [ 'Auto',
+		         'English',
 		         'Spanish',
 		         'French',
 		         'Japanese',
@@ -2136,54 +2167,126 @@ class Transcription( Gemini ):
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
-		'''
-			
-			Purpose:
-			---------
-			Returns a list of audio mime types
-			
-		'''
-		return [ 'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac' ]
-	
-	def transcribe( self, path: str, model: str='gemini-2.0-flash' ) -> Optional[ str ]:
 		"""
-			
+
 			Purpose:
-			---------
-			Transcribes an audio file into text using multimodal GenAI.
-			
+			--------
+			Returns supported audio mime hints.
+
+		"""
+		return [ 'audio/wav',
+		         'audio/mp3',
+		         'audio/x-m4a',
+		         'audio/flac' ]
+	
+	def _build_prompt( self, language: str = None, start_time: float = None, end_time: float = None ) -> str:
+		"""
+
+			Purpose:
+			--------
+			Builds the transcription prompt for Gemini audio understanding.
+
+			Parameters:
+			-----------
+			language: str - Optional language hint.
+			start_time: float - Optional start timestamp in seconds.
+			end_time: float - Optional end timestamp in seconds.
+
+			Returns:
+			--------
+			str - Prompt text.
+
+		"""
+		self.prompt_parts = [ 'Generate a verbatim transcript of the speech.' ]
+		
+		if language is not None and str( language ).strip( ) and str( language ).strip( ) != 'Auto':
+			self.prompt_parts.append(
+				f'The expected spoken language is {str( language ).strip( )}.' )
+		
+		if start_time is not None and end_time is not None and end_time >= start_time:
+			self.prompt_parts.append(
+				f'Only transcribe the portion of the audio between {start_time:0.2f} seconds '
+				f'and {end_time:0.2f} seconds.' )
+		
+		self.prompt_parts.append( 'Return only the transcript text.' )
+		return ' '.join( self.prompt_parts )
+	
+	def transcribe( self, path: str, model: str = 'gemini-3-flash-preview',
+			language: str = None, mime_type: str = None, temperature: float = None,
+			top_p: float = None, frequency: float = None, presence: float = None,
+			max_tokens: int = None, start_time: float = None, end_time: float = None,
+			instruct: str = None ) -> Optional[ str ]:
+		"""
+
+			Purpose:
+			--------
+			Transcribes an audio file into text using Gemini audio understanding.
+
 			Parameters:
 			-----------
 			path: str - Local path to the source audio.
 			model: str - Specific GenAI model ID.
+			language: str - Optional language hint.
+			mime_type: str - Optional mime-type override.
+			temperature: float - Sampling temperature.
+			top_p: float - Nucleus sampling threshold.
+			frequency: float - Frequency penalty.
+			presence: float - Presence penalty.
+			max_tokens: int - Maximum output tokens.
+			start_time: float - Optional start timestamp in seconds.
+			end_time: float - Optional end timestamp in seconds.
+			instruct: str - Optional system instruction.
+
 			Returns:
 			--------
-			Optional[ str ] - Verbatim text transcript.
-		
+			Optional[ str ] - Verbatim transcript text.
+
 		"""
 		try:
+			import mimetypes
+			
 			throw_if( 'path', path )
 			self.file_path = path
-			self.model = model
-			self.content_config = GenerateContentConfig( temperature=self.temperature )
-			if self.use_vertex:
-				with open( self.file_path, 'rb' ) as f:
-					audio_part = Part.from_bytes( data=f.read( ), mime_type="audio/mpeg" )
-				response = self.client.models.generate_content( model=self.model,
-					contents=[ audio_part,"Provide a verbatim transcription." ],
-					config=self.content_config )
-			else:
-				uploaded_file = self.client.files.upload( path=self.file_path )
-				response = self.client.models.generate_content( model=self.model,
-					contents=[ uploaded_file, "Provide a verbatim transcription." ],
-					config=self.content_config )
-			self.transcript = response.text
+			self.model = str( model or self.model or 'gemini-3-flash-preview' ).strip( )
+			self.temperature = temperature if temperature is not None else self.temperature
+			self.top_p = top_p if top_p is not None else self.top_p
+			self.frequency_penalty = frequency if frequency is not None else self.frequency_penalty
+			self.presence_penalty = presence if presence is not None else self.presence_penalty
+			self.max_tokens = max_tokens if max_tokens is not None else self.max_tokens
+			self.instructions = instruct if instruct is not None else self.instructions
+			self.mime_type = mime_type or mimetypes.guess_type( self.file_path )[ 0 ] or 'audio/wav'
+			self.prompt = self._build_prompt(
+				language=language,
+				start_time=start_time,
+				end_time=end_time )
+			
+			self.config_kwargs = { }
+			
+			if self.temperature is not None:
+				self.config_kwargs[ 'temperature' ] = self.temperature
+			
+			if self.top_p is not None:
+				self.config_kwargs[ 'top_p' ] = self.top_p
+			
+			if self.max_tokens is not None:
+				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+			
+			if self.instructions is not None and str( self.instructions ).strip( ):
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+			
+			self.content_config = GenerateContentConfig( **self.config_kwargs )
+			self.uploaded_file = self.client.files.upload( file=self.file_path )
+			self.response = self.client.models.generate_content(
+				model=self.model,
+				contents=[ self.prompt, self.uploaded_file ],
+				config=self.content_config )
+			self.transcript = self.response.text
 			return self.transcript
 		except Exception as e:
 			ex = Error( e )
 			ex.module = 'gemini'
 			ex.cause = 'Transcription'
-			ex.method = 'transcribe( self, path, model ) -> str'
+			ex.method = 'transcribe( self, path, model, language ) -> str'
 			error = ErrorDialog( ex )
 			error.show( )
 
@@ -2192,27 +2295,30 @@ class Translation( Gemini ):
 
 	    Purpose
 	    ___________
-	    Class for translating text between languages using Gemini LLM.
+	    Class for translating spoken audio into text using Gemini audio understanding.
 
 	    Attributes:
 	    -----------
 	    client          : Client - genai client instance
 	    target_language : str - Destination language
-	    source_language : str - Source language
-	    use_vertex      : bool - Cloud integration flag
+	    source_language : str - Source language hint
+	    file_path       : str - Audio file path
+	    response        : GenerateContentResponse - Raw response
 
 	    Methods:
 	    --------
-	    translate( text, target, source ) : Translates text strings
+	    translate( path, model, language ) : Translates speech in an audio file
 
     """
 	client: Optional[ genai.Client ]
 	target_language: Optional[ str ]
 	source_language: Optional[ str ]
+	file_path: Optional[ str ]
+	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-2.0-flash', temperature: float=0.8,
-			top_p: float=0.9, frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
-			instruct: str=None ):
+	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
+			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0, max_tokens: int = 10000,
+			instruct: str = None ):
 		super( ).__init__( )
 		self.number = n
 		self.model = model
@@ -2225,39 +2331,44 @@ class Translation( Gemini ):
 		self.client = genai.Client( api_key=self.gemini_api_key )
 		self.target_language = None
 		self.source_language = None
+		self.file_path = None
+		self.response = None
 		self.content_config = None
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
 		"""
-			
+
 			Purpose:
 			--------
-			Returns list of translation-capable models.
-			
+			Returns list of translation-capable audio models.
+
 		"""
-		return [ 'gemini-2.0-flash',
-		         'gemini-1.5-pro' ]
+		return [ 'gemini-3-flash-preview',
+		         'gemini-2.0-flash' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
-		'''
-			
+		"""
+
 			Purpose:
-			---------
-			Returns a list of audio mime types
-			
-		'''
-		return [ 'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac' ]
+			--------
+			Returns supported audio mime hints.
+
+		"""
+		return [ 'audio/wav',
+		         'audio/mp3',
+		         'audio/x-m4a',
+		         'audio/flac' ]
 	
 	@property
 	def language_options( self ) -> List[ str ] | None:
 		"""
-			
+
 			Purpose:
 			--------
 			Returns list of available target languages.
-			
+
 		"""
 		return [ 'English',
 		         'Spanish',
@@ -2266,39 +2377,120 @@ class Translation( Gemini ):
 		         'German',
 		         'Chinese' ]
 	
-	def translate( self, text: str, target: str, source: str='Auto' ) -> Optional[ str ]:
+	def _build_prompt( self, target: str, source: str = 'Auto', start_time: float = None,
+			end_time: float = None ) -> str:
 		"""
-			
+
 			Purpose:
-			-------
-			Translates text from one language to another.
-			
+			--------
+			Builds the translation prompt for Gemini audio understanding.
+
 			Parameters:
 			-----------
-			text: str - Text to translate.
-			target: str - Target language.
-			source: str - Source language.
-			
+			target: str - Target translation language.
+			source: str - Optional source-language hint.
+			start_time: float - Optional start timestamp in seconds.
+			end_time: float - Optional end timestamp in seconds.
+
+			Returns:
+			--------
+			str - Prompt text.
+
+		"""
+		self.prompt_parts = [ f'Translate the spoken audio into {target}.' ]
+		
+		if source is not None and str( source ).strip( ) and str( source ).strip( ) != 'Auto':
+			self.prompt_parts.append(
+				f'The expected source language is {str( source ).strip( )}.' )
+		
+		if start_time is not None and end_time is not None and end_time >= start_time:
+			self.prompt_parts.append(
+				f'Only translate the portion of the audio between {start_time:0.2f} seconds '
+				f'and {end_time:0.2f} seconds.' )
+		
+		self.prompt_parts.append( 'Return only the translated text.' )
+		return ' '.join( self.prompt_parts )
+	
+	def translate( self, path: str, model: str = 'gemini-3-flash-preview',
+			language: str = 'English', source: str = 'Auto', mime_type: str = None,
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None, max_tokens: int = None, start_time: float = None,
+			end_time: float = None, instruct: str = None ) -> Optional[ str ]:
+		"""
+
+			Purpose:
+			--------
+			Translates spoken audio from one language to another.
+
+			Parameters:
+			-----------
+			path: str - Local path to the source audio.
+			model: str - Specific GenAI model ID.
+			language: str - Target language.
+			source: str - Source language hint.
+			mime_type: str - Optional mime-type override.
+			temperature: float - Sampling temperature.
+			top_p: float - Nucleus sampling threshold.
+			frequency: float - Frequency penalty.
+			presence: float - Presence penalty.
+			max_tokens: int - Maximum output tokens.
+			start_time: float - Optional start timestamp in seconds.
+			end_time: float - Optional end timestamp in seconds.
+			instruct: str - Optional system instruction.
+
 			Returns:
 			--------
 			Optional[ str ] - Translated text.
-		
+
 		"""
 		try:
-			throw_if( 'text', text )
-			self.target_language = target
-			self.source_language = source
-			self.content_config = GenerateContentConfig( temperature=self.temperature )
-			prompt = f"Translate the following from {self.source_language} to {self.target_language}: {text}"
-			response = self.client.models.generate_content( model=self.model,
-				contents=prompt, config=self.content_config )
-			return response.text
+			import mimetypes
+			
+			throw_if( 'path', path )
+			self.file_path = path
+			self.model = str( model or self.model or 'gemini-3-flash-preview' ).strip( )
+			self.target_language = str( language or 'English' ).strip( )
+			self.source_language = str( source or 'Auto' ).strip( )
+			self.temperature = temperature if temperature is not None else self.temperature
+			self.top_p = top_p if top_p is not None else self.top_p
+			self.frequency_penalty = frequency if frequency is not None else self.frequency_penalty
+			self.presence_penalty = presence if presence is not None else self.presence_penalty
+			self.max_tokens = max_tokens if max_tokens is not None else self.max_tokens
+			self.instructions = instruct if instruct is not None else self.instructions
+			self.mime_type = mime_type or mimetypes.guess_type( self.file_path )[ 0 ] or 'audio/wav'
+			self.prompt = self._build_prompt(
+				target=self.target_language,
+				source=self.source_language,
+				start_time=start_time,
+				end_time=end_time )
+			
+			self.config_kwargs = { }
+			
+			if self.temperature is not None:
+				self.config_kwargs[ 'temperature' ] = self.temperature
+			
+			if self.top_p is not None:
+				self.config_kwargs[ 'top_p' ] = self.top_p
+			
+			if self.max_tokens is not None:
+				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+			
+			if self.instructions is not None and str( self.instructions ).strip( ):
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+			
+			self.content_config = GenerateContentConfig( **self.config_kwargs )
+			self.uploaded_file = self.client.files.upload( file=self.file_path )
+			self.response = self.client.models.generate_content(
+				model=self.model,
+				contents=[ self.prompt, self.uploaded_file ],
+				config=self.content_config )
+			return self.response.text
 		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Translation'
-			exception.method = 'translate( self, text, target, source ) -> str'
-			error = ErrorDialog( exception )
+			ex = Error( e )
+			ex.module = 'gemini'
+			ex.cause = 'Translation'
+			ex.method = 'translate( self, path, model, language, source ) -> str'
+			error = ErrorDialog( ex )
 			error.show( )
 
 class Files( Gemini ):
