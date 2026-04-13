@@ -44,6 +44,7 @@
 from __future__ import annotations
 
 import base64
+import fitz
 import hashlib
 from pathlib import Path
 import os
@@ -60,8 +61,6 @@ import tiktoken
 from reportlab.lib.pagesizes import LETTER
 import config as cfg
 import sqlite_vec
-
-import fitz  # pymupdf
 
 import streamlit as st
 from typing import List, Dict, Any, Optional, Tuple
@@ -5851,26 +5850,24 @@ elif mode == 'Data Export':
 # DATA MANAGEMENT MODE
 # ==============================================================================
 elif mode == 'Data Management':
-	st.subheader( "🏛️ Data Management", help=cfg.DATA_MANAGEMENT )
+	st.subheader( '🏛️ Data Management', help=cfg.DATA_MANAGEMENT )
 	st.divider( )
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
-		tabs = st.tabs( [ "📥 Import", "🗂 Browse", "💉 CRUD", "📊 Explore", "🔎 Filter",
-		                  "🧮 Aggregate", "📈 Visualize", "⚙ Admin", "🧠 SQL" ] )
-		
-		tables = list_tables( )
-		if not tables:
-			st.info( "No tables available." )
-		else:
-			table = st.selectbox( "Table", tables )
-			df_full = read_table( table )
-		
+		tabs = st.tabs( [ '📥 Import', '🗂 Browse', '💉 CRUD', '📊 Explore', '🔎 Filter',
+		                  '🧮 Aggregate', '📈 Visualize', '⚙ Admin', '🧠 SQL' ] )
+
 		# ------------------------------------------------------------------------------
 		# UPLOAD TAB
 		# ------------------------------------------------------------------------------
 		with tabs[ 0 ]:
-			uploaded_file = st.file_uploader( 'Upload Excel File', type=[ 'xlsx' ] )
-			overwrite = st.checkbox( 'Overwrite existing tables', value=True )
+			upl_c1, upl_c2 = st.columns( [ 0.75, 0.25 ] )
+			with upl_c1:
+				uploaded_file = st.file_uploader( 'Upload Excel File', type=[ 'xlsx' ] )
+			
+			with upl_c2:
+				overwrite = st.checkbox( 'Overwrite Existing Tables', value=True )
+			
 			if uploaded_file:
 				try:
 					sheets = pd.read_excel( uploaded_file, sheet_name=None )
@@ -5888,19 +5885,14 @@ elif mode == 'Data Management':
 								sql_type = get_sqlite_type( df[ col ].dtype )
 								columns.append( f'"{col}" {sql_type}' )
 							
-							create_stmt = (
-									f'CREATE TABLE "{table_name}" '
-									f'({", ".join( columns )});'
-							)
+							create_stmt = ( f'CREATE TABLE "{table_name}" '
+									f'({", ".join( columns )});' )
 							
 							conn.execute( create_stmt )
 							
 							# --- Insert Data ---
 							placeholders = ", ".join( [ "?" ] * len( df.columns ) )
-							insert_stmt = (
-									f'INSERT INTO "{table_name}" '
-									f'VALUES ({placeholders});'
-							)
+							insert_stmt = ( f'INSERT INTO "{table_name}" VALUES ({placeholders});' )
 							
 							conn.executemany( insert_stmt,
 								df.where( pd.notnull( df ), None ).values.tolist( ) )
@@ -5909,14 +5901,14 @@ elif mode == 'Data Management':
 					
 					st.success( 'Import completed successfully (transaction committed).' )
 					st.rerun( )
-				
+					
 				except Exception as e:
 					try:
 						conn.rollback( )
 					except:
 						pass
 					st.error( f'Import failed — transaction rolled back.\n\n{e}' )
-		
+	
 		# ------------------------------------------------------------------------------
 		# BROWSE TAB
 		# ------------------------------------------------------------------------------
@@ -5925,7 +5917,7 @@ elif mode == 'Data Management':
 			if tables:
 				table = st.selectbox( 'Table', tables, key='table_name' )
 				df = read_table( table )
-				render_table( df )
+				st.data_editor( df, key='dm_browse_table' )
 			else:
 				st.info( 'No tables available.' )
 		
@@ -6027,12 +6019,21 @@ elif mode == 'Data Management':
 		with tabs[ 3 ]:
 			tables = list_tables( )
 			if tables:
-				table = st.selectbox( 'Table', tables, key='explore_table' )
-				page_size = st.slider( 'Rows per page', 10, 500, 50 )
-				page = st.number_input( 'Page', min_value=1, step=1 )
-				offset = (page - 1) * page_size
-				df_page = read_table( table, page_size, offset )
-				render_table( df_page )
+				exp_c1, exp_c2, exp_c3 = st.columns( [ 0.33, 0.33, 0.33 ], border=True )
+				with exp_c1:
+					table = st.selectbox( 'Table', tables, key='explore_table' )
+				
+				with exp_c2:
+					page_size = st.slider( 'Rows per page', 10, 500, 50 )
+					
+				with exp_c3:
+					page = st.number_input( 'Page', min_value=1, step=1 )
+					offset = (page - 1) * page_size
+					df_page = read_table( table, page_size, offset )
+					
+				st.divider( )
+				
+				st.data_editor( df_page, key='dm_explore_table' )
 		
 		# ------------------------------------------------------------------------------
 		# FILTER
@@ -6040,14 +6041,20 @@ elif mode == 'Data Management':
 		with tabs[ 4 ]:
 			tables = list_tables( )
 			if tables:
-				table = st.selectbox( 'Table', tables, key='filter_table' )
-				df = read_table( table )
-				column = st.selectbox( 'Column', df.columns )
-				value = st.text_input( 'Contains' )
-				if value:
-					df = df[ df[ column ].astype( str ).str.contains( value ) ]
+				ftr_c1, ftr_c2, ftr_c3 = st.columns( [ 0.33, 0.33, 0.33 ], border=True )
+				with ftr_c1:
+					table = st.selectbox( 'Table', tables, key='select_filter_table' )
 				
-				render_table( df )
+				with ftr_c2:
+					df = read_table( table )
+					column = st.selectbox( 'Column', df.columns )
+					
+				with ftr_c3:
+					value = st.text_input( 'Contains' )
+					if value:
+						df = df[ df[ column ].astype( str ).str.contains( value ) ]
+				
+				st.data_editor( df, key='dm_filter_table' )
 		
 		# ------------------------------------------------------------------------------
 		# AGGREGATE
@@ -6154,12 +6161,8 @@ elif mode == 'Data Management':
 				primary_key = st.checkbox( 'PRIMARY KEY', key=f'pk_{i}' )
 				auto_inc = st.checkbox( 'AUTOINCREMENT (INTEGER only)', key=f'ai_{i}' )
 				
-				columns.append( {
-						'name': col_name,
-						'type': col_type,
-						'not_null': not_null,
-						'primary_key': primary_key,
-						'auto_increment': auto_inc } )
+				columns.append( { 'name': col_name, 'type': col_type, 'not_null': not_null,
+						'primary_key': primary_key, 'auto_increment': auto_inc } )
 			
 			if st.button( 'Create Table' ):
 				try:
