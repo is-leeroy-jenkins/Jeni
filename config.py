@@ -62,7 +62,6 @@ OUTPUT_FILE_NAME = "jeni.wav"
 SAMPLE_RATE = 48000
 MODELS = [ 'gpt-5-nano-2025-08-07', 'gpt-4.1-nano-2025-04-14', 'gpt-4o-mini', ]
 DEFAULT_MODEL = MODELS[ 0 ]
-MODEL_PATH = 'llm/gemma-3-270m-it-Q4_K_M.gguf'
 DB_PATH = r'stores/sqlite/datamodels/Data.db'
 BASE_DIR = Path(__file__).resolve().parent
 FAVICON = r'resources/images/favicon.ico'
