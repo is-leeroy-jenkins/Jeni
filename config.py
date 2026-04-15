@@ -78,6 +78,7 @@ AUDIO_TEST_FILE = r'resources/audio/conditions.mp3'
 ANALYST = '❓'
 JENI = '🧠'
 DEFAULT_CTX = 4096
+ENABLE_LOCAL_LLM = False
 CORES = multiprocessing.cpu_count( )
 MODE_CLASS_MAP = {
 		'Text': [ 'Chat' ],

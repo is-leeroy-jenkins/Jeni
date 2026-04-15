@@ -66,7 +66,6 @@ from typing import List, Dict, Any, Optional, Tuple
 from boogr import Error
 from reportlab.lib.pagesizes import LETTER
 from reportlab.pdfgen import canvas
-from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
 
 try:
@@ -3122,9 +3121,9 @@ def run_llm_turn( user_input: str, temperature: float, top_p: float, repeat_pena
 	
 		Purpose:
 		--------
-		Run a single LLM turn using the application's shared prompt builder and either stream or
+		Run a single local LLM turn using the shared prompt builder and either stream or
 		return the full response text.
-
+	
 		Parameters:
 		-----------
 		user_input : str
@@ -3140,8 +3139,8 @@ def run_llm_turn( user_input: str, temperature: float, top_p: float, repeat_pena
 		stream : bool
 			When True, stream tokens to the provided Streamlit placeholder.
 		output : Any | None
-			A Streamlit placeholder (e.g., st.empty()) used for streaming output.
-
+			A Streamlit placeholder used for streaming output.
+	
 		Returns:
 		--------
 		str
@@ -3151,7 +3150,12 @@ def run_llm_turn( user_input: str, temperature: float, top_p: float, repeat_pena
 	if user_input is None:
 		return ''
 	
+	llm = get_llm( )
+	if llm is None:
+		return ''
+	
 	prompt = build_prompt( user_input )
+	
 	if not stream:
 		resp = llm(
 			prompt,
@@ -3162,6 +3166,7 @@ def run_llm_turn( user_input: str, temperature: float, top_p: float, repeat_pena
 			repeat_penalty=repeat_penalty,
 			stop=[ '</s>' ]
 		)
+		
 		text = (resp.get( 'choices', [ { 'text': '' } ] )[ 0 ].get( 'text', '' ) or '')
 		return text.strip( )
 	
@@ -3186,13 +3191,99 @@ def run_llm_turn( user_input: str, temperature: float, top_p: float, repeat_pena
 
 # -------------- LLM  UTILITIES -------------------
 
+def local_llm_enabled( ) -> bool:
+	"""
+	
+		Purpose:
+		--------
+		Determine whether the optional local llama.cpp model should be enabled.
+	
+		Parameters:
+		-----------
+		None
+	
+		Returns:
+		--------
+		bool
+			True when local LLM support is enabled in configuration.
+			
+	"""
+	try:
+		return bool( getattr( cfg, 'ENABLE_LOCAL_LLM', False ) )
+	except Exception:
+		return False
+
 @st.cache_resource
-def load_llm( ctx: int, threads: int ) -> Llama:
-	return Llama( model_path=str( cfg.MODEL_PATH ), n_ctx=ctx, n_threads=threads, n_batch=512,
-		verbose=False )
+def load_llm( ctx: int, threads: int ):
+	"""
+	
+		Purpose:
+		--------
+		Lazily load the optional local llama.cpp model.
+	
+		Parameters:
+		-----------
+		ctx : int
+			Context window size.
+		threads : int
+			Number of CPU threads to allocate.
+	
+		Returns:
+		--------
+		Any
+			Instantiated llama.cpp model object.
+			
+	"""
+	from llama_cpp import Llama
+	
+	return Llama(
+		model_path=str( cfg.MODEL_PATH ),
+		n_ctx=ctx,
+		n_threads=threads,
+		n_batch=512,
+		verbose=False
+	)
+
+def get_llm( ):
+	"""
+	
+		Purpose:
+		--------
+		Return the optional local llama.cpp model only when enabled.
+	
+		Parameters:
+		-----------
+		None
+	
+		Returns:
+		--------
+		Any | None
+			Loaded llama.cpp model instance or None when disabled.
+			
+	"""
+	if not local_llm_enabled( ):
+		return None
+	
+	return load_llm( cfg.DEFAULT_CTX, cfg.CORES )
 
 @st.cache_resource
 def load_embedder( ) -> SentenceTransformer:
+	"""
+	
+		Purpose:
+		--------
+		Load the sentence-transformers model used for embedding and retrieval workflows.
+	
+		Parameters:
+		-----------
+		None
+	
+		Returns:
+		--------
+		SentenceTransformer
+			Loaded embedder instance.
+			
+	"""
 	return SentenceTransformer( 'all-MiniLM-L6-v2' )
 
 # ==============================================================================
@@ -3200,7 +3291,6 @@ def load_embedder( ) -> SentenceTransformer:
 # ==============================================================================
 
 initialize_database( )
-llm = load_llm( cfg.DEFAULT_CTX, cfg.CORES )
 embedder = load_embedder( )
 
 if not isinstance( st.session_state.get( 'messages' ), list ):
