@@ -44,7 +44,6 @@
 from __future__ import annotations
 
 import base64
-import fitz
 import hashlib
 from pathlib import Path
 import os
@@ -70,6 +69,11 @@ from reportlab.pdfgen import canvas
 from llama_cpp import Llama
 from sentence_transformers import SentenceTransformer
 
+try:
+	import fitz
+except Exception:
+	fitz = None
+	
 from gemini import (
 	Chat,
 	Images,
