@@ -62,7 +62,7 @@ OUTPUT_FILE_NAME = "jeni.wav"
 SAMPLE_RATE = 48000
 MODELS = [ 'gpt-5-nano-2025-08-07', 'gpt-4.1-nano-2025-04-14', 'gpt-4o-mini', ]
 DEFAULT_MODEL = MODELS[ 0 ]
-MODEL_PATH = 'models/gemma-3-270m-it-Q4_K_M.gguf'
+MODEL_PATH = 'llm/gemma-3-270m-it-Q4_K_M.gguf'
 DB_PATH = r'stores/sqlite/datamodels/Data.db'
 BASE_DIR = Path(__file__).resolve().parent
 FAVICON = r'resources/images/favicon.ico'
@@ -124,7 +124,7 @@ TOP_P = r'''Optional. The maximum cumulative probability of tokens to consider w
 		Top-k sampling directly limits the maximum number of tokens to consider,
 		while Nucleus sampling limits the number of tokens based on the cumulative probability.'''
 
-TOP_K = r'''Optional. The maximum number of tokens to consider when sampling. Gemini models use
+TOP_K = r'''Optional. The maximum number of tokens to consider when sampling. Gemini llm use
 		Top-p (nucleus) sampling or a combination of Top-k and nucleus sampling. Top-k sampling considers
 		the set of topK most probable tokens. Models running with nucleus sampling don't allow topK setting.
 		Note: The default value varies by Model and is specified by theModel.top_p attribute returned
@@ -162,20 +162,20 @@ STREAM = 'Optional. Whether to return the generated respose in asynchronous chun
 
 TOOLS = '''Optional. An array of tools the model may call while generating a response. You can specify which
 		tool to use by setting the tool_choice parameter. Used by the Reponses API
-		and Reasoning models'''
+		and Reasoning llm'''
 
 INCLUDE = r'''Optional. Specifies additional output data to include in the model response enabling reasoning
 			items to be used in multi-turn conversations when using the Responses API statelessly
-			and Reasoning models.
+			and Reasoning llm.
 			'''
 
-REASONING = r'''Optional. Reasoning models introduce reasoning tokens in addition to input and output tokens.
-				The models use these reasoning tokens to “think,” breaking down the prompt and
+REASONING = r'''Optional. Reasoning llm introduce reasoning tokens in addition to input and output tokens.
+				The llm use these reasoning tokens to “think,” breaking down the prompt and
 				considering multiple approaches to generating a response. After generating reasoning tokens,
 				the model produces an answer as visible completion tokens and discards
-				the reasoning tokens from its context. Used by the Reasoning models'''
+				the reasoning tokens from its context. Used by the Reasoning llm'''
 
-CHOICE = r'''Optional. Determines how tools are chosen when using reasoning models'''
+CHOICE = r'''Optional. Determines how tools are chosen when using reasoning llm'''
 
 SYSTEM_INSTRUCTIONS = r'''Optional. Gives the model high-level instructions on how it should behave while
 		generating a response, including tone, goals, and examples of correct responses. Any
@@ -207,7 +207,7 @@ TEXT_GENERATION = r'''Use a large language model to produce coherent, context-aw
 		a conversational assistant, analytical explainer, summarizer, drafting tool, and reasoning engine,
 		producing structured or narrative outputs tailored to the user’s workflow. '''
 
-CHAT_COMPLETIONS = r'''A unified interface for interacting with advanced generative models through
+CHAT_COMPLETIONS = r'''A unified interface for interacting with advanced generative llm through
 		a single request–response workflow. It allows a client to send structured inputs—such as text,
 		images, audio, or tool instructions—and receive model-generated outputs that may include
 		natural language responses, structured data, reasoning traces, or tool call instructions.
@@ -286,24 +286,24 @@ DATA_MANAGEMENT = r'''Structured handling, organization, processing of
 		on reliable, well-governed data rather than unmanaged documents.  '''
 
 IMAGE_BACKGROUND = r'''Optional. Allows to set transparency for the background of the generated image(s).
-		This parameter is only supported for the GPT image models. Must be one of transparent,
+		This parameter is only supported for the GPT image llm. Must be one of transparent,
 		opaque or auto (default value). When auto is used, the model will automatically determine
 		the best background for the image
 '''
 
 IMAGE_OUPUT = r'''Optional. The format in which the generated images are returned. This parameter is only
-		supported for the GPT image models. Must be one of png, jpeg, or webp.
+		supported for the GPT image llm. Must be one of png, jpeg, or webp.
 '''
 
 IMAGE_RESPONSE = r'''Optional. The format in which generated images with dall-e-2 and dall-e-3 are
 		returned. Must be one of url or b64_json. URLs are only valid for 60 minutes after the
-		image has been generated. This parameter isn't supported for models which
+		image has been generated. This parameter isn't supported for llm which
 		always return base64-encoded images.
 '''
 
 IMAGE_SIZE = r'''Optional. The size of the generated images. Must be one of 1024x1024,
 		1536x1024 (landscape), 1024x1536 (portrait), or auto (default value) for the GPT image
-		models, one of 256x256, 512x512, or 1024x1024 for dall-e-2, and one of 1024x1024,
+		llm, one of 256x256, 512x512, or 1024x1024 for dall-e-2, and one of 1024x1024,
 		1792x1024, or 1024x1792 for dall-e-3.
 '''
 
@@ -315,7 +315,7 @@ IMAGE_STYLE = r'''Optional. The style of the generated images. This parameter is
 
 IMAGE_QUALITY = r'''Optional. The quality of the image that will be generated: 'standard' or 'hd'
 		or 'low'. auto (default value) will automatically select the best quality for the given model. high,
-		medium and low are supported for the GPT image models. hd and standard are supported for dall-e-3.
+		medium and low are supported for the GPT image llm. hd and standard are supported for dall-e-3.
 		standard is the only option for dall-e-2.
 '''
 

@@ -4031,7 +4031,7 @@ elif mode == "Images":
 						st.selectbox(
 							label='Image Size',
 							options=list( image.size_options ),
-							help='Optional. Supported by Gemini 3 image-preview models.',
+							help='Optional. Supported by Gemini 3 image-preview llm.',
 							key='image_size',
 							placeholder='Options',
 							index=None
@@ -4850,7 +4850,7 @@ elif mode == 'Embedding':
 				set_embedding_dimensions = st.slider( label='Dimensions', min_value=0, max_value=2048,
 					value=int( st.session_state.get( 'embeddings_dimensions' ) ),
 					step=1, key='embeddings_dimensions',
-					help='Optional (large models only): An integer between 1 and 2048',
+					help='Optional (large llm only): An integer between 1 and 2048',
 					width='stretch' )
 				
 				embeddings_dimensions = st.session_state[ 'embeddings_dimensions' ]

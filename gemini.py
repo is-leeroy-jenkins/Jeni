@@ -262,7 +262,7 @@ class Chat( Gemini ):
 			
 			Purpose:
 			--------
-			Returns list of available chat models.
+			Returns list of available chat llm.
 			
 		"""
 		return [ 'gemini-2.5-flash',
@@ -1040,7 +1040,7 @@ class Images( Gemini ):
 			
 			Purpose:
 			--------
-			Returns list of image generation models.
+			Returns list of image generation llm.
 			
 		"""
 		return [ 'gemini-2.5-flash-image',
@@ -1269,7 +1269,7 @@ class Images( Gemini ):
 			
 			Purpose:
 			-----------
-			Builds a Google Search grounding tool for supported image models.
+			Builds a Google Search grounding tool for supported image llm.
 			
 			Parameters:
 			-----------
@@ -1801,7 +1801,7 @@ class Embeddings( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""Returns list of embedding models."""
+		"""Returns list of embedding llm."""
 		return [ 'gemini-embedding-001',
 		         'text-multilingual-embedding-002' ]
 	
@@ -1931,7 +1931,7 @@ class TTS( Gemini ):
 
 			Purpose:
 			--------
-			Returns list of TTS-capable Gemini models.
+			Returns list of TTS-capable Gemini llm.
 
 		"""
 		return [ 'gemini-2.5-flash-preview-tts',
@@ -2142,7 +2142,7 @@ class Transcription( Gemini ):
 
 			Purpose:
 			--------
-			Returns list of models supporting audio input.
+			Returns list of llm supporting audio input.
 
 		"""
 		return [ 'gemini-3-flash-preview',
@@ -2341,7 +2341,7 @@ class Translation( Gemini ):
 
 			Purpose:
 			--------
-			Returns list of translation-capable audio models.
+			Returns list of translation-capable audio llm.
 
 		"""
 		return [ 'gemini-3-flash-preview',
@@ -2573,7 +2573,7 @@ class Files( Gemini ):
 			
 			Purpose:
 			--------
-			Returns list of available chat models.
+			Returns list of available chat llm.
 			
 		"""
 		return self.files
@@ -2584,7 +2584,7 @@ class Files( Gemini ):
 			
 			Purpose:
 			--------
-			Returns list of available chat models.
+			Returns list of available chat llm.
 			
 		"""
 		return [ 'gemini-3.5-flash',
@@ -3135,7 +3135,7 @@ class VectorStores( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""Returns list of available chat models."""
+		"""Returns list of available chat llm."""
 		return [ 'gemini-2.5-flash',
 		         'gemini-2.5 flash image',
 		         'gemini-2.5 flash-tts',

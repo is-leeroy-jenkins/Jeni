@@ -183,4 +183,4 @@ stores/sqlite/Locations.db
 !/stores/sqlite/datamodels/Data.db
 /stores/sqlite/datamodels/Data.db
 /stores/sqlite/Locations.db
-/models/gemma-3-270m-it-Q4_K_M.gguf
+/llm/gemma-3-270m-it-Q4_K_M.gguf
