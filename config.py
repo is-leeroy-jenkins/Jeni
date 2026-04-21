@@ -3,12 +3,12 @@
       Assembly:                Jeni
       Filename:                Config.py
       Author:                  Terry D. Eppler
-      Created:                 05-31-2022
+      Created:                 05-31-2024
 
       Last Modified By:        Terry D. Eppler
       Last Modified On:        05-01-2025
   ******************************************************************************************
-  <copyright file="webconfig.py" company="Terry D. Eppler">
+  <copyright file="config.py" company="Terry D. Eppler">
 
 	     Jeni is a df analysis tool integrating GenAI, GptText Processing, and Machine-Learning
 	     algorithms for federal analysts.
@@ -60,15 +60,13 @@ GOOGLE_CLOUD_PROJECT_ID = os.getenv( 'GOOGLE_CLOUD_PROJECT_ID' )
 # ---------------- CONSTANTS ------------------
 OUTPUT_FILE_NAME = "jeni.wav"
 SAMPLE_RATE = 48000
-MODELS = [ 'gpt-5-nano-2025-08-07', 'gpt-4.1-nano-2025-04-14', 'gpt-4o-mini', ]
-DEFAULT_MODEL = MODELS[ 0 ]
 DB_PATH = r'stores/sqlite/datamodels/Data.db'
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path( __file__ ).resolve( ).parent
 FAVICON = r'resources/images/favicon.ico'
 LOGO_PATH = r'resources/images/jeni_logo.png'
 BLUE_DIVIDER = "<div style='height:2px;align:left;background:#0078FC;margin:6px 0 10px 0;'></div>"
 APP_TITLE = 'Jeni'
-APP_SUBTITLE = 'Multi-Modal AI'
+APP_SUBTITLE = "Multi-Modal AI based on Google's Gemini API"
 OPEN_TAG = re.compile( r'<([A-Za-z0-9_\-:.]+)>' )
 CLOSE_TAG = re.compile( r'</([A-Za-z0-9_\-:.]+)>' )
 MARKDOWN_HEADING_PATTERN = re.compile( r'^##\s+(?P<title>.+?)\s*$' )
@@ -76,8 +74,6 @@ XML_BLOCK_PATTERN = re.compile( r'<(?P<tag>[a-zA-Z0-9_:-]+)>(?P<body>.*?)</\1>',
 AUDIO_TEST_FILE = r'resources/audio/conditions.mp3'
 ANALYST = '❓'
 JENI = '🧠'
-DEFAULT_CTX = 4096
-ENABLE_LOCAL_LLM = False
 CORES = multiprocessing.cpu_count( )
 MODE_CLASS_MAP = {
 		'Text': [ 'Chat' ],

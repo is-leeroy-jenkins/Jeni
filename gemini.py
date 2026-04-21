@@ -211,7 +211,7 @@ class Chat( Gemini ):
 	safety_profile: Optional[ str ]
 	safety_settings: Optional[ List[ SafetySetting ] ]
 	
-	def __init__( self, model: str = 'gemini-2.5-flash-lite' ):
+	def __init__( self, model: str='gemini-2.5-flash-lite' ):
 		super( ).__init__( )
 		self.api_version = None
 		self.client = None
@@ -273,7 +273,7 @@ class Chat( Gemini ):
 		         'gemini-3.1-pro-preview',
 		         'gemini-2.0-flash',
 		         'gemini-2.0-flash-lite' ]
-		
+	
 	@property
 	def tool_options( self ) -> List[ str ] | None:
 		'''
@@ -379,7 +379,7 @@ class Chat( Gemini ):
 		         'balanced',
 		         'permissive' ]
 	
-	def get_supported_tool_options( self, model: str = None ) -> List[ str ]:
+	def get_supported_tool_options( self, model: str=None ) -> List[ str ]:
 		"""
 		
 			Purpose:
@@ -447,7 +447,7 @@ class Chat( Gemini ):
 			exception.method = '_resolve_api_key( self ) -> str | None'
 			raise exception
 	
-	def _supports_google_maps( self, model: str = None ) -> bool:
+	def _supports_google_maps( self, model: str=None ) -> bool:
 		"""
 		
 			Purpose:
@@ -482,7 +482,7 @@ class Chat( Gemini ):
 			exception.method = '_supports_google_maps( self, model: str=None ) -> bool'
 			raise exception
 	
-	def _supports_computer_use( self, model: str = None ) -> bool:
+	def _supports_computer_use( self, model: str=None ) -> bool:
 		"""
 		
 			Purpose:
@@ -532,7 +532,7 @@ class Chat( Gemini ):
 		except Exception:
 			return None
 	
-	def _build_tools( self, tools: List[ str ] = None ) -> List[ Tool ] | None:
+	def _build_tools( self, tools: List[ str ]=None ) -> List[ Tool ] | None:
 		"""
 		
 			Purpose:
@@ -620,8 +620,8 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = '_parse_response_schema( self, response_schema: Any=None )'
 			raise exception
-		
-	def _build_contents( self, prompt: str, context: List[ Any ] = None,
+	
+	def _build_contents( self, prompt: str, context: List[ Any ]=None,
 			content: str=None ) -> str | List[ Content ]:
 		"""
 		
@@ -702,7 +702,7 @@ class Chat( Gemini ):
 			                    'context: List[ Any ]=None, '
 			                    'content: str=None )')
 			raise exception
-		
+	
 	def _get_response_content( self ) -> Content | None:
 		"""
 		
@@ -765,14 +765,14 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'get_structured_history( self ) -> List[ Content ] | None'
 			raise exception
-		
-	def _build_config( self, model: str = 'gemini-2.5-flash-lite', number: int = None,
-			temperature: float = None, top_p: float = None, top_k: int = None,
-			frequency: float = None, presence: float = None, max_tokens: int = None,
-			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
-			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
-			modalities: List[ str ] = None, media_resolution: str = None,
-			response_schema: Any = None, safety_profile: str = None ) -> GenerateContentConfig:
+	
+	def _build_config( self, model: str='gemini-2.5-flash-lite', number: int=None,
+			temperature: float=None, top_p: float=None, top_k: int=None,
+			frequency: float=None, presence: float=None, max_tokens: int=None,
+			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
+			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
+			modalities: List[ str ]=None, media_resolution: str=None,
+			response_schema: Any = None, safety_profile: str=None ) -> GenerateContentConfig:
 		"""
 		
 			Purpose:
@@ -815,58 +815,58 @@ class Chat( Gemini ):
 			self.config_kwargs = { }
 			
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ] = self.temperature
+				self.config_kwargs[ 'temperature' ]=self.temperature
 			
 			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ] = self.top_p
+				self.config_kwargs[ 'top_p' ]=self.top_p
 			
 			if self.top_k is not None:
-				self.config_kwargs[ 'top_k' ] = self.top_k
+				self.config_kwargs[ 'top_k' ]=self.top_k
 			
 			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
 			
 			if self.candidate_count is not None:
-				self.config_kwargs[ 'candidate_count' ] = self.candidate_count
+				self.config_kwargs[ 'candidate_count' ]=self.candidate_count
 			
 			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
 			
 			if self.frequency_penalty is not None:
-				self.config_kwargs[ 'frequency_penalty' ] = self.frequency_penalty
+				self.config_kwargs[ 'frequency_penalty' ]=self.frequency_penalty
 			
 			if self.presence_penalty is not None:
-				self.config_kwargs[ 'presence_penalty' ] = self.presence_penalty
+				self.config_kwargs[ 'presence_penalty' ]=self.presence_penalty
 			
 			if self.stops is not None and len( self.stops ) > 0:
-				self.config_kwargs[ 'stop_sequences' ] = self.stops
+				self.config_kwargs[ 'stop_sequences' ]=self.stops
 			
 			if self.response_mime_type is not None and str( self.response_mime_type ).strip( ):
-				self.config_kwargs[ 'response_mime_type' ] = str( self.response_mime_type ).strip( )
+				self.config_kwargs[ 'response_mime_type' ]=str( self.response_mime_type ).strip( )
 			
 			if self.response_schema is not None:
 				if isinstance( self.response_schema, dict ):
-					self.config_kwargs[ 'response_json_schema' ] = self.response_schema
+					self.config_kwargs[ 'response_json_schema' ]=self.response_schema
 				else:
-					self.config_kwargs[ 'response_schema' ] = self.response_schema
+					self.config_kwargs[ 'response_schema' ]=self.response_schema
 			
 			if self.media_resolution is not None and self.media_resolution:
-				self.config_kwargs[ 'media_resolution' ] = self.media_resolution
+				self.config_kwargs[ 'media_resolution' ]=self.media_resolution
 			
 			if self.tool_objects is not None and len( self.tool_objects ) > 0:
-				self.config_kwargs[ 'tools' ] = self.tool_objects
+				self.config_kwargs[ 'tools' ]=self.tool_objects
 			
 			if self.function_tool_config is not None:
-				self.config_kwargs[ 'tool_config' ] = self.function_tool_config
+				self.config_kwargs[ 'tool_config' ]=self.function_tool_config
 			
 			if self.safety_settings is not None and len( self.safety_settings ) > 0:
-				self.config_kwargs[ 'safety_settings' ] = self.safety_settings
+				self.config_kwargs[ 'safety_settings' ]=self.safety_settings
 			
 			if self.response_modalities is not None and len( self.response_modalities ) > 0:
-				self.config_kwargs[ 'response_modalities' ] = self.response_modalities
+				self.config_kwargs[ 'response_modalities' ]=self.response_modalities
 			
 			if self.thought_config is not None:
-				self.config_kwargs[ 'thinking_config' ] = self.thought_config
+				self.config_kwargs[ 'thinking_config' ]=self.thought_config
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			return self.content_config
@@ -877,15 +877,15 @@ class Chat( Gemini ):
 			exception.method = '_build_config( self, model ) -> GenerateContentConfig'
 			raise exception
 	
-	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-			number: int = None, temperature: float = None, top_p: float = None, top_k: int = None,
-			frequency: float = None, presence: float = None, max_tokens: int = None,
-			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
-			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
-			modalities: List[ str ] = None, media_resolution: str = None,
-			context: List[ Dict[ str, Any ] ] = None, content: str = None,
-			urls: List[ str ] = None, max_urls: int = None, response_schema: Any = None,
-			safety_profile: str = None, stream: bool = False,
+	def generate_text( self, prompt: str, model: str='gemini-2.5-flash-lite',
+			number: int=None, temperature: float=None, top_p: float=None, top_k: int=None,
+			frequency: float=None, presence: float=None, max_tokens: int=None,
+			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
+			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
+			modalities: List[ str ]=None, media_resolution: str=None,
+			context: List[ Dict[ str, Any ] ]=None, content: str=None,
+			urls: List[ str ]=None, max_urls: int=None, response_schema: Any = None,
+			safety_profile: str=None, stream: bool = False,
 			stream_handler: Any = None ) -> str | None:
 		"""
 		
@@ -999,7 +999,7 @@ class Images( Gemini ):
 	resolution: Optional[ str ]
 	size: Optional[ str ]
 	
-	def __init__( self, model: str = 'gemini-2.5-flash-image' ):
+	def __init__( self, model: str='gemini-2.5-flash-image' ):
 		super( ).__init__( )
 		self.number = None
 		self.model = model
@@ -1177,7 +1177,7 @@ class Images( Gemini ):
 		'''
 		return [ '1K', '2K', '4K' ]
 	
-	def _supports_image_size( self, model: str = None ) -> bool:
+	def _supports_image_size( self, model: str=None ) -> bool:
 		try:
 			self.model_name = str( model or self.model ).strip( )
 			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
@@ -1187,8 +1187,8 @@ class Images( Gemini ):
 			exception.cause = 'Images'
 			exception.method = '_supports_image_size( self, model=None ) -> bool'
 			raise exception
-
-	def _supports_search_grounding( self, model: str = None ) -> bool:
+	
+	def _supports_search_grounding( self, model: str=None ) -> bool:
 		try:
 			self.model_name = str( model or self.model ).strip( )
 			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
@@ -1199,7 +1199,7 @@ class Images( Gemini ):
 			exception.method = '_supports_search_grounding( self, model=None ) -> bool'
 			raise exception
 	
-	def _supports_image_search( self, model: str = None ) -> bool:
+	def _supports_image_search( self, model: str=None ) -> bool:
 		"""
 			
 			Purpose:
@@ -1309,8 +1309,8 @@ class Images( Gemini ):
 			raise exception
 	
 	def _get_content_config( self, image_only: bool = False, grounded: bool = False,
-			image_search: bool = False, response_modalities: Optional[ str ] = None,
-			output_mime_type: Optional[ str ] = None ) -> GenerateContentConfig:
+			image_search: bool = False, response_modalities: Optional[ str ]=None,
+			output_mime_type: Optional[ str ]=None ) -> GenerateContentConfig:
 		"""
 			
 			Purpose:
@@ -1336,13 +1336,13 @@ class Images( Gemini ):
 			self.grounding_metadata = None
 			self.image_kwargs = { }
 			if self.aspect_ratio:
-				self.image_kwargs[ 'aspect_ratio' ] = self.aspect_ratio
+				self.image_kwargs[ 'aspect_ratio' ]=self.aspect_ratio
 			
 			if self.size and self._supports_image_size( self.model ):
-				self.image_kwargs[ 'image_size' ] = self.size
+				self.image_kwargs[ 'image_size' ]=self.size
 			
 			if output_mime_type:
-				self.image_kwargs[ 'output_mime_type' ] = output_mime_type
+				self.image_kwargs[ 'output_mime_type' ]=output_mime_type
 			
 			if len( self.image_kwargs ) > 0:
 				self.image_config = types.ImageConfig( **self.image_kwargs )
@@ -1354,7 +1354,7 @@ class Images( Gemini ):
 			
 			self.response_modalities = self._normalize_response_modalities(
 				response_modalities=response_modalities,
-				image_only=image_only)
+				image_only=image_only )
 			
 			self.config_kwargs = {
 					'temperature': self.temperature,
@@ -1366,10 +1366,10 @@ class Images( Gemini ):
 			}
 			
 			if self.image_config is not None:
-				self.config_kwargs[ 'image_config' ] = self.image_config
+				self.config_kwargs[ 'image_config' ]=self.image_config
 			
 			if self.tool_config is not None and len( self.tool_config ) > 0:
-				self.config_kwargs[ 'tools' ] = self.tool_config
+				self.config_kwargs[ 'tools' ]=self.tool_config
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			return self.content_config
@@ -1542,11 +1542,11 @@ class Images( Gemini ):
 			exception.method = '_get_output_text( self ) -> Optional[ str ]'
 			raise exception
 	
-	def generate( self, prompt: str, model: str = 'gemini-2.5-flash-image', aspect: str = None,
-			number: int = None, temperature: float = None, top_p: float = None,
-			frequency: float = None, presence: float = None, max_tokens: int = None,
-			resolution: str = None, instruct: str = None, output_mime_type: str = None,
-			response_modalities: str = None, grounded: bool = False,
+	def generate( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
+			number: int=None, temperature: float=None, top_p: float=None,
+			frequency: float=None, presence: float=None, max_tokens: int=None,
+			resolution: str=None, instruct: str=None, output_mime_type: str=None,
+			response_modalities: str=None, grounded: bool = False,
 			image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
@@ -1607,11 +1607,11 @@ class Images( Gemini ):
 			exception.method = 'generate( self, prompt, aspect ) -> Optional[ PIL.Image.Image ]'
 			raise exception
 	
-	def analyze( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
-			aspect: str = None, number: int = None, temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, resolution: str = None, instruct: str = None,
-			output_mime_type: str = None, response_modalities: str = None,
+	def analyze( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
+			aspect: str=None, number: int=None, temperature: float=None,
+			top_p: float=None, frequency: float=None, presence: float=None,
+			max_tokens: int=None, resolution: str=None, instruct: str=None,
+			output_mime_type: str=None, response_modalities: str=None,
 			grounded: bool = False, image_search: bool = False ) -> Optional[ str ]:
 		"""
 			
@@ -1672,11 +1672,11 @@ class Images( Gemini ):
 			exception.method = 'analyze( self, prompt, path, model ) -> Optional[ str ]'
 			raise exception
 	
-	def edit( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
-			aspect: str = None, number: int = None, temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, resolution: str = None, instruct: str = None,
-			output_mime_type: str = None, response_modalities: str = None,
+	def edit( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
+			aspect: str=None, number: int=None, temperature: float=None,
+			top_p: float=None, frequency: float=None, presence: float=None,
+			max_tokens: int=None, resolution: str=None, instruct: str=None,
+			output_mime_type: str=None, response_modalities: str=None,
 			grounded: bool = False, image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
@@ -1779,7 +1779,7 @@ class Embeddings( Gemini ):
 	file_path: Optional[ str ]
 	response_modalities: Optional[ str ]
 	
-	def __init__( self, model: str='gemini-embedding-001'  ):
+	def __init__( self, model: str='gemini-embedding-001' ):
 		super( ).__init__( )
 		self.model = model
 		self.temperature = None
@@ -1902,7 +1902,7 @@ class TTS( Gemini ):
 	input_text: Optional[ str ]
 	audio_bytes: Optional[ bytes ]
 	
-	def __init__( self, model: str = 'gemini-2.5-flash-preview-tts' ):
+	def __init__( self, model: str='gemini-2.5-flash-preview-tts' ):
 		super( ).__init__( )
 		self.number = None
 		self.model = model
@@ -1963,8 +1963,8 @@ class TTS( Gemini ):
 		"""
 		return [ 'audio/wav' ]
 	
-	def _to_wave_bytes( self, pcm_data: bytes, rate: int = 24000, channels: int = 1,
-			sample_width: int = 2 ) -> bytes:
+	def _to_wave_bytes( self, pcm_data: bytes, rate: int=24000, channels: int=1,
+			sample_width: int=2 ) -> bytes:
 		"""
 
 			Purpose:
@@ -1995,11 +1995,11 @@ class TTS( Gemini ):
 			
 			return buffer.getvalue( )
 	
-	def create_speech( self, text: str, filepath: str = None,
-			model: str = 'gemini-2.5-flash-preview-tts', format: str = 'audio/wav',
-			speed: float = None, voice: str = None, frequency: float = None,
-			presense: float = None, max_tokens: int = None, instruct: str = None,
-			temperature: float = None, top_p: float = None ) -> bytes | str | None:
+	def create_speech( self, text: str, filepath: str=None,
+			model: str='gemini-2.5-flash-preview-tts', format: str='audio/wav',
+			speed: float=None, voice: str=None, frequency: float=None,
+			presense: float=None, max_tokens: int=None, instruct: str=None,
+			temperature: float=None, top_p: float=None ) -> bytes | str | None:
 		"""
 
 			Purpose:
@@ -2052,16 +2052,16 @@ class TTS( Gemini ):
 			}
 			
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ] = self.temperature
+				self.config_kwargs[ 'temperature' ]=self.temperature
 			
 			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ] = self.top_p
+				self.config_kwargs[ 'top_p' ]=self.top_p
 			
 			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
 			
 			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -2118,9 +2118,9 @@ class Transcription( Gemini ):
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
-			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0,
-			max_tokens: int = 10000, instruct: str = None ):
+	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
+			top_p: float=0.9, frequency: float=0.0, presence: float=0.0,
+			max_tokens: int=10000, instruct: str=None ):
 		super( ).__init__( )
 		self.number = n
 		self.model = model
@@ -2179,7 +2179,8 @@ class Transcription( Gemini ):
 		         'audio/x-m4a',
 		         'audio/flac' ]
 	
-	def _build_prompt( self, language: str = None, start_time: float = None, end_time: float = None ) -> str:
+	def _build_prompt( self, language: str=None, start_time: float=None,
+			end_time: float=None ) -> str:
 		"""
 
 			Purpose:
@@ -2211,11 +2212,11 @@ class Transcription( Gemini ):
 		self.prompt_parts.append( 'Return only the transcript text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def transcribe( self, path: str, model: str = 'gemini-3-flash-preview',
-			language: str = None, mime_type: str = None, temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, start_time: float = None, end_time: float = None,
-			instruct: str = None ) -> Optional[ str ]:
+	def transcribe( self, path: str, model: str='gemini-3-flash-preview',
+			language: str=None, mime_type: str=None, temperature: float=None,
+			top_p: float=None, frequency: float=None, presence: float=None,
+			max_tokens: int=None, start_time: float=None, end_time: float=None,
+			instruct: str=None ) -> Optional[ str ]:
 		"""
 
 			Purpose:
@@ -2263,16 +2264,16 @@ class Transcription( Gemini ):
 			self.config_kwargs = { }
 			
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ] = self.temperature
+				self.config_kwargs[ 'temperature' ]=self.temperature
 			
 			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ] = self.top_p
+				self.config_kwargs[ 'top_p' ]=self.top_p
 			
 			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
 			
 			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.uploaded_file = self.client.files.upload( file=self.file_path )
@@ -2316,9 +2317,10 @@ class Translation( Gemini ):
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
-			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0, max_tokens: int = 10000,
-			instruct: str = None ):
+	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
+			top_p: float=0.9, frequency: float=0.0, presence: float=0.0,
+			max_tokens: int=10000,
+			instruct: str=None ):
 		super( ).__init__( )
 		self.number = n
 		self.model = model
@@ -2377,8 +2379,8 @@ class Translation( Gemini ):
 		         'German',
 		         'Chinese' ]
 	
-	def _build_prompt( self, target: str, source: str = 'Auto', start_time: float = None,
-			end_time: float = None ) -> str:
+	def _build_prompt( self, target: str, source: str='Auto', start_time: float=None,
+			end_time: float=None ) -> str:
 		"""
 
 			Purpose:
@@ -2411,11 +2413,11 @@ class Translation( Gemini ):
 		self.prompt_parts.append( 'Return only the translated text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def translate( self, path: str, model: str = 'gemini-3-flash-preview',
-			language: str = 'English', source: str = 'Auto', mime_type: str = None,
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None, max_tokens: int = None, start_time: float = None,
-			end_time: float = None, instruct: str = None ) -> Optional[ str ]:
+	def translate( self, path: str, model: str='gemini-3-flash-preview',
+			language: str='English', source: str='Auto', mime_type: str=None,
+			temperature: float=None, top_p: float=None, frequency: float=None,
+			presence: float=None, max_tokens: int=None, start_time: float=None,
+			end_time: float=None, instruct: str=None ) -> Optional[ str ]:
 		"""
 
 			Purpose:
@@ -2467,16 +2469,16 @@ class Translation( Gemini ):
 			self.config_kwargs = { }
 			
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ] = self.temperature
+				self.config_kwargs[ 'temperature' ]=self.temperature
 			
 			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ] = self.top_p
+				self.config_kwargs[ 'top_p' ]=self.top_p
 			
 			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
+				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
 			
 			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
+				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.uploaded_file = self.client.files.upload( file=self.file_path )
@@ -2787,7 +2789,8 @@ class Files( Gemini ):
 			raise ex
 	
 	def summarize( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
-			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
+			temperature: float=None, top_p: float=None, frequency: float=None,
+			presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 			
@@ -2838,7 +2841,8 @@ class Files( Gemini ):
 			raise ex
 	
 	def search( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
-			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
+			temperature: float=None, top_p: float=None, frequency: float=None,
+			presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 			
@@ -2891,7 +2895,8 @@ class Files( Gemini ):
 	
 	def survey( self, prompt: str, filepaths: List[ str ], model: str='gemini-2.0-flash',
 			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None, max_tokens: int=None, stops: List[ str ]=None ) -> str | None:
+			presence: float=None, max_tokens: int=None,
+			stops: List[ str ]=None ) -> str | None:
 		"""
 			
 			Purpose:
@@ -2939,7 +2944,8 @@ class Files( Gemini ):
 			ex.method = 'survey( self, prompt, filepaths, model ) -> str'
 			raise ex
 	
-	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite', temperature: float=None,
+	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
+			temperature: float=None,
 			top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
@@ -2970,8 +2976,7 @@ class Files( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -2986,7 +2991,8 @@ class Files( Gemini ):
 			error = ErrorDialog( exception )
 			error.show( )
 	
-	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite', temperature: float=None,
+	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
+			temperature: float=None,
 			top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
@@ -3118,20 +3124,20 @@ class VectorStores( Gemini ):
 		self.bucket = None
 		self.response = None
 		self.collections = \
-		{
-			'Federal Financial Data': 'jeni-financial/data',
-			'Federal Financial Regulations': 'jeni-financial/regulations',
-			'DoW Financial Data': 'jeni_dow/budget/data',
-			'DoW Financial Regulations': 'jeni_dow/budget/regulations',
-			'DoA Financial Data': 'jenni-doa/Financial Data',
-		}
+			{
+					'Federal Financial Data': 'jeni-financial/data',
+					'Federal Financial Regulations': 'jeni-financial/regulations',
+					'DoW Financial Data': 'jeni-dow/budget/data',
+					'DoW Financial Regulations': 'jeni-dow/budget/regulations',
+					'DoA Financial Data': 'jenni-doa/Financial Data',
+			}
 		self.documents = \
-		{
-			'Account_Balances.csv': 'file-U6wFeRGSeg38Db5uJzo5sj',
-			'SF133.csv': 'file-32s641QK1Xb5QUatY3zfWF',
-			'Authority.csv': 'file-Qi2rw2QsdxKBX1iiaQxY3m',
-			'Outlays.csv': 'file-GHEwSWR7ezMvHrQ3X648wn'
-		}
+			{
+					'Account_Balances.csv': 'file-U6wFeRGSeg38Db5uJzo5sj',
+					'SF133.csv': 'file-32s641QK1Xb5QUatY3zfWF',
+					'Authority.csv': 'file-Qi2rw2QsdxKBX1iiaQxY3m',
+					'Outlays.csv': 'file-GHEwSWR7ezMvHrQ3X648wn'
+			}
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
@@ -3295,9 +3301,10 @@ class VectorStores( Gemini ):
 			ex.method = 'list( self, bucket )'
 			raise ex
 	
-	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite', temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
+			temperature: float=None,
+			top_p: float=None, frequency: float=None, presence: float=None,
+			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 		
 			Purpose:
@@ -3342,7 +3349,8 @@ class VectorStores( Gemini ):
 			error = ErrorDialog( exception )
 			error.show( )
 	
-	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite', temperature: float=None,
+	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
+			temperature: float=None,
 			top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""

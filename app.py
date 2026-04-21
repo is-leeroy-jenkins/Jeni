@@ -3246,8 +3246,6 @@ with st.sidebar:
 # TEXT MODE
 # ======================================================================================
 if mode == 'Text':
-	st.subheader( "💬 Text Generation", help=cfg.TEXT_GENERATION )
-	st.divider( )
 	text_model = st.session_state.get( 'text_model', '' )
 	text_number = st.session_state.get( 'text_number', 0 )
 	text_max_urls = st.session_state.get( 'text_max_urls', 0 )
@@ -3280,6 +3278,8 @@ if mode == 'Text':
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
+		st.subheader( "💬 Text Generation", help=cfg.TEXT_GENERATION )
+		st.divider( )
 		if st.session_state.get( 'clear_instructions' ):
 			st.session_state[ 'text_system_instructions' ] = ''
 			st.session_state[ 'instructions_last_loaded' ] = ''
@@ -3341,11 +3341,15 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_model_reset', width='stretch' ):
-					st.session_state[ 'text_model' ] = ''
-					st.session_state[ 'text_max_urls' ] = 0
-					st.session_state[ 'text_reasoning' ] = ''
-					st.session_state[ 'text_response_schema' ] = ''
-					st.session_state[ 'text_tools' ] = [ ]
+					for key in [ 'text_model',
+					             'text_max_urls',
+					             'text_reasoning',
+								 'thinking_level',
+					             'text_response_schema',
+					             'text_tools' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
 					st.rerun( )
 			
 			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
@@ -3395,11 +3399,14 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='text_inference_reset', width='stretch' ):
-					st.session_state[ 'text_top_percent' ] = 0.0
-					st.session_state[ 'text_frequency_penalty' ] = 0.0
-					st.session_state[ 'text_presence_penalty' ] = 0.0
-					st.session_state[ 'text_temperature' ] = 0.0
-					st.session_state[ 'text_top_k' ] = 0
+					for key in [ 'text_top_percent',
+					             'text_frequency_penalty',
+					             'text_presence_penalty',
+					             'text_temperature',
+					             'text_top_k' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
 					st.rerun( )
 					
 			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
@@ -3426,32 +3433,26 @@ if mode == 'Text':
 				# ---------- Resolution ------------
 				with tool_c3:
 					media_options = list( text.media_options )
-					set_text_media_resolution = st.selectbox(
-						label='Resolution',
+					set_text_media_resolution = st.selectbox( label='Resolution',
 						options=media_options,
 						key='text_media_resolution',
 						help='Optional. Requested media resolution for supported outputs.',
 						index=None,
-						placeholder='Options'
-					)
+						placeholder='Options' )
 					
 					text_media_resolution = st.session_state[ 'text_media_resolution' ]
 				
 				# ---------- URLs ------------
 				with tool_c4:
-					set_text_urls = st.text_input(
-						label='URLs',
+					set_text_urls = st.text_input( label='URLs',
 						key='text_urls_input',
 						value=';'.join( st.session_state.get( 'text_urls', [ ] ) ),
 						help='Optional. Enter URLs separated by semicolons for grounding.',
 						width='stretch',
-						placeholder='https://example.com/page-1;https://example.com/page-2'
-					)
+						placeholder='https://example.com/page-1;https://example.com/page-2' )
 					
-					normalized_text_urls = [
-							line.strip( ) for line in set_text_urls.split( ';' )
-							if line.strip( )
-					]
+					normalized_text_urls = [ line.strip( ) for line in set_text_urls.split( ';' )
+							if line.strip( ) ]
 					
 					st.session_state[ 'text_urls' ] = normalized_text_urls
 					text_urls = st.session_state[ 'text_urls' ]
@@ -3472,13 +3473,17 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_tools', width='stretch' ):
-					st.session_state[ 'text_number' ] = 0
-					st.session_state[ 'text_tool_choice' ] = ''
-					st.session_state[ 'text_media_resolution' ] = ''
-					st.session_state[ 'text_urls' ] = [ ]
-					st.session_state[ 'text_urls_input' ] = ''
-					st.session_state[ 'text_modalities' ] = [ ]
+					for key in [ 'text_number',
+					             'text_tool_choice',
+					             'text_media_resolution',
+					             'text_urls',
+					             'text_urls_input',
+					             'text_modalities' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
 					st.rerun( )
+				
 					
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
@@ -3552,12 +3557,17 @@ if mode == 'Text':
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_response', width='stretch' ):
-					st.session_state[ 'text_max_tokens' ] = 0
-					st.session_state[ 'text_stops' ] = [ ]
-					st.session_state[ 'text_stops_input' ] = ''
-					st.session_state[ 'text_safety_profile' ] = ''
-					st.session_state[ 'text_stream' ] = False
-					st.session_state[ 'text_response_format' ] = ''
+					for key in [ 'text_max_tokens',
+					             'text_stops',
+					             'text_safety_profile',
+					             'text_stream',
+					             'text_response_format' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
+					if 'text_stops_input' in st.session_state:
+						del st.session_state[ 'text_stops_input' ]
+					
 					st.rerun( )
 				
 		# ------------------------------------------------------------------
@@ -3716,8 +3726,6 @@ if mode == 'Text':
 # IMAGES MODE
 # ======================================================================================
 elif mode == "Images":
-	st.subheader( '📷 Images API', help=cfg.IMAGES_API )
-	st.divider( )
 	image_model = st.session_state.get( 'image_model', '' )
 	image_number = st.session_state.get( 'image_number', 1 )
 	image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
@@ -3788,6 +3796,9 @@ elif mode == "Images":
 	
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
+		st.subheader( '📷 Images API', help=cfg.IMAGES_API )
+		st.divider( )
+		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
@@ -4320,8 +4331,6 @@ elif mode == "Images":
 # AUDIO MODE
 # ======================================================================================
 elif mode == 'Audio':
-	st.subheader( '🎧 Audio API', help=cfg.AUDIO_API )
-	st.divider( )
 	audio_model = st.session_state.get( 'audio_model', '' )
 	audio_top_percent = st.session_state.get( 'audio_top_percent', 0.0 )
 	audio_freq = st.session_state.get( 'audio_frequency_penalty', 0.0 )
@@ -4416,6 +4425,9 @@ elif mode == 'Audio':
 	
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
+		st.subheader( '🎧 Audio API', help=cfg.AUDIO_API )
+		st.divider( )
+		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
 			with st.expander( 'LLM Settings', icon='🧊', expanded=False, width='stretch' ):
@@ -4749,8 +4761,6 @@ elif mode == 'Audio':
 # EMBEDDINGS MODE
 # ======================================================================================
 elif mode == 'Embedding':
-	st.subheader( '🔢 Embeddings', help=cfg.EMBEDDINGS_API )
-	st.divider( )
 	embedding_model = st.session_state.get( 'embedding_model', '' )
 	embeddings_dimensions = st.session_state.get( 'embeddings_dimensions', )
 	embeddings_chunk_size = st.session_state.get( 'embeddings_chunk_size', 0 )
@@ -4764,6 +4774,9 @@ elif mode == 'Embedding':
 	# ------------------------------------------------------------------
 	emb_left, emb_center, emb_right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with emb_center:
+		st.subheader( '🔢 Embeddings', help=cfg.EMBEDDINGS_API )
+		st.divider( )
+		
 		with st.expander( label='Configuration', icon='🎚️', expanded=False, width='stretch' ):
 			emb_c1, emb_c2, emb_c3, emb_c4, emb_c5 = st.columns(
 				[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
@@ -4941,8 +4954,6 @@ elif mode == 'Embedding':
 # DOCUMENTS MODE
 # ======================================================================================
 elif mode == 'Document Q&A':
-	st.subheader( '📖 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
-	st.divider( )
 	docqna_model = st.session_state.get( 'docqna_model', '' )
 	docqna_number = st.session_state.get( 'docqna_number', 0 )
 	docqna_max_calls = st.session_state.get( 'docqna_max_calls', 0 )
@@ -4994,6 +5005,8 @@ elif mode == 'Document Q&A':
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
+		st.subheader( '📖 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
+		st.divider( )
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
 			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
@@ -5319,8 +5332,6 @@ elif mode == 'Document Q&A':
 # FILES API MODE
 # ======================================================================================
 elif mode == 'Files':
-	st.subheader( '📁 Files API', help=cfg.FILES_API )
-	st.divider( )
 	files = Files( )
 	files_model = st.session_state.get( 'files_model', '' )
 	files_purpose = st.session_state.get( 'files_purpose', '' )
@@ -5337,6 +5348,8 @@ elif mode == 'Files':
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
+		st.subheader( '📁 Files API', help=cfg.FILES_API )
+		st.divider( )
 		list_method = None
 		if hasattr( files, 'list' ):
 			list_method = getattr( files, 'list' )
@@ -5427,12 +5440,12 @@ elif mode == 'Vector Stores':
 	# ------------------------------------------------------------------
 	# Main Chat UI
 	# ------------------------------------------------------------------
-	st.subheader( '🏛️ File Search Stores', help=cfg.VECTORSTORES_API )
-	st.divider( )
 	searcher = VectorStores( )
 	
 	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
 	with center:
+		st.subheader( '🏛️ File Search Stores', help=cfg.VECTORSTORES_API )
+		st.divider( )
 		st.caption( 'File Search Store Management' )
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
 		with stores_left:
@@ -5504,8 +5517,6 @@ elif mode == 'Vector Stores':
 # PROMPT ENGINEERING MODE
 # ======================================================================================
 elif mode == 'Prompt Engineering':
-	st.subheader( '📝 Prompt Engineering', help=cfg.PROMPT_ENGINEERING )
-	st.divider( )
 	import sqlite3
 	import math
 	
@@ -5514,6 +5525,8 @@ elif mode == 'Prompt Engineering':
 	st.session_state.setdefault( 'pe_cascade_enabled', False )
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
+		st.subheader( '📝 Prompt Engineering', help=cfg.PROMPT_ENGINEERING )
+		st.divider( )
 		st.checkbox( 'Cascade selection into System Instructions', key='pe_cascade_enabled' )
 		
 		# ------------------------------------------------------------------
@@ -5738,10 +5751,9 @@ elif mode == 'Prompt Engineering':
 # EXPORT MODE
 # ==============================================================================
 elif mode == 'Data Export':
-	st.subheader( '📭  Export' )
-	st.divider( )
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
+		st.subheader( '📭  Export' )
 		st.divider( )
 		
 		# -----------------------------------
@@ -5790,7 +5802,7 @@ elif mode == 'Data Export':
 		pdf.save( )
 		
 		st.download_button( 'Download Chat History (PDF)', buf.getvalue( ),
-			'buddy_chat.pdf', mime='application/pdf' )
+			'jeni_chat.pdf', mime='application/pdf' )
 
 # ==============================================================================
 # DATA MANAGEMENT MODE
