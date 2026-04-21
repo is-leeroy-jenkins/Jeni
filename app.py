@@ -81,6 +81,7 @@ from gemini import (
 	Translation,
 	TTS,
 	Files,
+	FileSearch,
 	VectorStores )
 
 # ======================================================================================
@@ -263,6 +264,15 @@ if 'translation_model' not in st.session_state:
 
 # --------TEXT-GENERATION PARAMETERS--------------------
 
+if 'text_file_search_store_names' not in st.session_state:
+	st.session_state[ 'text_file_search_store_names' ] = [ ]
+
+if 'selected_filestore_id' not in st.session_state:
+	st.session_state[ 'selected_filestore_id' ] = ''
+
+if 'selected_filestore_label' not in st.session_state:
+	st.session_state[ 'selected_filestore_label' ] = ''
+	
 if 'text_number' not in st.session_state:
 	st.session_state[ 'text_number' ] = 0
 
@@ -601,7 +611,24 @@ if 'docqna_chunk_count' not in st.session_state:
 
 if 'docqna_fallback_rows' not in st.session_state:
 	st.session_state[ 'docqna_fallback_rows' ] = [ ]
+if 'files_purpose' not in st.session_state:
+	st.session_state[ 'files_purpose' ] = ''
 
+if 'files_type' not in st.session_state:
+	st.session_state[ 'files_type' ] = ''
+
+if 'files_id' not in st.session_state:
+	st.session_state[ 'files_id' ] = ''
+
+if 'files_url' not in st.session_state:
+	st.session_state[ 'files_url' ] = ''
+
+if 'files_table' not in st.session_state:
+	st.session_state[ 'files_table' ] = ''
+
+if 'files_messages' not in st.session_state:
+	st.session_state.files_messages: List[ Dict[ str, Any ] ] = [ ]
+	
 # ------- EMBEDDING-SPECIFIC PARAMETERS ----------------------
 
 if 'embedding_model' not in st.session_state:
@@ -3168,7 +3195,6 @@ init_state( )
 # ======================================================================================
 # Sidebar
 # ======================================================================================
-
 with st.sidebar:
 	style_subheaders( )
 	st.logo( cfg.LOGO_PATH, size='large' )
@@ -3454,16 +3480,58 @@ if mode == 'Text':
 				# ---------- Modalities ------------
 				with tool_c5:
 					modality_options = list( text.modality_options )
-					set_text_modalities = st.multiselect(
-						label='Response Modalities',
-						options=modality_options,
-						key='text_modalities',
-						help='Optional. Modality of the response',
-						placeholder='Options'
-					)
+					set_text_modalities = st.multiselect( label='Response Modalities',
+						options=modality_options, key='text_modalities',
+						help='Optional. Modality of the response', placeholder='Options' )
 					
 					text_modalities = [ d.strip( ) for d in set_text_modalities if d.strip( ) ]
 					text_modalities = st.session_state[ 'text_modalities' ]
+					
+					if 'file_search' in st.session_state.get( 'text_tools', [ ] ):
+						try:
+							tool_searcher = FileSearch( )
+							file_store_map = getattr( tool_searcher, 'collections', { } ) or { }
+							file_store_options = list( file_store_map.items( ) )
+						except Exception:
+							file_store_map = { }
+							file_store_options = [ ]
+						
+						if file_store_options:
+							file_store_labels = [ f'{n} — {i}' for n, i in file_store_options ]
+							
+							default_index = None
+							current_store_id = st.session_state.get( 'selected_filestore_id', '' )
+							if current_store_id:
+								for idx, (_, store_id) in enumerate( file_store_options ):
+									if str( store_id ) == str( current_store_id ):
+										default_index = idx
+										break
+							
+							selected_file_store = st.selectbox( label='File Search Store',
+								options=file_store_labels, index=default_index,
+								key='text_file_search_store_select',
+								help='Optional. Gemini File Search Store' )
+							
+							selected_store_id = ''
+							selected_store_label = ''
+							for name, store_id in file_store_options:
+								if f'{name} — {store_id}' == selected_file_store:
+									selected_store_label = str( name )
+									selected_store_id = str( store_id )
+									break
+							
+							st.session_state[ 'selected_filestore_id' ] = selected_store_id
+							st.session_state[ 'selected_filestore_label' ] = selected_store_label
+							st.session_state[ 'text_file_search_store_names' ] = (
+									[ selected_store_id ] if selected_store_id else [ ]
+							)
+						else:
+							st.session_state[ 'selected_filestore_id' ] = ''
+							st.session_state[ 'selected_filestore_label' ] = ''
+							st.session_state[ 'text_file_search_store_names' ] = [ ]
+							st.caption( 'No Gemini File Search Stores found.' )
+					else:
+						st.session_state[ 'text_file_search_store_names' ] = [ ]
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='reset_text_tools', width='stretch' ):
@@ -3477,7 +3545,6 @@ if mode == 'Text':
 							del st.session_state[ key ]
 					
 					st.rerun( )
-				
 					
 			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
@@ -5326,6 +5393,8 @@ elif mode == 'Document Q&A':
 # FILES API MODE
 # ======================================================================================
 elif mode == 'Files':
+	st.subheader( '📁 Files API', help=cfg.FILES_API )
+	st.divider( )
 	files = Files( )
 	files_model = st.session_state.get( 'files_model', '' )
 	files_purpose = st.session_state.get( 'files_purpose', '' )
@@ -5333,78 +5402,357 @@ elif mode == 'Files':
 	files_id = st.session_state.get( 'files_id', '' )
 	files_url = st.session_state.get( 'files_url', '' )
 	files_table = st.session_state.get( 'files_table', '' )
+	files_messages = st.session_state.get( 'files_messages', [ ] )
 	
-	for key in [ 'files_domains', 'files_stops', 'files_includes', 'files_input', ]:
-		if key in st.session_state and isinstance( st.session_state[ key ], list ):
-			del st.session_state[ key ]
+	for key in [ 'files_domains', 'files_stops', 'files_includes', 'files_messages', ]:
+		if key in st.session_state:
+			st.session_state[ key ] = [ ]
 	# ------------------------------------------------------------------
 	# Main Chat UI
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
-		st.subheader( '📁 Files API', help=cfg.FILES_API )
-		st.divider( )
-		list_method = None
-		if hasattr( files, 'list' ):
-			list_method = getattr( files, 'list' )
-		
-		uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
-			type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
-		if uploaded_file:
-			tmp_path = save_temp( uploaded_file )
-			upload_fn = None
-			for name in ('upload_file', 'upload', 'files_upload'):
-				if hasattr( files, name ):
-					upload_fn = getattr( files, name )
-					break
-			if not upload_fn:
-				st.warning( 'No upload function found on chat object.' )
-			else:
-				with st.spinner( 'Uploading to Files API...' ):
-					try:
-						fid = upload_fn( tmp_path )
-						st.success( f'Uploaded; file id: {fid}' )
-					except Exception as exc:
-						st.error( f"Upload failed: {exc}" )
-		
-		if st.button( 'List Files' ):
-			try:
-				files_resp = list_method( )
-				rows = [ ]
-				files_list = (files_resp.data if hasattr( files_resp, 'data' ) else files_resp
-				if isinstance( files_resp, list ) else [ ])
-				
-				for f in files_list:
-					rows.append( { 'id': str( getattr( f, 'id', "" ) ),
-					               'filename': str( getattr( f, 'filename', "" ) ),
-					               'files_purpose': str( getattr( f, 'files_purpose', "" ) ), } )
-				
-				st.session_state.files_table = rows
+		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
-			except Exception as exc:
-				st.session_state.files_table = None
-				st.error( f'List files failed: {exc}' )
+			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
+				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5, llm_c6 = st.columns(
+					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
+				
+				# ---------- Model ------------
+				with llm_c1:
+					model_options = list( files.model_options )
+					set_files_model = st.selectbox( label='Select Model', options=model_options,
+						key='files_model', placeholder='Options', index=None,
+						help='REQUIRED. Large Language Model used by the AI', )
+					
+					files_model = st.session_state[ 'files_model' ]
+				
+				# ---------- Reasoning ------------
+				with llm_c2:
+					reasoning_options = list( files.reasoning_options )
+					set_files_reasoning = st.selectbox( label='Reasoning',
+						options=reasoning_options, key='files_reasoning',
+						help=cfg.REASONING, index=None, placeholder='Options' )
+					
+					files_reasoning = st.session_state[ 'files_reasoning' ]
+				
+				# ---------- Top-P ------------
+				with llm_c3:
+					set_files_top_p = st.slider( label='Top-P', min_value=0.0, max_value=1.0,
+						step=0.01, help=cfg.TOP_P, key='files_top_percent' )
+					
+					files_top_percent = st.session_state[ 'files_top_percent' ]
+				
+				# ---------- Temperature ------------
+				with llm_c4:
+					set_files_temperature = st.slider( label='Temperature', min_value=-2.0,
+						max_value=2.0,
+						step=0.01,
+						help=cfg.TEMPERATURE, key='files_temperature' )
+					
+					files_temperature = st.session_state[ 'files_temperature' ]
+				
+				# ---------- Presense ------------
+				with llm_c5:
+					set_files_presence = st.slider( label='Presense Penalty', min_value=-2.0,
+						max_value=2.0,
+						step=0.01, help=cfg.PRESENCE_PENALTY, key='files_presence_penalty' )
+					
+					files_presence = st.session_state[ 'files_presence_penalty' ]
+				
+				# ---------- Frequency ------------
+				with llm_c6:
+					set_files_freq = st.slider( label='Frequency Penalty', min_value=-2.0,
+						max_value=2.0,
+						step=0.01, help=cfg.FREQUENCY_PENALTY, key='files_frequency_penalty' )
+					
+					files_fequency = st.session_state[ 'files_frequency_penalty' ]
+				
+				# ---------- Reset Model ------------
+				if st.button( label='Reset', key='reset_files_model', width='stretch' ):
+					for key in [ 'files_model', 'files_temperature', 'files_presence_penalty',
+					             'files_reasoning', 'files_top_percent',
+					             'files_frequency_penalty' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
+					st.rerun( )
 			
-			if 'files_list' in locals( ) and files_list:
-				file_ids = [ r.get( 'filename' ) if isinstance( r, dict )
-				             else getattr( r, 'id', None ) for r in files_list ]
-				sel = st.selectbox( label='Select File to Delete', options=file_ids,
-					index=None, placeholder='Options' )
-				if st.button( 'Delete File' ):
-					del_fn = None
-					for name in ('delete_file', 'delete', 'files_delete'):
-						if hasattr( files, name ):
-							del_fn = getattr( files, name )
-							break
-					if not del_fn:
-						st.warning( 'No delete function found on chat object.' )
-					else:
-						with st.spinner( 'Deleting file...' ):
-							try:
-								res = del_fn( sel )
-								st.success( f'Delete result: {res}' )
-							except Exception as exc:
-								st.error( f'Delete failed: {exc}' )
+			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
+				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5, tool_c6 = st.columns(
+					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
+				
+				# ---------- Max Calls ------------
+				with tool_c1:
+					set_files_calls = st.slider( label='Max Calls', min_value=0, max_value=10,
+						value=int( st.session_state.get( 'files_max_calls', 0 ) ), step=1,
+						help=cfg.MAX_TOOL_CALLS, key='files_max_calls' )
+					
+					files_max_calls = st.session_state[ 'files_max_calls' ]
+				
+				# ---------- Choice ------------
+				with tool_c2:
+					choice_options = list( files.choice_options )
+					set_files_choice = st.selectbox( label='Choice', options=choice_options,
+						key='files_tool_choice', help=cfg.CHOICE, index=None,
+						placeholder='Options' )
+					
+					files_tool_choice = st.session_state[ 'files_tool_choice' ]
+				
+				# ---------- Include ------------
+				with tool_c3:
+					include_options = list( files.include_options )
+					set_files_include = st.multiselect( label='Include', options=include_options,
+						key='files_include', help=cfg.INCLUDE, placeholder='Options' )
+					
+					files_include = [ d.strip( ) for d in set_files_include
+					                  if d.strip( ) ]
+					
+					files_include = st.session_state[ 'files_include' ]
+				
+				# ---------- Domains ------------
+				with tool_c4:
+					set_files_domains = st.text_input( label='Allowed Domains',
+						key='files_domains_input',
+						value=','.join( st.session_state.get( 'files_domains', [ ] ) ),
+						help=cfg.ALLOWED_DOMAINS, width='stretch', placeholder='Enter Domains' )
+					
+					files_domains = [ d.strip( ) for d in set_files_domains.split( ',' )
+					                  if d.strip( ) ]
+					
+					st.session_state[ 'files_domains' ] = files_domains
+				
+				# ---------- Tools ------------
+				with tool_c5:
+					tool_options = list( files.tool_options )
+					set_files_tools = st.multiselect( label='Tools', options=tool_options,
+						key='files_tools', help=cfg.TOOLS, placeholder='Options' )
+					
+					files_tools = [ d.strip( ) for d in set_files_tools
+					                if d.strip( ) ]
+					
+					files_tools = st.session_state[ 'files_tools' ]
+				
+				# ---------- Background ------------
+				with tool_c6:
+					set_files_background = st.toggle( label='Background', key='files_background',
+						help=cfg.BACKGROUND_MODE )
+					
+					files_background = st.session_state[ 'files_background' ]
+				
+				# ---------- Reset Tools ------------
+				if st.button( label='Reset', key='reset_files_tools', width='stretch' ):
+					for key in [ 'files_max_calls', 'files_tool_choice', 'files_include',
+					             'files_tools', 'files_domains', 'files_background' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
+					st.rerun( )
+			
+			with st.expander( label='Response Settings', icon='↔️', expanded=False,
+					width='stretch' ):
+				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5, resp_c6 = st.columns(
+					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
+				
+				# ---------- Number ------------
+				with resp_c1:
+					set_files_number = st.slider( label='Number', min_value=0, max_value=50,
+						value=int( st.session_state.get( 'files_number', 0 ) ), step=1,
+						help='Optional. Upper limit on the responses returned by the model',
+						key='files_number' )
+					
+					files_number = st.session_state[ 'files_number' ]
+				
+				# ---------- Stream ------------
+				with resp_c2:
+					set_files_stream = st.toggle( label='Stream', key='files_stream',
+						help=cfg.STREAM )
+					
+					files_stream = st.session_state[ 'files_stream' ]
+				
+				# ---------- Store ------------
+				with resp_c3:
+					set_files_store = st.toggle( label='Store', key='files_store', help=cfg.STORE )
+					
+					files_store = st.session_state[ 'files_store' ]
+				
+				# ---------- Max Tokens ------------
+				with resp_c4:
+					set_files_tokens = st.slider( label='Max Tokens', min_value=0, max_value=100000,
+						value=int( st.session_state.get( 'files_max_tokens', 0 ) ), step=500,
+						help=cfg.MAX_OUTPUT_TOKENS, key='files_max_tokens' )
+					
+					files_tokens = st.session_state[ 'files_max_tokens' ]
+				
+				# ---------- Modalities------------
+				with resp_c5:
+					modality_options = list( files.modality_options )
+					set_files_modalities = st.multiselect( label='Response Modalities',
+						options=modality_options,
+						key='files_modalities', help='Optional. Modality of the response',
+						placeholder='Options' )
+					
+					files_modalities = [ d.strip( ) for d in set_files_modalities
+					                     if d.strip( ) ]
+					
+					files_modalities = st.session_state[ 'files_modalities' ]
+				
+				# ---------- Stops ------------
+				with resp_c6:
+					set_files_stops = st.text_input( label='Stop Sequences',
+						key='files_stops_input',
+						value=','.join( st.session_state.get( 'files_stops', [ ] ) ),
+						help=cfg.STOP_SEQUENCE, width='stretch', placeholder='Enter Stop Strings' )
+					
+					files_stops = [ d.strip( ) for d in set_files_stops.split( ',' )
+					                if d.strip( ) ]
+					
+					st.session_state[ 'files_stops' ] = files_stops
+				
+				# ---------- Reset Reponse ------------
+				if st.button( label='Reset', key='reset_files_response', width='stretch' ):
+					for key in [ 'files_stream', 'files_store', 'files_number', 'files_stops',
+					             'files_tools', 'files_max_tokens', 'files_modalities' ]:
+						if key in st.session_state:
+							del st.session_state[ key ]
+					
+					st.rerun( )
+		
+		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			
+			prompt_names = fetch_prompt_names( cfg.DB_PATH )
+			if not prompt_names:
+				prompt_names = [ '' ]
+			
+			with in_left:
+				st.text_area( label='Enter Text', height=50, width='stretch',
+					help=cfg.SYSTEM_INSTRUCTIONS, key='files_system_instructions' )
+			
+			def _on_template_change( ) -> None:
+				name = st.session_state.get( 'instructions' )
+				if name and name != 'No Templates Found':
+					text = fetch_prompt_text( cfg.DB_PATH, name )
+					if text is not None:
+						st.session_state[ 'files_system_instructions' ] = text
+			
+			with in_right:
+				st.selectbox( label='Use Template', options=prompt_names, index=None,
+					key='instructions', on_change=_on_template_change )
+			
+			def _on_clear( ) -> None:
+				st.session_state[ 'files_system_instructions' ] = ''
+				st.session_state[ 'instructions' ] = ''
+			
+			def _on_convert_system_instructions( ) -> None:
+				text = st.session_state.get( 'files_system_instructions', '' )
+				if not isinstance( text, str ) or not text.strip( ):
+					return
+				
+				src = text.strip( )
+				
+				# XML-delimited prompt blocks -> Markdown headings
+				if cfg.XML_BLOCK_PATTERN.search( src ):
+					converted = convert_xml( src )
+				
+				# Markdown headings <-> simple <hN> tags handled by existing helper
+				else:
+					converted = convert_markdown( src )
+				
+				st.session_state[ 'files_system_instructions' ] = converted
+			
+			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+			with btn_c1:
+				st.button( label='Clear Instructions', width='stretch', on_click=_on_clear )
+			
+			with btn_c2:
+				st.button( label='XML <-> Markdown', width='stretch',
+					on_click=_on_convert_system_instructions )
+		
+		fls_c1, fls_c2 = st.columns([ 0.4, 0.6 ], border=True )
+		with fls_c1:
+			if st.button( 'List Files' ):
+				try:
+					list_method = None
+					if hasattr( files, 'list' ):
+						list_method = getattr( files, 'list' )
+						files_resp = list_method( )
+						rows = [ ]
+						files_list = (files_resp.data if hasattr( files_resp, 'data' ) else files_resp
+						if isinstance( files_resp, list ) else [ ])
+						
+						for f in files_list:
+							rows.append( { 'id': str( getattr( f, 'id', "" ) ),
+							               'filename': str( getattr( f, 'filename', "" ) ),
+							               'files_purpose': str( getattr( f, 'files_purpose', "" ) ), } )
+						
+						st.session_state.files_table = rows
+				
+				except Exception as exc:
+					st.session_state.files_table = None
+					st.error( f'List files failed: {exc}' )
+				
+				if 'files_list' in locals( ) and files_list:
+					file_ids = [ r.get( 'filename' ) if isinstance( r, dict )
+					             else getattr( r, 'id', None ) for r in files_list ]
+					sel = st.selectbox( label='Select File to Delete', options=file_ids,
+						index=None, placeholder='Options' )
+					if st.button( 'Delete File' ):
+						del_fn = None
+						for name in ('delete_file', 'delete', 'files_delete'):
+							if hasattr( files, name ):
+								del_fn = getattr( files, name )
+								break
+						if not del_fn:
+							st.warning( 'No delete function found on chat object.' )
+						else:
+							with st.spinner( 'Deleting file...' ):
+								try:
+									res = del_fn( sel )
+									st.success( f'Delete result: {res}' )
+								except Exception as exc:
+									st.error( f'Delete failed: {exc}' )
+		
+		with fls_c2:
+			list_method = None
+			if hasattr( files, 'list' ):
+				list_method = getattr( files, 'list' )
+			
+			uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
+				type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
+			
+			if uploaded_file:
+				tmp_path = save_temp( uploaded_file )
+				upload_fn = None
+				for name in ('upload_file', 'upload', 'files_upload'):
+					if hasattr( files, name ):
+						upload_fn = getattr( files, name )
+						break
+				
+				if not upload_fn:
+					st.warning( 'No upload function found on chat object.' )
+				else:
+					with st.spinner( 'Uploading to Files API...' ):
+						try:
+							fid = upload_fn( tmp_path )
+							st.success( f'Uploaded; file id: {fid}' )
+						except Exception as exc:
+							st.error( f"Upload failed: {exc}" )
+		
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ---------------------------------------------------
+		#                   MESSAGES
+		# ---------------------------------------------------
+		for msg in st.session_state.files_messages:
+			with st.chat_message( msg[ 'role' ] ):
+				st.markdown( msg[ 'content' ] )
+		
+		if prompt := st.chat_input( 'Ask a question about the files' ):
+			st.session_state.files_messages.append( { 'role': 'user', 'content': prompt } )
+			response = route_document_query( prompt )
+			st.session_state.files_messages.append( { 'role': 'assistant', 'content': response } )
+			st.rerun( )
 		
 		# --------  Reset Button
 		if st.button( 'Clear Messages' ):
@@ -5434,11 +5782,11 @@ elif mode == 'Vector Stores':
 	# ------------------------------------------------------------------
 	# Main Chat UI
 	# ------------------------------------------------------------------
-	searcher = VectorStores( )
+	searcher = FileSearch( )
 	
 	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
 	with center:
-		st.subheader( '🏛️ File Search Stores', help=cfg.VECTORSTORES_API )
+		st.subheader( '🧊 File Search Stores', help=cfg.VECTORSTORES_API )
 		st.divider( )
 		st.caption( 'File Search Store Management' )
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
@@ -5454,17 +5802,16 @@ elif mode == 'Vector Stores':
 					else:
 						try:
 							res = searcher.create( new_store_name )
-							st.success( f"Create call submitted for '{new_store_name}'." )
+							created_name = getattr( res, 'name', None ) or new_store_name
+							st.success( f"Created File Search Store: {created_name}" )
 						except Exception as exc:
 							st.error( f'Create store failed: {exc}' )
-		
-		with stores_right:
 			vs_map = getattr( searcher, 'collections', None )
 			# --------------------------------------------------------------
 			# Expander - Retreive Files
 			# --------------------------------------------------------------
 			with st.expander( 'Retreive:', expanded=True ):
-				options: List[ tuple ] = [ ]
+				options = [ ]
 				if vs_map and isinstance( vs_map, dict ):
 					options = list( vs_map.items( ) )
 				
@@ -5473,21 +5820,20 @@ elif mode == 'Vector Stores':
 				# --------------------------------------------------------------
 				if options:
 					names = [ f'{n} — {i}' for n, i in options ]
-					sel = st.selectbox( 'Select File Search Store', options=names,
-						key='select_filestore' )
+					sel = st.selectbox( 'Select  File Search Store', options=names,
+						key='select_stores' )
 					
-					sel_id: Optional[ str ] = None
+					sel_id = ''
 					for n, i in options:
 						if f'{n} — {i}' == sel:
 							sel_id = i
 							break
 					
-					c1, c2 = st.columns( [ 1, 1 ] )
-					
-					with c1:
-						if st.button( '📥 Retrieve File Search Store', key='retrieve_filestore' ):
+					opt_c1, opt_c2 = st.columns( [ 0.5, 0.5 ] )
+					with opt_c1:
+						if st.button( '📥  File Search Store', key='retrieve_filestore' ):
 							if not sel_id:
-								st.warning( 'No File Search Store Selected!' )
+								st.warning( 'No Vector Store Selected!' )
 							else:
 								try:
 									vs = searcher.retrieve( store_id=sel_id )
@@ -5497,15 +5843,38 @@ elif mode == 'Vector Stores':
 								except Exception as exc:
 									st.error( f'retrieve() failed: {exc}' )
 					
-					with c2:
+					with opt_c2:
 						if st.button( '❌ Delete File Search Store', key='delete_store' ):
 							if not sel_id:
-								st.warning( 'No File Search Store Selected.' )
+								st.warning( 'No Vector Store Selected.' )
 							else:
 								try:
 									vs = searcher.delete( store_id=sel_id )
 								except Exception as exc:
 									st.error( f'Delete failed: {exc}' )
+			#--------- Uploader
+			with stores_right:
+				uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
+					type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
+			
+				if uploaded_file:
+					tmp_path = save_temp( uploaded_file )
+					upload_fn = None
+					for name in ('upload_file', 'upload', 'files_upload'):
+						if hasattr( searcher, name ):
+							upload_fn = getattr( searcher, name )
+							break
+					
+					if not upload_fn:
+						st.warning( 'No upload function found on chat object.' )
+					else:
+						with st.spinner( 'Uploading to Files API...' ):
+							try:
+								fid = upload_fn( tmp_path )
+								st.success( f'Uploaded; file id: {fid}' )
+							except Exception as exc:
+								st.error( f"Upload failed: {exc}" )
+
 
 # ======================================================================================
 # PROMPT ENGINEERING MODE

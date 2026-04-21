@@ -55,15 +55,15 @@ from google import genai
 from google.cloud import storage
 from google.genai import types
 from google.genai.pagers import Pager
-from google.genai.types import (Part, GenerateContentConfig, ImageConfig, FunctionCallingConfig,
+from google.genai.types import ( Part, GenerateContentConfig, ImageConfig, FunctionCallingConfig,
                                 GenerateImagesConfig, GenerateVideosConfig, ThinkingConfig,
                                 GeneratedImage, EmbedContentConfig, Content, ContentEmbedding,
                                 Candidate, HttpOptions, GenerateImagesResponse, Field,
-                                FileSearchStore,
+                                FileSearchStore, FileSearch,
                                 GenerateContentResponse, GenerateVideosResponse, Image, File,
                                 SpeakerVoiceConfig, VoiceConfig, SpeechConfig, Tool, ToolConfig,
                                 GoogleSearch, UrlContext, SafetySetting, HarmCategory,
-                                HarmBlockThreshold)
+                                HarmBlockThreshold )
 
 def throw_if( name: str, value: object ):
 	if value is None:
@@ -255,6 +255,8 @@ class Chat( Gemini ):
 		self.max_urls = None
 		self.safety_profile = None
 		self.safety_settings = None
+		self.file_search_store_names = [ ]
+		self.include_server_side_tool_invocations = None
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
@@ -532,29 +534,34 @@ class Chat( Gemini ):
 			return self.int_value if self.int_value > 0 else None
 		except Exception:
 			return None
-	
-	def build_tools( self, tools: List[ str ]=None ) -> List[ Tool ] | None:
-		"""
 		
-			Purpose:
-			--------
-			Builds Gemini built-in tool objects from
-			selected tool names.
-			
-			Parameters:
-			-----------
-			tools: List[ str ] - Tool names selected in the UI.
-			
-			Returns:
-			--------
-			Optional[ List[ Tool ] ] - Tool collection or None.
-		
+	def build_tools( self, tools: List[ str ]=None, ile_search_store_names: List[ str ]=None ) -> List[ Tool ] | None:
 		"""
+			
+				Purpose:
+				--------
+				Build Gemini built-in tool objects from selected tool names.
+				
+				Parameters:
+				-----------
+				tools: List[ str ]
+					Tool names selected in the UI.
+				file_search_store_names: List[ str ]
+					Optional Gemini File Search Store resource names in the form
+					fileSearchStores/<id>.
+				
+				Returns:
+				--------
+				List[ Tool ] | None
+				
+			"""
 		try:
 			self.tools = tools if tools is not None else [ ]
+			self.file_search_store_names = [ str( name ).strip( )
+					for name in (file_search_store_names or [ ])
+					if str( name ).strip( ) ]
 			self.tool_objects = [ ]
 			self.supported_tools = set( self.get_supported_tool_options( self.model ) )
-			
 			for name in self.tools:
 				if not isinstance( name, str ):
 					continue
@@ -574,13 +581,19 @@ class Chat( Gemini ):
 				
 				elif self.name == 'google_maps':
 					self.tool_objects.append( Tool( google_maps=types.GoogleMaps( ) ) )
+				
+				elif self.name == 'file_search':
+					if len( self.file_search_store_names ) > 0:
+						self.tool_objects.append( Tool( file_search=FileSearch(
+									file_search_store_names=self.file_search_store_names )))
 			
 			return self.tool_objects if len( self.tool_objects ) > 0 else None
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'build_tools( self, tools: List[ str ]=None )'
+			exception.method = ('build_tools( self, tools: List[ str ]=None, '
+					'file_search_store_names: List[ str ]=None )' )
 			raise exception
 	
 	def parse_response_schema( self, response_schema: Any = None ) -> Any:
@@ -676,23 +689,15 @@ class Chat( Gemini ):
 						)
 					)
 				else:
-					self.contents.append(
-						Content(
-							role='user',
-							parts=[ Part.from_text( text=text ) ]
-						)
-					)
+					self.contents.append( Content( role='user',
+							parts=[ Part.from_text( text=text ) ] ) )
 			
 			self.user_text = str( self.prompt ).strip( )
 			if self.content_block is not None and str( self.content_block ).strip( ):
 				self.user_text = f"{str( self.content_block ).strip( )}\n\n{self.user_text}"
 			
-			self.contents.append(
-				Content(
-					role='user',
-					parts=[ Part.from_text( text=self.user_text ) ]
-				)
-			)
+			self.contents.append( Content( role='user',
+					parts=[ Part.from_text( text=self.user_text ) ] ) )
 			
 			return self.contents if len( self.contents ) > 0 else self.prompt
 		except Exception as e:
@@ -772,7 +777,8 @@ class Chat( Gemini ):
 			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
 			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
 			modalities: List[ str ]=None, media_resolution: str=None,
-			response_schema: Any = None, safety_profile: str=None ) -> GenerateContentConfig:
+			response_schema: Any=None, safety_profile: str=None,
+			file_search_store_names: List[ str ]=None ) -> GenerateContentConfig:
 		"""
 		
 			Purpose:
@@ -803,15 +809,15 @@ class Chat( Gemini ):
 			self.instructions = instruct
 			self.response_mime_type = response_format
 			self.response_schema = self.parse_response_schema( response_schema=response_schema )
-			self.safety_settings = self._build_safety_settings( safety_profile=safety_profile )
+			self.safety_settings = self.build_safety_settings( safety_profile=safety_profile )
 			self.tool_choice = tool_choice
 			self.media_resolution = str( media_resolution ).strip( ) if media_resolution else None
-			self.tool_objects = self.build_tools( tools=tools )
-			self.function_tool_config = self._build_tool_config(
-				tool_choice=self.tool_choice,
+			self.tool_objects = self.build_tools( tools=tools,
+				file_search_store_names=file_search_store_names )
+			self.function_tool_config = self.build_tool_config( tool_choice=self.tool_choice,
 				tools=self.tool_objects )
-			self.response_modalities = self._build_modalities( modalities=modalities )
-			self.thought_config = self._build_reasoning( reasoning=reasoning )
+			self.response_modalities = self.build_modalities( modalities=modalities )
+			self.thought_config = self.build_reasoning( reasoning=reasoning )
 			self.config_kwargs = { }
 			if self.temperature is not None:
 				self.config_kwargs[ 'temperature' ]=self.temperature
@@ -884,8 +890,8 @@ class Chat( Gemini ):
 			modalities: List[ str ]=None, media_resolution: str=None,
 			context: List[ Dict[ str, Any ] ]=None, content: str=None,
 			urls: List[ str ]=None, max_urls: int=None, response_schema: Any = None,
-			safety_profile: str=None, stream: bool=False,
-			stream_handler: Any = None ) -> str | None:
+			safety_profile: str=None, file_search_store_names: List[ str ]=None,
+			stream: bool = False, stream_handler: Any = None ) -> str | None:
 		"""
 		
 			Purpose:
@@ -903,39 +909,26 @@ class Chat( Gemini ):
 		"""
 		try:
 			throw_if( 'prompt', prompt )
+			self.api_key = self.resolve_api_key( )
+			throw_if( 'api_key', self.api_key )
 			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
 			self.stream = bool( stream )
 			self.urls = self._build_urls( urls=urls, max_urls=max_urls )
 			self.content_block = self._append_urls_to_content( content=content, urls=self.urls )
 			self.contents = self.build_contents( prompt=prompt, context=context, 
 				content=self.content_block )
-			self.content_config = self.build_config( model=self.model, number=number,
-				temperature=temperature,
-				top_p=top_p,
-				top_k=top_k,
-				frequency=frequency,
-				presence=presence,
-				max_tokens=max_tokens,
-				stops=stops,
-				instruct=instruct,
-				response_format=response_format,
-				tools=tools,
-				tool_choice=tool_choice,
-				reasoning=reasoning,
-				modalities=modalities,
-				media_resolution=media_resolution,
-				response_schema=response_schema,
-				safety_profile=safety_profile )
+			self.content_config = self._build_config( model=self.model, number=number,
+				temperature=temperature, top_p=top_p, top_k=top_k, frequency=frequency,
+				presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct,
+				response_format=response_format, tools=tools, tool_choice=tool_choice,
+				reasoning=reasoning, modalities=modalities, media_resolution=media_resolution,
+				response_schema=response_schema, safety_profile=safety_profile,
+				file_search_store_names=file_search_store_names )
 			
-			self.api_key = self.resolve_api_key( )
-			throw_if( 'api_key', self.api_key )
 			self.client = genai.Client( api_key=self.api_key )
-			
 			if self.stream:
-				self.stream_response = self.client.models.generate_content_stream(
-					model=self.model,
-					contents=self.contents,
-					config=self.content_config )
+				self.stream_response = self.client.models.generate_content_stream( model=self.model,
+					contents=self.contents, config=self.content_config )
 				
 				if stream_handler is not None:
 					self.text_blocks = [ ]
@@ -998,7 +991,6 @@ class Images( Gemini ):
 		self.model = model
 		self.client = None
 		self.instructions = None
-		self.content_config = None
 		self.image_config = None
 		self.function_config = None
 		self.thought_config = None
@@ -3032,6 +3024,280 @@ class Files( Gemini ):
 			ex.method = 'delete( self, file_id: str ) -> bool'
 			raise ex
 
+class FileSearch( Gemini ):
+	"""
+
+		Purpose:
+		--------
+		Encapsulate Gemini File Search Store management for the Jeni application.
+
+		Attributes:
+		-----------
+		client       : genai.Client | None
+		response     : Any
+		store_id     : str | None
+		store_name   : str | None
+		collections  : Dict[ str, str ]
+		stores       : List[ FileSearchStore ]
+
+		Methods:
+		--------
+		create( name )
+		retrieve( store_id )
+		list( )
+		delete( store_id )
+
+	"""
+	client: Optional[ genai.Client ]
+	response: Optional[ Any ]
+	store_id: Optional[ str ]
+	store_name: Optional[ str ]
+	collections: Optional[ Dict[ str, str ] ]
+	stores: Optional[ List[ FileSearchStore ] ]
+	
+	def __init__( self ):
+		super( ).__init__( )
+		self.client = None
+		self.response = None
+		self.store_id = None
+		self.store_name = None
+		self.collections = { }
+		self.stores = [ ]
+		self._refresh_collections( )
+	
+	def _resolve_api_key( self ) -> str | None:
+		"""
+
+			Purpose:
+			--------
+			Resolve the Gemini Developer API key at call-time.
+
+			Parameters:
+			-----------
+			None
+
+			Returns:
+			--------
+			str | None
+
+		"""
+		try:
+			self.api_key = os.environ.get( 'GEMINI_API_KEY' )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = os.environ.get( 'GOOGLE_API_KEY' )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = getattr( cfg, 'GEMINI_API_KEY', None )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = getattr( cfg, 'GOOGLE_API_KEY', None )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = '_resolve_api_key( self ) -> str | None'
+			raise exception
+	
+	def _get_client( self ) -> genai.Client:
+		"""
+
+			Purpose:
+			--------
+			Create a Gemini client for File Search Store operations.
+
+			Parameters:
+			-----------
+			None
+
+			Returns:
+			--------
+			genai.Client
+
+		"""
+		try:
+			self.api_key = self._resolve_api_key( )
+			throw_if( 'api_key', self.api_key )
+			self.client = genai.Client( api_key=self.api_key )
+			return self.client
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = '_get_client( self ) -> genai.Client'
+			raise exception
+	
+	def _refresh_collections( self ) -> Dict[ str, str ]:
+		"""
+
+			Purpose:
+			--------
+			Refresh the in-memory mapping of display names to File Search Store resource names.
+
+			Parameters:
+			-----------
+			None
+
+			Returns:
+			--------
+			Dict[ str, str ]
+
+		"""
+		try:
+			self.client = self._get_client( )
+			self.collections = { }
+			self.stores = [ ]
+			
+			for store in self.client.file_search_stores.list( ):
+				self.stores.append( store )
+				self.display_name = getattr( store, 'display_name', None )
+				self.resource_name = getattr( store, 'name', None )
+				
+				if self.resource_name is None:
+					continue
+				
+				self.label = str( self.display_name ).strip( ) if self.display_name else str(
+					self.resource_name ).strip( )
+				self.collections[ self.label ]=str( self.resource_name ).strip( )
+			
+			return self.collections
+		except Exception:
+			self.collections = { }
+			self.stores = [ ]
+			return self.collections
+	
+	def create( self, name: str ) -> FileSearchStore | Any:
+		"""
+
+			Purpose:
+			--------
+			Create a new Gemini File Search Store.
+
+			Parameters:
+			-----------
+			name: str
+				Display name for the File Search Store.
+
+			Returns:
+			--------
+			FileSearchStore | Any
+
+		"""
+		try:
+			throw_if( 'name', name )
+			self.store_name = str( name ).strip( )
+			self.client = self._get_client( )
+			self.response = self.client.file_search_stores.create(
+				config={ 'display_name': self.store_name }
+			)
+			self._refresh_collections( )
+			return self.response
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = 'create( self, name: str ) -> FileSearchStore | Any'
+			raise exception
+	
+	def retrieve( self, store_id: str ) -> FileSearchStore | Any:
+		"""
+
+			Purpose:
+			--------
+			Retrieve a specific Gemini File Search Store by resource name.
+
+			Parameters:
+			-----------
+			store_id: str
+				Resource name in the form fileSearchStores/<id>.
+
+			Returns:
+			--------
+			FileSearchStore | Any
+
+		"""
+		try:
+			throw_if( 'store_id', store_id )
+			self.store_id = str( store_id ).strip( )
+			self.client = self._get_client( )
+			self.response = self.client.file_search_stores.get( name=self.store_id )
+			return self.response
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = 'retrieve( self, store_id: str ) -> FileSearchStore | Any'
+			raise exception
+	
+	def list( self ) -> List[ FileSearchStore ] | Any:
+		"""
+
+			Purpose:
+			--------
+			List all Gemini File Search Stores available to the current project.
+
+			Parameters:
+			-----------
+			None
+
+			Returns:
+			--------
+			List[ FileSearchStore ] | Any
+
+		"""
+		try:
+			self._refresh_collections( )
+			return self.stores
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = 'list( self ) -> List[ FileSearchStore ] | Any'
+			raise exception
+	
+	def delete( self, store_id: str, force: bool=True ) -> bool | Any:
+		"""
+
+			Purpose:
+			--------
+			Delete a Gemini File Search Store.
+
+			Parameters:
+			-----------
+			store_id: str
+				Resource name in the form fileSearchStores/<id>.
+			force: bool
+				If True, delete contained documents and related objects as well.
+
+			Returns:
+			--------
+			bool | Any
+
+		"""
+		try:
+			throw_if( 'store_id', store_id )
+			self.store_id = str( store_id ).strip( )
+			self.client = self._get_client( )
+			self.client.file_search_stores.delete(
+				name=self.store_id,
+				config={ 'force': bool( force ) }
+			)
+			self._refresh_collections( )
+			return True
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = 'delete( self, store_id: str, force: bool=True ) -> bool | Any'
+			raise exception
+		
 class VectorStores( Gemini ):
 	'''
 

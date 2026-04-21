@@ -84,6 +84,7 @@ MODE_CLASS_MAP = {
 		'Embedding': [ 'Embeddings' ],
 		'Document Q&A': [ 'Files' ],
 		'Files': [ 'Files' ],
+		'File Search Store': [ 'FileSearch' ],
 		'Vector Stores': [ 'VectorStores' ],
 }
 
@@ -96,7 +97,6 @@ GEMINI_MODES = [ 'Text',
                  'Document Q&A',
                  'Embedding',
                  'Files',
-                 'File Search Store',
                  'Vector Stores',
                  'Prompt Engineering',
                  'Data Management',
