@@ -286,6 +286,7 @@ class Chat( Gemini ):
 		return [ 'google_search',
 		         'google_maps',
 		         'url_context',
+		         'file_search',
 		         'code_execution' ]
 	
 	@property
@@ -397,9 +398,9 @@ class Chat( Gemini ):
 		"""
 		try:
 			self.model_name = str( model or self.model or '' ).strip( ).lower( )
-			self.options = [ 'google_search', 'url_context', 'code_execution' ]
+			self.options = [ 'google_search', 'url_context', 'file_search', 'code_execution' ]
 			
-			if self._supports_google_maps( self.model_name ):
+			if self.supports_google_maps( self.model_name ):
 				self.options.append( 'google_maps' )
 			
 			return self.options
@@ -410,7 +411,7 @@ class Chat( Gemini ):
 			exception.method = 'get_supported_tool_options( self, model: str=None )'
 			raise exception
 	
-	def _resolve_api_key( self ) -> str | None:
+	def resolve_api_key( self ) -> str | None:
 		"""
 		
 			Purpose:
@@ -444,10 +445,10 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_resolve_api_key( self ) -> str | None'
+			exception.method = 'resolve_api_key( self ) -> str | None'
 			raise exception
 	
-	def _supports_google_maps( self, model: str=None ) -> bool:
+	def supports_google_maps( self, model: str=None ) -> bool:
 		"""
 		
 			Purpose:
@@ -479,10 +480,10 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_supports_google_maps( self, model: str=None ) -> bool'
+			exception.method = 'supports_google_maps( self, model: str=None ) -> bool'
 			raise exception
 	
-	def _supports_computer_use( self, model: str=None ) -> bool:
+	def supports_computer_use( self, model: str=None ) -> bool:
 		"""
 		
 			Purpose:
@@ -504,10 +505,10 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_supports_computer_use( self, model: str=None ) -> bool'
+			exception.method = 'supports_computer_use( self, model: str=None ) -> bool'
 			raise exception
 	
-	def _normalize_positive_int( self, value: Any = None ) -> int | None:
+	def normalize_positive_int( self, value: Any = None ) -> int | None:
 		"""
 		
 			Purpose:
@@ -532,7 +533,7 @@ class Chat( Gemini ):
 		except Exception:
 			return None
 	
-	def _build_tools( self, tools: List[ str ]=None ) -> List[ Tool ] | None:
+	def build_tools( self, tools: List[ str ]=None ) -> List[ Tool ] | None:
 		"""
 		
 			Purpose:
@@ -579,10 +580,10 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_build_tools( self, tools: List[ str ]=None )'
+			exception.method = 'build_tools( self, tools: List[ str ]=None )'
 			raise exception
 	
-	def _parse_response_schema( self, response_schema: Any = None ) -> Any:
+	def parse_response_schema( self, response_schema: Any = None ) -> Any:
 		"""
 		
 			Purpose:
@@ -618,10 +619,10 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_parse_response_schema( self, response_schema: Any=None )'
+			exception.method = 'parse_response_schema( self, response_schema: Any=None )'
 			raise exception
 	
-	def _build_contents( self, prompt: str, context: List[ Any ]=None,
+	def build_contents( self, prompt: str, context: List[ Any ]=None,
 			content: str=None ) -> str | List[ Content ]:
 		"""
 		
@@ -698,12 +699,12 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = ('_build_contents( self, prompt: str, '
+			exception.method = ('build_contents( self, prompt: str, '
 			                    'context: List[ Any ]=None, '
 			                    'content: str=None )')
 			raise exception
 	
-	def _get_response_content( self ) -> Content | None:
+	def get_response_content( self ) -> Content | None:
 		"""
 		
 			Purpose:
@@ -730,7 +731,7 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_get_response_content( self ) -> Content | None'
+			exception.method = 'get_response_content( self ) -> Content | None'
 			raise exception
 	
 	def get_structured_history( self ) -> List[ Content ] | None:
@@ -748,13 +749,12 @@ class Chat( Gemini ):
 		"""
 		try:
 			self.history = [ ]
-			
 			if self.contents is not None and isinstance( self.contents, list ):
 				for item in self.contents:
 					if isinstance( item, Content ):
 						self.history.append( item )
 			
-			self.response_content = self._get_response_content( )
+			self.response_content = self.get_response_content( )
 			if self.response_content is not None:
 				self.history.append( self.response_content )
 			
@@ -766,7 +766,7 @@ class Chat( Gemini ):
 			exception.method = 'get_structured_history( self ) -> List[ Content ] | None'
 			raise exception
 	
-	def _build_config( self, model: str='gemini-2.5-flash-lite', number: int=None,
+	def build_config( self, model: str='gemini-2.5-flash-lite', number: int=None,
 			temperature: float=None, top_p: float=None, top_k: int=None,
 			frequency: float=None, presence: float=None, max_tokens: int=None,
 			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
@@ -791,29 +791,28 @@ class Chat( Gemini ):
 		"""
 		try:
 			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
-			self.number = self._normalize_positive_int( number )
+			self.number = self.normalize_positive_int( number )
 			self.candidate_count = self.number
 			self.temperature = temperature
 			self.top_p = top_p
-			self.top_k = self._normalize_positive_int( top_k )
+			self.top_k = self.normalize_positive_int( top_k )
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
-			self.max_tokens = self._normalize_positive_int( max_tokens )
+			self.max_tokens = self.normalize_positive_int( max_tokens )
 			self.stops = stops if stops is not None else [ ]
 			self.instructions = instruct
 			self.response_mime_type = response_format
-			self.response_schema = self._parse_response_schema( response_schema=response_schema )
+			self.response_schema = self.parse_response_schema( response_schema=response_schema )
 			self.safety_settings = self._build_safety_settings( safety_profile=safety_profile )
 			self.tool_choice = tool_choice
 			self.media_resolution = str( media_resolution ).strip( ) if media_resolution else None
-			self.tool_objects = self._build_tools( tools=tools )
+			self.tool_objects = self.build_tools( tools=tools )
 			self.function_tool_config = self._build_tool_config(
 				tool_choice=self.tool_choice,
 				tools=self.tool_objects )
 			self.response_modalities = self._build_modalities( modalities=modalities )
 			self.thought_config = self._build_reasoning( reasoning=reasoning )
 			self.config_kwargs = { }
-			
 			if self.temperature is not None:
 				self.config_kwargs[ 'temperature' ]=self.temperature
 			
@@ -874,7 +873,7 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = '_build_config( self, model ) -> GenerateContentConfig'
+			exception.method = 'build_config( self, model ) -> GenerateContentConfig'
 			raise exception
 	
 	def generate_text( self, prompt: str, model: str='gemini-2.5-flash-lite',
@@ -908,13 +907,9 @@ class Chat( Gemini ):
 			self.stream = bool( stream )
 			self.urls = self._build_urls( urls=urls, max_urls=max_urls )
 			self.content_block = self._append_urls_to_content( content=content, urls=self.urls )
-			self.contents = self._build_contents(
-				prompt=prompt,
-				context=context,
+			self.contents = self.build_contents( prompt=prompt, context=context, 
 				content=self.content_block )
-			self.content_config = self._build_config(
-				model=self.model,
-				number=number,
+			self.content_config = self.build_config( model=self.model, number=number,
 				temperature=temperature,
 				top_p=top_p,
 				top_k=top_k,
@@ -932,7 +927,7 @@ class Chat( Gemini ):
 				response_schema=response_schema,
 				safety_profile=safety_profile )
 			
-			self.api_key = self._resolve_api_key( )
+			self.api_key = self.resolve_api_key( )
 			throw_if( 'api_key', self.api_key )
 			self.client = genai.Client( api_key=self.api_key )
 			
@@ -960,10 +955,8 @@ class Chat( Gemini ):
 				
 				return self.get_stream_output_text( stream_response=self.stream_response )
 			
-			self.content_response = self.client.models.generate_content(
-				model=self.model,
-				contents=self.contents,
-				config=self.content_config )
+			self.content_response = self.client.models.generate_content( model=self.model,
+				contents=self.contents, config=self.content_config )
 			
 			return self.get_output_text( )
 		except Exception as e:
