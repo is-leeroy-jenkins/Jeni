@@ -3182,9 +3182,7 @@ with st.sidebar:
 	
 	# -----API KEY Expander------------------------------
 	with st.expander( label='Keys:', icon='🔑', expanded=False ):
-		google_key = st.text_input(
-			'Google API Key',
-			type='password',
+		google_key = st.text_input( 'Google API Key', type='password',
 			value=st.session_state.google_api_key or '',
 			help='Overrides GOOGLE_API_KEY from config.py for this session only.' )
 	
@@ -3192,9 +3190,7 @@ with st.sidebar:
 			st.session_state.google_api_key = google_key
 			os.environ[ 'GOOGLE_API_KEY' ] = google_key
 		
-		gemini_key = st.text_input(
-			'Gemini API Key',
-			type='password',
+		gemini_key = st.text_input( 'Gemini API Key', type='password',
 			value=st.session_state.gemini_api_key or '',
 			help='Overrides GEMINI_API_KEY from config.py for this session only.' )
 		
@@ -3202,9 +3198,7 @@ with st.sidebar:
 			st.session_state.gemini_api_key = gemini_key
 			os.environ[ 'GEMINI_API_KEY' ] = gemini_key
 		
-		googlemaps_key = st.text_input(
-			'Google Maps API Key',
-			type='password',
+		googlemaps_key = st.text_input( 'Google Maps API Key', type='password',
 			value=st.session_state.googlemaps_api_key or '',
 			help='Overrides GOOGLEMAPS_API_KEY from config.py for this session only.' )
 		
