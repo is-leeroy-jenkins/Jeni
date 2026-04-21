@@ -863,7 +863,7 @@ def resolve_gemini_api_key( ) -> Optional[ str ]:
 	
 	return os.environ.get( "GOOGLE_API_KEY" )
 
-def _apply_gemini_runtime_config( ) -> None:
+def apply_gemini_runtime_config( ) -> None:
 	"""
 	Ensure Gemini client initializes in API-key mode (not Vertex AI).
 
@@ -3634,7 +3634,7 @@ if mode == 'Text':
 		prompt = st.chat_input( 'Jeni Generate …' )
 		if prompt is not None and str( prompt ).strip( ):
 			prompt = str( prompt ).strip( )
-			_apply_gemini_runtime_config( )
+			apply_gemini_runtime_config( )
 			
 			st.session_state.text_messages.append(
 			{
@@ -3946,9 +3946,9 @@ elif mode == "Images":
 				img_c1, img_c2, img_c3, img_c4 = st.columns(
 					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
 				
-				supports_image_size = image._supports_image_size( image_model )
-				supports_grounding = image._supports_search_grounding( image_model )
-				supports_image_search = image._supports_image_search( image_model )
+				supports_image_size = image.supports_image_size( image_model )
+				supports_grounding = image.supports_search_grounding( image_model )
+				supports_image_search = image.supports_image_search( image_model )
 				visual_enabled = image_mode in [ 'Generation', 'Editing' ]
 				
 				if not supports_grounding and st.session_state.get( 'image_grounded', False ):
