@@ -884,7 +884,7 @@ class Chat( Gemini ):
 			modalities: List[ str ]=None, media_resolution: str=None,
 			context: List[ Dict[ str, Any ] ]=None, content: str=None,
 			urls: List[ str ]=None, max_urls: int=None, response_schema: Any = None,
-			safety_profile: str=None, stream: bool = False,
+			safety_profile: str=None, stream: bool=False,
 			stream_handler: Any = None ) -> str | None:
 		"""
 		
@@ -1170,7 +1170,7 @@ class Images( Gemini ):
 		'''
 		return [ '1K', '2K', '4K' ]
 	
-	def _supports_image_size( self, model: str=None ) -> bool:
+	def supports_image_size( self, model: str=None ) -> bool:
 		try:
 			self.model_name = str( model or self.model ).strip( )
 			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
@@ -1178,10 +1178,10 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_supports_image_size( self, model=None ) -> bool'
+			exception.method = 'supports_image_size( self, model=None ) -> bool'
 			raise exception
 	
-	def _supports_search_grounding( self, model: str=None ) -> bool:
+	def supports_search_grounding( self, model: str=None ) -> bool:
 		try:
 			self.model_name = str( model or self.model ).strip( )
 			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
@@ -1189,10 +1189,10 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_supports_search_grounding( self, model=None ) -> bool'
+			exception.method = 'supports_search_grounding( self, model=None ) -> bool'
 			raise exception
 	
-	def _supports_image_search( self, model: str=None ) -> bool:
+	def supports_image_search( self, model: str=None ) -> bool:
 		"""
 			
 			Purpose:
@@ -1215,11 +1215,11 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_supports_image_search( self, model=None ) -> bool'
+			exception.method = 'supports_image_search( self, model=None ) -> bool'
 			raise exception
 	
-	def _normalize_response_modalities( self, response_modalities: Optional[ str ],
-			image_only: bool = False ) -> List[ str ]:
+	def normalize_response_modalities( self, response_modalities: Optional[ str ],
+			image_only: bool=False ) -> List[ str ]:
 		"""
 			
 			Purpose:
@@ -1238,7 +1238,6 @@ class Images( Gemini ):
 		"""
 		try:
 			self.mode_name = str( response_modalities or '' ).strip( ).upper( )
-			
 			if self.mode_name == 'TEXT_AND_IMAGE':
 				return [ 'TEXT', 'IMAGE' ]
 			
@@ -1253,11 +1252,11 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = ('_normalize_response_modalities( self, response_modalities=None, '
+			exception.method = ('normalize_response_modalities( self, response_modalities=None, '
 			                    'image_only=False ) -> List[ str ]')
 			raise exception
 	
-	def _build_grounding_tool( self, image_search: bool = False ) -> Optional[ Tool ]:
+	def build_grounding_tool( self, image_search: bool=False ) -> Optional[ Tool ]:
 		"""
 			
 			Purpose:
@@ -1274,21 +1273,16 @@ class Images( Gemini ):
 			
 		"""
 		try:
-			if not self._supports_search_grounding( self.model ):
+			if not self.supports_search_grounding( self.model ):
 				return None
 			
 			self.use_image_search = bool( image_search )
 			self.model_name = str( self.model ).strip( )
 			
-			if self.use_image_search and self._supports_image_search( self.model_name ):
+			if self.use_image_search and self.supports_image_search( self.model_name ):
 				try:
-					return Tool(
-						google_search=types.GoogleSearch(
-							search_types=types.SearchTypes(
-								web_search=types.WebSearch( ),
-								image_search=types.ImageSearch( )
-							)
-						)
+					return Tool( google_search=types.GoogleSearch( search_types=types.SearchTypes(
+								web_search=types.WebSearch( ), image_search=types.ImageSearch( ) ) )
 					)
 				except Exception:
 					return Tool( google_search=types.GoogleSearch( ) )
@@ -1298,11 +1292,11 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_build_grounding_tool( self, image_search=False ) -> Optional[ Tool ]'
+			exception.method = 'build_grounding_tool( self, image_search=False ) -> Optional[ Tool ]'
 			raise exception
 	
-	def _get_content_config( self, image_only: bool = False, grounded: bool = False,
-			image_search: bool = False, response_modalities: Optional[ str ]=None,
+	def get_content_config( self, image_only: bool=False, grounded: bool=False,
+			image_search: bool=False, response_modalities: Optional[ str ]=None,
 			output_mime_type: Optional[ str ]=None ) -> GenerateContentConfig:
 		"""
 			
@@ -1331,7 +1325,7 @@ class Images( Gemini ):
 			if self.aspect_ratio:
 				self.image_kwargs[ 'aspect_ratio' ]=self.aspect_ratio
 			
-			if self.size and self._supports_image_size( self.model ):
+			if self.size and self.supports_image_size( self.model ):
 				self.image_kwargs[ 'image_size' ]=self.size
 			
 			if output_mime_type:
@@ -1341,11 +1335,11 @@ class Images( Gemini ):
 				self.image_config = types.ImageConfig( **self.image_kwargs )
 			
 			if grounded:
-				self.grounding_tool = self._build_grounding_tool( image_search=image_search )
+				self.grounding_tool = self.build_grounding_tool( image_search=image_search )
 				if self.grounding_tool is not None:
 					self.tool_config = [ self.grounding_tool ]
 			
-			self.response_modalities = self._normalize_response_modalities(
+			self.response_modalities = self.normalize_response_modalities(
 				response_modalities=response_modalities,
 				image_only=image_only )
 			
@@ -1370,12 +1364,12 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = ('_get_content_config( self, image_only=False, grounded=False, '
+			exception.method = ('get_content_config( self, image_only=False, grounded=False, '
 			                    'image_search=False, response_modalities=None, '
 			                    'output_mime_type=None ) -> GenerateContentConfig')
 			raise exception
 	
-	def _open_image( self, path: str ) -> PIL.Image.Image:
+	def open_image( self, path: str ) -> PIL.Image.Image:
 		"""
 			
 			Purpose:
@@ -1399,10 +1393,10 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_open_image( self, path ) -> PIL.Image.Image'
+			exception.method = 'open_image( self, path ) -> PIL.Image.Image'
 			raise exception
 	
-	def _capture_grounding_metadata( self ) -> None:
+	def capture_metadata( self ) -> None:
 		"""
 			
 			Purpose:
@@ -1429,10 +1423,14 @@ class Images( Gemini ):
 					if self.metadata is not None:
 						self.grounding_metadata = self.metadata
 						return
-		except Exception:
-			self.grounding_metadata = None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'capture_metadata( self )'
+			raise exception
 	
-	def _get_first_image( self ) -> Optional[ PIL.Image.Image ]:
+	def get_first_image( self ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
 			Purpose:
@@ -1477,10 +1475,10 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_get_first_image( self ) -> Optional[ PIL.Image.Image ]'
+			exception.method = 'get_first_image( self ) -> Optional[ PIL.Image.Image ]'
 			raise exception
 	
-	def _get_output_text( self ) -> Optional[ str ]:
+	def get_output_text( self ) -> Optional[ str ]:
 		"""
 			
 			Purpose:
@@ -1532,15 +1530,15 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = '_get_output_text( self ) -> Optional[ str ]'
+			exception.method = 'get_output_text( self ) -> Optional[ str ]'
 			raise exception
 	
 	def generate( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
 			number: int=None, temperature: float=None, top_p: float=None,
 			frequency: float=None, presence: float=None, max_tokens: int=None,
 			resolution: str=None, instruct: str=None, output_mime_type: str=None,
-			response_modalities: str=None, grounded: bool = False,
-			image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+			response_modalities: str=None, grounded: bool=False,
+			image_search: bool=False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
 			Purpose:
@@ -1578,21 +1576,14 @@ class Images( Gemini ):
 			self.output_mime_type = output_mime_type
 			self.response_mode = response_modalities
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config(
-				image_only=True,
-				grounded=grounded,
-				image_search=image_search,
-				response_modalities=self.response_mode,
-				output_mime_type=self.output_mime_type
-			)
-			self.content_response = self.client.models.generate_content(
-				model=self.model,
-				contents=[ self.prompt ],
-				config=self.content_config
-			)
+			self.content_config = self.get_content_config( image_only=True, grounded=grounded,
+				image_search=image_search, response_modalities=self.response_mode,
+				output_mime_type=self.output_mime_type )
+			self.content_response = self.client.models.generate_content( model=self.model,
+				contents=[ self.prompt ], config=self.content_config )
 			self.response = self.content_response
-			self._capture_grounding_metadata( )
-			return self._get_first_image( )
+			self.capture_metadata( )
+			return self.get_first_image( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -1605,7 +1596,7 @@ class Images( Gemini ):
 			top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, resolution: str=None, instruct: str=None,
 			output_mime_type: str=None, response_modalities: str=None,
-			grounded: bool = False, image_search: bool = False ) -> Optional[ str ]:
+			grounded: bool=False, image_search: bool=False ) -> Optional[ str ]:
 		"""
 			
 			Purpose:
@@ -1643,21 +1634,14 @@ class Images( Gemini ):
 			self.output_mime_type = output_mime_type
 			self.response_mode = response_modalities or 'TEXT'
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config(
-				image_only=False,
-				grounded=grounded,
-				image_search=image_search,
-				response_modalities=self.response_mode,
-				output_mime_type=self.output_mime_type
-			)
-			self.content_response = self.client.models.generate_content(
-				model=self.model,
-				contents=[ self.prompt, self._open_image( path ) ],
-				config=self.content_config
-			)
+			self.content_config = self.get_content_config( image_only=False,
+				grounded=grounded, image_search=image_search, response_modalities=self.response_mode,
+				output_mime_type=self.output_mime_type )
+			self.content_response = self.client.models.generate_content( model=self.model,
+				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
 			self.response = self.content_response
-			self._capture_grounding_metadata( )
-			return self._get_output_text( )
+			self.capture_metadata( )
+			return self.get_output_text( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -1670,7 +1654,7 @@ class Images( Gemini ):
 			top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, resolution: str=None, instruct: str=None,
 			output_mime_type: str=None, response_modalities: str=None,
-			grounded: bool = False, image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+			grounded: bool=False, image_search: bool=False ) -> Optional[ PIL.Image.Image ]:
 		"""
 			
 			Purpose:
@@ -1710,7 +1694,7 @@ class Images( Gemini ):
 			self.output_mime_type = output_mime_type
 			self.response_mode = response_modalities
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self._get_content_config(
+			self.content_config = self.get_content_config(
 				image_only=True,
 				grounded=grounded,
 				image_search=image_search,
@@ -1719,12 +1703,12 @@ class Images( Gemini ):
 			)
 			self.content_response = self.client.models.generate_content(
 				model=self.model,
-				contents=[ self.prompt, self._open_image( path ) ],
+				contents=[ self.prompt, self.open_image( path ) ],
 				config=self.content_config
 			)
 			self.response = self.content_response
-			self._capture_grounding_metadata( )
-			return self._get_first_image( )
+			self.capture_metadata( )
+			return self.get_first_image( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -1956,7 +1940,7 @@ class TTS( Gemini ):
 		"""
 		return [ 'audio/wav' ]
 	
-	def _to_wave_bytes( self, pcm_data: bytes, rate: int=24000, channels: int=1,
+	def to_wave_bytes( self, pcm_data: bytes, rate: int=24000, channels: int=1,
 			sample_width: int=2 ) -> bytes:
 		"""
 
@@ -2058,15 +2042,13 @@ class TTS( Gemini ):
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.response = self.client.models.generate_content(
-				model=self.model,
-				contents=self.input_text,
-				config=self.content_config )
+			self.response = self.client.models.generate_content( model=self.model,
+				contents=self.input_text, config=self.content_config )
 			
 			self.audio_bytes = None
 			for part in self.response.candidates[ 0 ].content.parts:
 				if getattr( part, 'inline_data', None ) is not None and part.inline_data.data:
-					self.audio_bytes = self._to_wave_bytes( part.inline_data.data )
+					self.audio_bytes = self.to_wave_bytes( part.inline_data.data )
 					break
 			
 			if self.audio_bytes is None:
@@ -2172,7 +2154,7 @@ class Transcription( Gemini ):
 		         'audio/x-m4a',
 		         'audio/flac' ]
 	
-	def _build_prompt( self, language: str=None, start_time: float=None,
+	def build_prompt( self, language: str=None, start_time: float=None,
 			end_time: float=None ) -> str:
 		"""
 
@@ -2249,7 +2231,7 @@ class Transcription( Gemini ):
 			self.max_tokens = max_tokens if max_tokens is not None else self.max_tokens
 			self.instructions = instruct if instruct is not None else self.instructions
 			self.mime_type = mime_type or mimetypes.guess_type( self.file_path )[ 0 ] or 'audio/wav'
-			self.prompt = self._build_prompt(
+			self.prompt = self.build_prompt(
 				language=language,
 				start_time=start_time,
 				end_time=end_time )
@@ -2372,7 +2354,7 @@ class Translation( Gemini ):
 		         'German',
 		         'Chinese' ]
 	
-	def _build_prompt( self, target: str, source: str='Auto', start_time: float=None,
+	def build_prompt( self, target: str, source: str='Auto', start_time: float=None,
 			end_time: float=None ) -> str:
 		"""
 
@@ -2393,7 +2375,6 @@ class Translation( Gemini ):
 
 		"""
 		self.prompt_parts = [ f'Translate the spoken audio into {target}.' ]
-		
 		if source is not None and str( source ).strip( ) and str( source ).strip( ) != 'Auto':
 			self.prompt_parts.append(
 				f'The expected source language is {str( source ).strip( )}.' )
@@ -2440,7 +2421,6 @@ class Translation( Gemini ):
 		"""
 		try:
 			import mimetypes
-			
 			throw_if( 'path', path )
 			self.file_path = path
 			self.model = str( model or self.model or 'gemini-3-flash-preview' ).strip( )
@@ -2453,14 +2433,10 @@ class Translation( Gemini ):
 			self.max_tokens = max_tokens if max_tokens is not None else self.max_tokens
 			self.instructions = instruct if instruct is not None else self.instructions
 			self.mime_type = mime_type or mimetypes.guess_type( self.file_path )[ 0 ] or 'audio/wav'
-			self.prompt = self._build_prompt(
-				target=self.target_language,
-				source=self.source_language,
-				start_time=start_time,
-				end_time=end_time )
+			self.prompt = self.build_prompt( target=self.target_language, source=self.source_language,
+				start_time=start_time, end_time=end_time )
 			
 			self.config_kwargs = { }
-			
 			if self.temperature is not None:
 				self.config_kwargs[ 'temperature' ]=self.temperature
 			
@@ -2475,10 +2451,8 @@ class Translation( Gemini ):
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.uploaded_file = self.client.files.upload( file=self.file_path )
-			self.response = self.client.models.generate_content(
-				model=self.model,
-				contents=[ self.prompt, self.uploaded_file ],
-				config=self.content_config )
+			self.response = self.client.models.generate_content( model=self.model,
+				contents=[ self.prompt, self.uploaded_file ], config=self.content_config )
 			return self.response.text
 		except Exception as e:
 			ex = Error( e )
@@ -2912,7 +2886,7 @@ class Files( Gemini ):
 			self.prompt = prompt
 			self.file_paths = filepaths
 			self.model = model
-			self.top_p = top_p;
+			self.top_p = top_p
 			self.temperature = temperature
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
@@ -2985,8 +2959,7 @@ class Files( Gemini ):
 			error.show( )
 	
 	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
+			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 		
@@ -3053,7 +3026,7 @@ class Files( Gemini ):
 			self.client = genai.Client( api_key=self.gemini_api_key )
 			self.client.files.delete( name=self.file_id )
 		except Exception as e:
-			ex = Error( e );
+			ex = Error( e )
 			ex.module = 'gemini'
 			ex.cause = 'FileStore'
 			ex.method = 'delete( self, file_id: str ) -> bool'
@@ -3326,8 +3299,7 @@ class VectorStores( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -3343,8 +3315,7 @@ class VectorStores( Gemini ):
 			error.show( )
 	
 	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
+			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 		
@@ -3373,8 +3344,7 @@ class VectorStores( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config )
 			self.client = genai.Client( api_key=self.gemini_api_key )
