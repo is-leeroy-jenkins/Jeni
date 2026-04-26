@@ -5333,8 +5333,6 @@ elif mode == 'Document Q&A':
 # FILES API MODE
 # ======================================================================================
 elif mode == 'Files':
-	st.subheader( '📚 Files API', help=cfg.FILES_API )
-	st.divider( )
 	files = Files( )
 	files_model = st.session_state.get( 'files_model', '' )
 	files_purpose = st.session_state.get( 'files_purpose', '' )
@@ -5352,6 +5350,8 @@ elif mode == 'Files':
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
+		st.subheader( '📚 Files API', help=cfg.FILES_API )
+		st.divider( )
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
@@ -5791,6 +5791,7 @@ elif mode == 'File Search Stores':
 									vs = searcher.delete( store_id=sel_id )
 								except Exception as exc:
 									st.error( f'Delete failed: {exc}' )
+			
 			#--------- Uploader
 			with stores_right:
 				uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
@@ -6226,10 +6227,10 @@ elif mode == 'Data Export':
 # DATA MANAGEMENT MODE
 # ==============================================================================
 elif mode == 'Data Management':
-	st.subheader( '🏛️ Data Management', help=cfg.DATA_MANAGEMENT )
-	st.divider( )
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
+		st.subheader( '🏛️ Data Management', help=cfg.DATA_MANAGEMENT )
+		st.divider( )
 		tabs = st.tabs( [ '📥 Import', '🗂 Browse', '💉 CRUD', '📊 Explore', '🔎 Filter',
 		                  '🧮 Aggregate', '📈 Visualize', '⚙ Admin', '🧠 SQL' ] )
 
@@ -6305,89 +6306,159 @@ elif mode == 'Data Management':
 			if not tables:
 				st.info( 'No tables available.' )
 			else:
-				table = st.selectbox( 'Select Table', tables, key='crud_table' )
+				crud_header_c1, crud_header_c2, crud_header_c3 = st.columns(
+					[ 0.45, 0.25, 0.30 ], border=True )
+				
+				with crud_header_c1:
+					table = st.selectbox( 'Select Table', tables, key='crud_table' )
+				
 				df = read_table( table )
 				schema = create_schema( table )
 				
-				# Build type map
 				type_map = { col[ 1 ]: col[ 2 ].upper( ) for col in schema if col[ 1 ] != 'rowid' }
+				
+				with crud_header_c2:
+					st.metric( 'Rows', len( df.index ) )
+				
+				with crud_header_c3:
+					st.metric( 'Columns', len( type_map ) )
+				
+				st.divider( )
+				
+				insert_col, update_col = st.columns( [ 0.50, 0.50 ], border=True )
 				
 				# ------------------------------------------------------------------
 				# INSERT
 				# ------------------------------------------------------------------
-				st.subheader( 'Insert Row' )
-				insert_data = { }
-				for column, col_type in type_map.items( ):
-					if 'INT' in col_type:
-						insert_data[ column ] = st.number_input( column, step=1, key=f'ins_{column}' )
+				with insert_col:
+					st.subheader( 'Insert Row' )
+					insert_data = { }
 					
-					elif 'REAL' in col_type:
-						insert_data[ column ] = st.number_input( column, format='%.6f', key=f'ins_{column}' )
+					for column, col_type in type_map.items( ):
+						if 'INT' in col_type:
+							insert_data[ column ] = st.number_input(
+								column,
+								step=1,
+								key=f'ins_{table}_{column}' )
+						
+						elif 'REAL' in col_type:
+							insert_data[ column ] = st.number_input(
+								column,
+								format='%.6f',
+								key=f'ins_{table}_{column}' )
+						
+						elif 'BOOL' in col_type:
+							insert_data[ column ] = 1 if st.checkbox(
+								column,
+								key=f'ins_{table}_{column}' ) else 0
+						
+						else:
+							insert_data[ column ] = st.text_input(
+								column,
+								key=f'ins_{table}_{column}' )
 					
-					elif 'BOOL' in col_type:
-						insert_data[ column ] = 1 if st.checkbox( column, key=f'ins_{column}' ) else 0
-					
-					else:
-						insert_data[ column ] = st.text_input( column, key=f'ins_{column}' )
-				
-				if st.button( 'Insert Row' ):
-					cols = list( insert_data.keys( ) )
-					placeholders = ', '.join( [ '?' ] * len( cols ) )
-					stmt = f'INSERT INTO "{table}" ({", ".join( cols )}) VALUES ({placeholders});'
-					
-					with create_connection( ) as conn:
-						conn.execute( stmt, list( insert_data.values( ) ) )
-						conn.commit( )
-					
-					st.success( 'Row inserted.' )
-					st.rerun( )
+					if st.button( 'Insert Row', key=f'insert_row_{table}',
+							use_container_width=True ):
+						cols = list( insert_data.keys( ) )
+						quoted_cols = [ f'"{c}"' for c in cols ]
+						placeholders = ', '.join( [ '?' ] * len( cols ) )
+						stmt = (
+								f'INSERT INTO "{table}" ({", ".join( quoted_cols )}) '
+								f'VALUES ({placeholders});')
+						
+						with create_connection( ) as conn:
+							conn.execute( stmt, list( insert_data.values( ) ) )
+							conn.commit( )
+						
+						st.success( 'Row inserted.' )
+						st.rerun( )
 				
 				# ------------------------------------------------------------------
 				# UPDATE
 				# ------------------------------------------------------------------
-				st.subheader( 'Update Row' )
-				rowid = st.number_input( 'Row ID', min_value=1, step=1 )
-				update_data = { }
-				for column, col_type in type_map.items( ):
-					if 'INT' in col_type:
-						val = st.number_input( column, step=1, key=f'upd_{column}' )
-						update_data[ column ] = val
+				with update_col:
+					st.subheader( 'Update Row' )
+					rowid = st.number_input(
+						'Row ID',
+						min_value=1,
+						step=1,
+						key=f'crud_update_rowid_{table}' )
 					
-					elif 'REAL' in col_type:
-						val = st.number_input( column, format='%.6f', key=f'upd_{column}' )
-						update_data[ column ] = val
+					update_data = { }
 					
-					elif 'BOOL' in col_type:
-						val = 1 if st.checkbox( column, key=f'upd_{column}' ) else 0
-						update_data[ column ] = val
+					for column, col_type in type_map.items( ):
+						if 'INT' in col_type:
+							val = st.number_input(
+								column,
+								step=1,
+								key=f'upd_{table}_{column}' )
+							update_data[ column ] = val
+						
+						elif 'REAL' in col_type:
+							val = st.number_input(
+								column,
+								format='%.6f',
+								key=f'upd_{table}_{column}' )
+							update_data[ column ] = val
+						
+						elif 'BOOL' in col_type:
+							val = 1 if st.checkbox(
+								column,
+								key=f'upd_{table}_{column}' ) else 0
+							update_data[ column ] = val
+						
+						else:
+							val = st.text_input(
+								column,
+								key=f'upd_{table}_{column}' )
+							update_data[ column ] = val
 					
-					else:
-						val = st.text_input( column, key=f"upd_{column}" )
-						update_data[ column ] = val
+					if st.button( 'Update Row', key=f'update_row_{table}',
+							use_container_width=True ):
+						set_clause = ', '.join( [ f'"{c}"=?' for c in update_data ] )
+						stmt = f'UPDATE "{table}" SET {set_clause} WHERE rowid=?;'
+						
+						with create_connection( ) as conn:
+							conn.execute( stmt, list( update_data.values( ) ) + [ rowid ] )
+							conn.commit( )
+						
+						st.success( 'Row updated.' )
+						st.rerun( )
 				
-				if st.button( 'Update Row' ):
-					set_clause = ', '.join( [ f'{c}=?' for c in update_data ] )
-					stmt = f'UPDATE {table} SET {set_clause} WHERE rowid=?;'
-					
-					with create_connection( ) as conn:
-						conn.execute( stmt, list( update_data.values( ) ) + [ rowid ] )
-						conn.commit( )
-					
-					st.success( 'Row updated.' )
-					st.rerun( )
+				st.divider( )
+				
+				delete_col, preview_col = st.columns( [ 0.35, 0.65 ], border=True )
 				
 				# ------------------------------------------------------------------
 				# DELETE
 				# ------------------------------------------------------------------
-				st.subheader( 'Delete Row' )
-				delete_id = st.number_input( 'Row ID to Delete', min_value=1, step=1 )
-				if st.button( 'Delete Row' ):
-					with create_connection( ) as conn:
-						conn.execute( f'DELETE FROM {table} WHERE rowid=?;', (delete_id,) )
-						conn.commit( )
+				with delete_col:
+					st.subheader( 'Delete Row' )
+					delete_id = st.number_input(
+						'Row ID to Delete',
+						min_value=1,
+						step=1,
+						key=f'crud_delete_rowid_{table}' )
 					
-					st.success( 'Row deleted.' )
-					st.rerun( )
+					if st.button( 'Delete Row', key=f'delete_row_{table}',
+							use_container_width=True ):
+						with create_connection( ) as conn:
+							conn.execute( f'DELETE FROM "{table}" WHERE rowid=?;', (delete_id,) )
+							conn.commit( )
+						
+						st.success( 'Row deleted.' )
+						st.rerun( )
+				
+				# ------------------------------------------------------------------
+				# PREVIEW
+				# ------------------------------------------------------------------
+				with preview_col:
+					st.subheader( 'Current Data Preview' )
+					st.data_editor(
+						df.head( 25 ),
+						key=f'dm_crud_preview_{table}',
+						use_container_width=True,
+						disabled=True )
 		
 		# ------------------------------------------------------------------------------
 		# EXPLORE
