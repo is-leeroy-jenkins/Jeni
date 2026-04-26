@@ -5723,7 +5723,7 @@ elif mode == 'File Search Stores':
 	# ------------------------------------------------------------------
 	searcher = FileSearch( )
 	
-	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
+	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
 		st.subheader( '📦 File Search Stores', help=cfg.VECTORSTORES_API )
 		st.divider( )
@@ -5840,7 +5840,7 @@ elif mode == 'Google Cloud Buckets':
 	# ------------------------------------------------------------------
 	searcher = CloudBuckets( )
 	
-	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
+	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
 		st.subheader( '🧊 Google Cloud Buckets', help=cfg.VECTORSTORES_API )
 		st.divider( )
