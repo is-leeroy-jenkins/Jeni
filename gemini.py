@@ -65,8 +65,30 @@ from google.genai.types import ( Part, GenerateContentConfig, ImageConfig, Funct
                                 GoogleSearch, UrlContext, SafetySetting, HarmCategory,
                                 HarmBlockThreshold )
 
-def throw_if( name: str, value: object ):
+def throw_if( name: str, value: object ) -> None:
+	"""
+	
+		Purpose:
+		--------
+		Raises a ValueError when a required argument is None or empty.
+		
+		Parameters:
+		-----------
+		name: str - Argument name used in the error message.
+		value: object - Argument value to validate.
+		
+		Returns:
+		--------
+		None
+	
+	"""
 	if value is None:
+		raise ValueError( f'Argument "{name}" cannot be empty!' )
+	
+	if isinstance( value, str ) and not value.strip( ):
+		raise ValueError( f'Argument "{name}" cannot be empty!' )
+	
+	if isinstance( value, (list, tuple, dict, set) ) and len( value ) == 0:
 		raise ValueError( f'Argument "{name}" cannot be empty!' )
 
 def encode_image( image_path: str ) -> str:
@@ -510,7 +532,7 @@ class Chat( Gemini ):
 			exception.method = 'supports_computer_use( self, model: str=None ) -> bool'
 			raise exception
 	
-	def normalize_positive_int( self, value: Any = None ) -> int | None:
+	def normalize_positive_int( self, value: Any=None ) -> int | None:
 		"""
 		
 			Purpose:
@@ -535,31 +557,109 @@ class Chat( Gemini ):
 		except Exception:
 			return None
 		
-	def build_tools( self, tools: List[ str ]=None, ile_search_store_names: List[ str ]=None ) -> List[ Tool ] | None:
+	def build_urls( self, urls: List[ str ]=None, max_urls: int=None ) -> List[ str ]:
 		"""
+		
+			Purpose:
+			--------
+			Normalizes URL context values selected or entered in the UI.
 			
-				Purpose:
-				--------
-				Build Gemini built-in tool objects from selected tool names.
+			Parameters:
+			-----------
+			urls: List[ str ] - Candidate URL values.
+			max_urls: int - Optional maximum number of URLs to include.
+			
+			Returns:
+			--------
+			List[ str ] - Clean URL list.
+		
+		"""
+		try:
+			self.urls = [ ]
+			if urls is None:
+				return self.urls
+			
+			for url in urls:
+				if url is None:
+					continue
 				
-				Parameters:
-				-----------
-				tools: List[ str ]
-					Tool names selected in the UI.
-				file_search_store_names: List[ str ]
-					Optional Gemini File Search Store resource names in the form
-					fileSearchStores/<id>.
+				self.url = str( url ).strip( )
+				if not self.url:
+					continue
 				
-				Returns:
-				--------
-				List[ Tool ] | None
-				
-			"""
+				self.urls.append( self.url )
+			
+			self.max_urls = self.normalize_positive_int( max_urls )
+			if self.max_urls is not None:
+				self.urls = self.urls[ : self.max_urls ]
+			
+			return self.urls
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_urls( self, urls: List[ str ]=None, max_urls: int=None )'
+			raise exception
+	
+	def append_urls_to_content( self, content: str=None, urls: List[ str ]=None ) -> str | None:
+		"""
+		
+			Purpose:
+			--------
+			Appends URL context values to the optional content block used in generation.
+			
+			Parameters:
+			-----------
+			content: str - Optional content/context text.
+			urls: List[ str ] - URLs to include in the prompt context.
+			
+			Returns:
+			--------
+			str | None - Combined context block or None.
+		
+		"""
+		try:
+			self.content_blocks = [ ]
+			if content is not None and str( content ).strip( ):
+				self.content_blocks.append( str( content ).strip( ) )
+			
+			self.urls = urls if urls is not None else [ ]
+			if len( self.urls ) > 0:
+				self.content_blocks.append( 'Reference URLs:\n' + '\n'.join( self.urls ) )
+			
+			return '\n\n'.join( self.content_blocks ) if len( self.content_blocks ) > 0 else None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('append_urls_to_content( self, content: str=None, '
+			                    'urls: List[ str ]=None )')
+			raise exception
+	
+	def build_tools( self, tools: List[ str ]=None,
+			file_search_store_names: List[ str ]=None ) -> List[ Tool ] | None:
+		"""
+		
+			Purpose:
+			--------
+			Builds Gemini built-in tool objects from UI-selected tool names.
+			
+			Parameters:
+			-----------
+			tools: List[ str ] - Tool names selected in the UI.
+			file_search_store_names: List[ str ] - Gemini File Search Store resource names.
+			
+			Returns:
+			--------
+			List[ Tool ] | None - Configured Gemini tool objects or None.
+		
+		"""
 		try:
 			self.tools = tools if tools is not None else [ ]
 			self.file_search_store_names = [ str( name ).strip( )
-					for name in (file_search_store_names or [ ])
-					if str( name ).strip( ) ]
+			                                 for name in (file_search_store_names or [ ])
+			                                 if str( name ).strip( ) ]
+			
 			self.tool_objects = [ ]
 			self.supported_tools = set( self.get_supported_tool_options( self.model ) )
 			for name in self.tools:
@@ -584,8 +684,8 @@ class Chat( Gemini ):
 				
 				elif self.name == 'file_search':
 					if len( self.file_search_store_names ) > 0:
-						self.tool_objects.append( Tool( file_search=FileSearch(
-									file_search_store_names=self.file_search_store_names )))
+						self.tool_objects.append( Tool( file_search=types.FileSearch(
+							file_search_store_names=self.file_search_store_names ) ) )
 			
 			return self.tool_objects if len( self.tool_objects ) > 0 else None
 		except Exception as e:
@@ -593,16 +693,266 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = ('build_tools( self, tools: List[ str ]=None, '
-					'file_search_store_names: List[ str ]=None )' )
+			                    'file_search_store_names: List[ str ]=None )')
 			raise exception
 	
-	def parse_response_schema( self, response_schema: Any = None ) -> Any:
+	def build_tool_config( self, tool_choice: str=None,
+			tools: List[ Tool ]=None ) -> ToolConfig | None:
 		"""
 		
 			Purpose:
 			--------
-			Normalizes a structured-output schema passed
-			as a dict, JSON string, or schema class.
+			Builds Gemini tool configuration from the selected tool-choice mode.
+			
+			Parameters:
+			-----------
+			tool_choice: str - Tool choice mode selected in the UI.
+			tools: List[ Tool ] - Configured Gemini tool objects.
+			
+			Returns:
+			--------
+			ToolConfig | None - Tool configuration or None.
+		
+		"""
+		try:
+			self.tool_choice = str( tool_choice or '' ).strip( ).upper( )
+			self.tool_objects = tools if tools is not None else [ ]
+			if not self.tool_choice or self.tool_choice == 'AUTO':
+				return None
+			
+			if len( self.tool_objects ) == 0:
+				return None
+			
+			if self.tool_choice not in [ 'ANY', 'NONE', 'VALIDATED' ]:
+				return None
+			
+			return ToolConfig( function_calling_config=FunctionCallingConfig(
+				mode=self.tool_choice ) )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('build_tool_config( self, tool_choice: str=None, '
+			                    'tools: List[ Tool ]=None ) -> ToolConfig | None')
+			raise exception
+	
+	def build_modalities( self, modalities: List[ str ]=None ) -> List[ str ] | None:
+		"""
+		
+			Purpose:
+			--------
+			Normalizes response modality values selected in the UI.
+			
+			Parameters:
+			-----------
+			modalities: List[ str ] - Candidate response modalities.
+			
+			Returns:
+			--------
+			List[ str ] | None - Clean response modality list or None.
+		
+		"""
+		try:
+			self.modalities = [ ]
+			if modalities is None:
+				return None
+			
+			for modality in modalities:
+				if modality is None:
+					continue
+				
+				self.modality = str( modality ).strip( ).upper( )
+				if not self.modality or self.modality == 'MODALITY_UNSPECIFIED':
+					continue
+				
+				if self.modality in [ 'TEXT', 'IMAGE', 'AUDIO' ]:
+					self.modalities.append( self.modality )
+			
+			return self.modalities if len( self.modalities ) > 0 else None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_modalities( self, modalities: List[ str ]=None )'
+			raise exception
+	
+	def build_reasoning( self, reasoning: str=None ) -> ThinkingConfig | None:
+		"""
+		
+			Purpose:
+			--------
+			Builds Gemini thinking configuration when a reasoning level is selected.
+			
+			Parameters:
+			-----------
+			reasoning: str - Reasoning level selected in the UI.
+			
+			Returns:
+			--------
+			ThinkingConfig | None - Thinking configuration or None.
+		
+		"""
+		try:
+			self.reasoning = str( reasoning or '' ).strip( ).upper( )
+			if not self.reasoning or self.reasoning == 'THINKING_LEVEL_UNSPECIFIED':
+				return None
+			
+			if self.reasoning not in [ 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH' ]:
+				return None
+			
+			return ThinkingConfig( thinking_level=self.reasoning )
+		except Exception:
+			return None
+	
+	def build_safety_settings( self, safety_profile: str=None ) -> List[ SafetySetting ] | None:
+		"""
+		
+			Purpose:
+			--------
+			Builds Gemini safety settings from a named UI safety profile.
+			
+			Parameters:
+			-----------
+			safety_profile: str - Safety profile selected in the UI.
+			
+			Returns:
+			--------
+			List[ SafetySetting ] | None - Safety settings or None.
+		
+		"""
+		try:
+			self.safety_profile = str( safety_profile or '' ).strip( ).lower( )
+			if not self.safety_profile:
+				return None
+			
+			self.threshold_map = {
+					'strict': HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+					'balanced': HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+					'permissive': HarmBlockThreshold.BLOCK_ONLY_HIGH
+			}
+			self.threshold = self.threshold_map.get( self.safety_profile )
+			if self.threshold is None:
+				return None
+			
+			self.categories = [
+					HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+					HarmCategory.HARM_CATEGORY_HARASSMENT,
+					HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+					HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT
+			]
+			
+			return [ SafetySetting( category=category, threshold=self.threshold )
+			         for category in self.categories ]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('build_safety_settings( self, safety_profile: str=None ) '
+			                    '-> List[ SafetySetting ] | None')
+			raise exception
+	
+	def get_output_text( self ) -> Optional[ str ]:
+		"""
+		
+			Purpose:
+			--------
+			Extracts text output from a Gemini generate_content response.
+			
+			Returns:
+			--------
+			Optional[ str ] - Text output or None.
+		
+		"""
+		try:
+			if self.content_response is None:
+				return None
+			
+			self.text = getattr( self.content_response, 'text', None )
+			if isinstance( self.text, str ) and self.text.strip( ):
+				return self.text.strip( )
+			
+			self.parts = getattr( self.content_response, 'parts', None )
+			if self.parts:
+				self.output = [ ]
+				for part in self.parts:
+					self.part_text = getattr( part, 'text', None )
+					if isinstance( self.part_text, str ) and self.part_text.strip( ):
+						self.output.append( self.part_text.strip( ) )
+				
+				if len( self.output ) > 0:
+					return '\n'.join( self.output ).strip( )
+			
+			self.candidates = getattr( self.content_response, 'candidates', None )
+			if self.candidates:
+				self.output = [ ]
+				for candidate in self.candidates:
+					self.content = getattr( candidate, 'content', None )
+					if self.content is None:
+						continue
+					
+					for part in getattr( self.content, 'parts', None ) or [ ]:
+						self.part_text = getattr( part, 'text', None )
+						if isinstance( self.part_text, str ) and self.part_text.strip( ):
+							self.output.append( self.part_text.strip( ) )
+				
+				if len( self.output ) > 0:
+					return '\n'.join( self.output ).strip( )
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'get_output_text( self ) -> Optional[ str ]'
+			raise exception
+	
+	def get_stream_output_text( self, stream_response: Any=None ) -> Optional[ str ]:
+		"""
+		
+			Purpose:
+			--------
+			Extracts text output from a Gemini generate_content_stream iterator.
+			
+			Parameters:
+			-----------
+			stream_response: Any - Gemini streaming response iterator.
+			
+			Returns:
+			--------
+			Optional[ str ] - Concatenated stream text or None.
+		
+		"""
+		try:
+			self.stream_response = stream_response
+			if self.stream_response is None:
+				return None
+			
+			self.text_blocks = [ ]
+			for chunk in self.stream_response:
+				if chunk is None:
+					continue
+				
+				self.chunk_text = getattr( chunk, 'text', None )
+				if self.chunk_text is None or not str( self.chunk_text ).strip( ):
+					continue
+				
+				self.text_blocks.append( str( self.chunk_text ) )
+			
+			self.output_text = ''.join( self.text_blocks ).strip( )
+			return self.output_text if self.output_text else None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'get_stream_output_text( self, stream_response: Any=None )'
+			raise exception
+	
+	def parse_response_schema( self, response_schema: Any=None ) -> Any:
+		"""
+		
+			Purpose:
+			--------
+			Normalizes a structured-output schema passed as a dict, JSON string, or schema class.
 			
 			Parameters:
 			-----------
@@ -641,8 +991,7 @@ class Chat( Gemini ):
 		
 			Purpose:
 			--------
-			Builds Gemini contents from the current
-			prompt and any prior conversational context.
+			Builds Gemini contents from the current prompt and any prior conversational context.
 			
 			Parameters:
 			-----------
@@ -682,30 +1031,25 @@ class Chat( Gemini ):
 					continue
 				
 				if role == 'assistant':
-					self.contents.append(
-						Content(
-							role='model',
-							parts=[ Part.from_text( text=text ) ]
-						)
-					)
+					self.contents.append( Content( role='model',
+						parts=[ Part.from_text( text=text ) ] ) )
 				else:
 					self.contents.append( Content( role='user',
-							parts=[ Part.from_text( text=text ) ] ) )
+						parts=[ Part.from_text( text=text ) ] ) )
 			
 			self.user_text = str( self.prompt ).strip( )
 			if self.content_block is not None and str( self.content_block ).strip( ):
 				self.user_text = f"{str( self.content_block ).strip( )}\n\n{self.user_text}"
 			
 			self.contents.append( Content( role='user',
-					parts=[ Part.from_text( text=self.user_text ) ] ) )
+				parts=[ Part.from_text( text=self.user_text ) ] ) )
 			
 			return self.contents if len( self.contents ) > 0 else self.prompt
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = ('build_contents( self, prompt: str, '
-			                    'context: List[ Any ]=None, '
+			exception.method = ('build_contents( self, prompt: str, context: List[ Any ]=None, '
 			                    'content: str=None )')
 			raise exception
 	
@@ -714,8 +1058,7 @@ class Chat( Gemini ):
 		
 			Purpose:
 			--------
-			Extracts the structured Gemini model content
-			from the most recent response.
+			Extracts the structured Gemini model content from the most recent response.
 			
 			Returns:
 			--------
@@ -744,8 +1087,7 @@ class Chat( Gemini ):
 		
 			Purpose:
 			--------
-			Builds the full structured conversation history
-			for reuse in a subsequent Gemini request.
+			Builds the full structured conversation history for reuse in a subsequent Gemini request.
 			
 			Returns:
 			--------
@@ -783,12 +1125,29 @@ class Chat( Gemini ):
 		
 			Purpose:
 			--------
-			Builds the GenerateContentConfig object used
-			for Gemini text generation.
+			Builds the GenerateContentConfig object used for Gemini text generation.
 			
 			Parameters:
 			-----------
 			model: str - Gemini model identifier.
+			number: int - Candidate count.
+			temperature: float - Sampling temperature.
+			top_p: float - Nucleus sampling probability.
+			top_k: int - Top-k token selection count.
+			frequency: float - Frequency penalty.
+			presence: float - Presence penalty.
+			max_tokens: int - Maximum output tokens.
+			stops: List[ str ] - Stop sequences.
+			instruct: str - System instruction text.
+			response_format: str - Response MIME type.
+			tools: List[ str ] - Selected tool names.
+			tool_choice: str - Tool-choice mode.
+			reasoning: str - Thinking level.
+			modalities: List[ str ] - Response modalities.
+			media_resolution: str - Media resolution.
+			response_schema: Any - Structured-output schema.
+			safety_profile: str - Safety profile.
+			file_search_store_names: List[ str ] - Gemini File Search Store names.
 			
 			Returns:
 			--------
@@ -819,6 +1178,7 @@ class Chat( Gemini ):
 			self.response_modalities = self.build_modalities( modalities=modalities )
 			self.thought_config = self.build_reasoning( reasoning=reasoning )
 			self.config_kwargs = { }
+			
 			if self.temperature is not None:
 				self.config_kwargs[ 'temperature' ]=self.temperature
 			
@@ -889,23 +1249,48 @@ class Chat( Gemini ):
 			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
 			modalities: List[ str ]=None, media_resolution: str=None,
 			context: List[ Dict[ str, Any ] ]=None, content: str=None,
-			urls: List[ str ]=None, max_urls: int=None, response_schema: Any = None,
+			urls: List[ str ]=None, max_urls: int=None, response_schema: Any=None,
 			safety_profile: str=None, file_search_store_names: List[ str ]=None,
-			stream: bool = False, stream_handler: Any = None ) -> str | None:
+			stream: bool=False, stream_handler: Any=None ) -> str | None:
 		"""
 		
 			Purpose:
-			-----------
+			--------
 			Generates a text completion based on the provided prompt and configuration.
 			
 			Parameters:
 			-----------
 			prompt: str - The text input for the model.
-			model: str - The specific Gemini model identifier.
+			model: str - The Gemini model identifier.
+			number: int - Candidate count.
+			temperature: float - Sampling temperature.
+			top_p: float - Nucleus sampling probability.
+			top_k: int - Top-k token selection count.
+			frequency: float - Frequency penalty.
+			presence: float - Presence penalty.
+			max_tokens: int - Maximum output tokens.
+			stops: List[ str ] - Stop sequences.
+			instruct: str - System instruction text.
+			response_format: str - Response MIME type.
+			tools: List[ str ] - Selected Gemini tools.
+			tool_choice: str - Tool-choice mode.
+			reasoning: str - Thinking level.
+			modalities: List[ str ] - Response modalities.
+			media_resolution: str - Media resolution.
+			context: List[ Dict[ str, Any ] ] - Conversation context.
+			content: str - Additional context block.
+			urls: List[ str ] - URLs used with URL context.
+			max_urls: int - Maximum URLs to include.
+			response_schema: Any - Structured-output schema.
+			safety_profile: str - Safety profile.
+			file_search_store_names: List[ str ] - File Search Store resource names.
+			stream: bool - Whether to stream the response.
+			stream_handler: Any - Optional callback for streaming chunks.
 			
 			Returns:
 			--------
-			Optional[ str ] - The text response or None on failure.
+			str | None - The generated text response or None.
+		
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -913,11 +1298,11 @@ class Chat( Gemini ):
 			throw_if( 'api_key', self.api_key )
 			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
 			self.stream = bool( stream )
-			self.urls = self._build_urls( urls=urls, max_urls=max_urls )
-			self.content_block = self._append_urls_to_content( content=content, urls=self.urls )
-			self.contents = self.build_contents( prompt=prompt, context=context, 
+			self.urls = self.build_urls( urls=urls, max_urls=max_urls )
+			self.content_block = self.append_urls_to_content( content=content, urls=self.urls )
+			self.contents = self.build_contents( prompt=prompt, context=context,
 				content=self.content_block )
-			self.content_config = self._build_config( model=self.model, number=number,
+			self.content_config = self.build_config( model=self.model, number=number,
 				temperature=temperature, top_p=top_p, top_k=top_k, frequency=frequency,
 				presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct,
 				response_format=response_format, tools=tools, tool_choice=tool_choice,
@@ -927,8 +1312,8 @@ class Chat( Gemini ):
 			
 			self.client = genai.Client( api_key=self.api_key )
 			if self.stream:
-				self.stream_response = self.client.models.generate_content_stream( model=self.model,
-					contents=self.contents, config=self.content_config )
+				self.stream_response = self.client.models.generate_content_stream(
+					model=self.model, contents=self.contents, config=self.content_config )
 				
 				if stream_handler is not None:
 					self.text_blocks = [ ]
@@ -1717,70 +2102,85 @@ class Embeddings( Gemini ):
 
 		Attributes:
 		-----------
-		client              : Client - Initialized GenAI client
-		response            : any - raw API response
-		embedding           : list - Generated vector of floats
-		encoding_format     : str - Format of the embedding response
-		dimensions          : int - Size of the embedding vector
-		use_vertex          : bool - Cloud integration flag
-		task_type           : str - Type of task (RETRIEVAL, etc)
-		http_options        : HttpOptions - Client networking settings
-		embedding_config    : EmbedContentConfig - Configuration for embeddings
-		contents            : list - Input strings
-		input_text          : str - Current text being processed
-		file_path           : str - Path to source text
-		response_modalities : str - Modality configuration
+		client              : Client - Initialized GenAI client.
+		response            : Any - Raw API response.
+		embedding           : List[ float ] | List[ List[ float ] ] - Generated vectors.
+		encoding_format     : str - UI-selected embedding output format.
+		dimensions          : int - Optional embedding output dimensionality.
+		task_type           : str - Optional embedding task type.
+		title               : str - Optional retrieval-document title.
+		embedding_config    : EmbedContentConfig - Configuration for embeddings.
+		contents            : str | List[ str ] - Input text or text chunks.
+		input_text          : str | List[ str ] - Current text input.
+		file_path           : str - Path to source text.
 
 		Methods:
 		--------
-		generate( text, model ) : Creates an embedding vector for input text
+		create( text, model ) : Creates one or more embedding vectors.
 
 	'''
 	client: Optional[ genai.Client ]
 	response: Optional[ Any ]
-	embedding: Optional[ List[ float ] ]
+	embedding: Optional[ List[ float ] | List[ List[ float ] ] ]
 	encoding_format: Optional[ str ]
 	dimensions: Optional[ int ]
 	task_type: Optional[ str ]
+	title: Optional[ str ]
 	embedding_config: Optional[ types.EmbedContentConfig ]
-	contents: Optional[ List[ str ] ]
-	input_text: Optional[ str ]
+	contents: Optional[ str | List[ str ] ]
+	input_text: Optional[ str | List[ str ] ]
 	file_path: Optional[ str ]
 	response_modalities: Optional[ str ]
 	
 	def __init__( self, model: str='gemini-embedding-001' ):
 		super( ).__init__( )
 		self.model = model
-		self.temperature = None
-		self.top_p = None
-		self.frequency_penalty = None
-		self.presence_penalty = None
-		self.max_tokens = None
 		self.client = None
-		self.embedding = None;
+		self.embedding = None
+		self.embeddings = None
 		self.response = None
 		self.encoding_format = None
 		self.input_text = None
+		self.contents = None
 		self.file_path = None
 		self.dimensions = None
 		self.task_type = None
+		self.title = None
 		self.response_modalities = None
-		self.embedding_config = None;
+		self.embedding_config = None
 		self.content_config = None
+		self.api_key = None
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""Returns list of embedding llm."""
+		"""
+		
+			Purpose:
+			--------
+			Returns supported Gemini embedding model options.
+			
+			Returns:
+			--------
+			List[ str ] | None - Available embedding model names.
+		
+		"""
 		return [ 'gemini-embedding-001',
+		         'gemini-embedding-2',
+		         'gemini-embedding-2-preview',
+		         'text-embedding-004',
 		         'text-multilingual-embedding-002' ]
 	
 	@property
 	def encoding_options( self ) -> List[ str ]:
 		'''
 			
+			Purpose:
+			--------
+			Returns available embedding output format options retained for UI compatibility.
+			
 			Returns:
 			--------
-			List[ str ] of available format options
+			List[ str ] - Available format options.
 
 		'''
 		return [ 'float', 'base64' ]
@@ -1789,53 +2189,263 @@ class Embeddings( Gemini ):
 	def task_options( self ) -> List[ str ]:
 		'''
 			
+			Purpose:
+			--------
+			Returns available embedding task options.
+			
 			Returns:
 			--------
-			List[ str ] of available embedding tasks
+			List[ str ] - Available embedding task types.
 
 		'''
-		return [ 'RETRIEVAL_QUERY', 'RETRIEVAL_DOCUMENT', 'SEMANTIC_SIMILARITY',
-		         'CLASSIFICATION', 'CLUSTERING' ]
+		return [ '',
+		         'RETRIEVAL_QUERY',
+		         'RETRIEVAL_DOCUMENT',
+		         'SEMANTIC_SIMILARITY',
+		         'CLASSIFICATION',
+		         'CLUSTERING',
+		         'QUESTION_ANSWERING',
+		         'FACT_VERIFICATION',
+		         'CODE_RETRIEVAL_QUERY' ]
 	
-	def create( self, text: str, model: str='gemini-embedding-001', temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None ) -> List[ float ] | None:
+	def resolve_api_key( self ) -> str | None:
 		"""
-			
+		
 			Purpose:
-			---------
-			Generates a vector representation of the provided text.
+			--------
+			Resolves the Gemini API key at call time.
+			
+			Returns:
+			--------
+			str | None - Resolved API key or None.
+		
+		"""
+		try:
+			self.api_key = os.environ.get( 'GEMINI_API_KEY' )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = os.environ.get( 'GOOGLE_API_KEY' )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = getattr( cfg, 'GEMINI_API_KEY', None )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			self.api_key = getattr( cfg, 'GOOGLE_API_KEY', None )
+			if self.api_key and str( self.api_key ).strip( ):
+				return str( self.api_key ).strip( )
+			
+			return None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Embeddings'
+			exception.method = 'resolve_api_key( self ) -> str | None'
+			raise exception
+	
+	def normalize_dimensions( self, dimensions: int=None ) -> int | None:
+		"""
+		
+			Purpose:
+			--------
+			Normalizes the optional embedding output dimensionality.
 			
 			Parameters:
 			-----------
-			text: str - Input text string.
-			model: str - Embedding model identifier.
+			dimensions: int - Requested output dimensionality.
 			
 			Returns:
 			--------
-			Optional[ List[ float ] ] - List of embedding values or None on failure.
+			int | None - Positive dimensionality or None.
+		
+		"""
+		try:
+			if dimensions is None:
+				return None
+			
+			self.dimensions = int( dimensions )
+			if self.dimensions <= 0:
+				return None
+			
+			return self.dimensions
+		except Exception:
+			return None
+	
+	def normalize_contents( self, text: str | List[ str ] ) -> str | List[ str ]:
+		"""
+		
+			Purpose:
+			--------
+			Normalizes embedding input into either one text string or a list of text chunks.
+			
+			Parameters:
+			-----------
+			text: str | List[ str ] - Input text or text chunks.
+			
+			Returns:
+			--------
+			str | List[ str ] - Normalized embedding content.
 		
 		"""
 		try:
 			throw_if( 'text', text )
-			self.input_text = text;
-			self.model = model
-			self.temperature = temperature
-			self.top_p = top_p
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_tokens = max_tokens
-			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.embedding_config = EmbedContentConfig( task_type=self.task_type )
-			self.response = self.client.models.embed_content( model=self.model,
-				contents=self.input_text, config=self.embedding_config )
-			self.embedding = self.response.embeddings[ 0 ].values
+			
+			if isinstance( text, list ):
+				self.contents = [ ]
+				for item in text:
+					if item is None:
+						continue
+					
+					self.item = str( item ).strip( )
+					if self.item:
+						self.contents.append( self.item )
+				
+				throw_if( 'text', self.contents )
+				return self.contents
+			
+			self.contents = str( text ).strip( )
+			throw_if( 'text', self.contents )
+			return self.contents
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Embeddings'
+			exception.method = 'normalize_contents( self, text: str | List[ str ] )'
+			raise exception
+	
+	def build_embedding_config( self, model: str='gemini-embedding-001',
+			dimensions: int=None, task_type: str=None,
+			title: str=None ) -> EmbedContentConfig:
+		"""
+		
+			Purpose:
+			--------
+			Builds the Gemini embedding configuration for the selected model.
+			
+			Parameters:
+			-----------
+			model: str - Gemini embedding model identifier.
+			dimensions: int - Optional output dimensionality.
+			task_type: str - Optional embedding task type.
+			title: str - Optional retrieval-document title.
+			
+			Returns:
+			--------
+			EmbedContentConfig - Embedding configuration object.
+		
+		"""
+		try:
+			self.model = str( model or self.model or 'gemini-embedding-001' ).strip( )
+			self.dimensions = self.normalize_dimensions( dimensions=dimensions )
+			self.task_type = str( task_type or '' ).strip( ).upper( )
+			self.title = str( title or '' ).strip( )
+			self.config_kwargs = { }
+			
+			if self.dimensions is not None:
+				self.config_kwargs[ 'output_dimensionality' ]=self.dimensions
+			
+			if self.task_type and 'gemini-embedding-2' not in self.model:
+				self.config_kwargs[ 'task_type' ]=self.task_type
+			
+			if self.title and self.task_type == 'RETRIEVAL_DOCUMENT' \
+					and 'gemini-embedding-2' not in self.model:
+				self.config_kwargs[ 'title' ]=self.title
+			
+			self.embedding_config = EmbedContentConfig( **self.config_kwargs )
+			return self.embedding_config
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Embeddings'
+			exception.method = 'build_embedding_config( self, model, dimensions, task_type, title )'
+			raise exception
+	
+	def extract_embeddings( self ) -> List[ float ] | List[ List[ float ] ] | None:
+		"""
+		
+			Purpose:
+			--------
+			Extracts embedding vectors from a Gemini embed_content response.
+			
+			Returns:
+			--------
+			List[ float ] | List[ List[ float ] ] | None - One vector, multiple vectors, or None.
+		
+		"""
+		try:
+			if self.response is None:
+				return None
+			
+			if not hasattr( self.response, 'embeddings' ):
+				return None
+			
+			self.embeddings = [ ]
+			for item in self.response.embeddings:
+				if item is None:
+					continue
+				
+				if hasattr( item, 'values' ) and item.values is not None:
+					self.embeddings.append( list( item.values ) )
+			
+			if len( self.embeddings ) == 0:
+				return None
+			
+			if len( self.embeddings ) == 1 and isinstance( self.input_text, str ):
+				self.embedding = self.embeddings[ 0 ]
+				return self.embedding
+			
+			self.embedding = self.embeddings
 			return self.embedding
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
-			exception.cause = 'Embedding'
-			exception.method = 'generate( self, text, model ) -> List[ float ]'
+			exception.cause = 'Embeddings'
+			exception.method = 'extract_embeddings( self )'
+			raise exception
+		
+	def create( self, text: str | List[ str ], model: str='gemini-embedding-001',
+			dimensions: int=None, task_type: str=None, title: str=None,
+			encoding_format: str='float' ) -> List[ float ] | List[ List[ float ] ] | None:
+		"""
+			
+			Purpose:
+			--------
+			Generates one or more vector representations of the provided text.
+			
+			Parameters:
+			-----------
+			text: str | List[ str ] - Input text string or chunk list.
+			model: str - Embedding model identifier.
+			dimensions: int - Optional output dimensionality.
+			task_type: str - Optional embedding task type.
+			title: str - Optional retrieval-document title.
+			encoding_format: str - UI-retained encoding format value.
+			
+			Returns:
+			--------
+			List[ float ] | List[ List[ float ] ] | None - Embedding vector or vectors.
+		
+		"""
+		try:
+			self.api_key = self.resolve_api_key( )
+			throw_if( 'api_key', self.api_key )
+			self.input_text = self.normalize_contents( text=text )
+			self.model = str( model or self.model or 'gemini-embedding-001' ).strip( )
+			self.encoding_format = str( encoding_format or 'float' ).strip( ).lower( )
+			self.embedding_config = self.build_embedding_config( model=self.model,
+				dimensions=dimensions, task_type=task_type, title=title )
+			self.client = genai.Client( api_key=self.api_key )
+			self.response = self.client.models.embed_content( model=self.model,
+				contents=self.input_text, config=self.embedding_config )
+			
+			return self.extract_embeddings( )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Embeddings'
+			exception.method = 'create( self, text, model ) -> List[ float ] | List[ List[ float ] ]'
 			raise exception
 
 class TTS( Gemini ):
@@ -2749,8 +3359,8 @@ class Files( Gemini ):
 	
 	def summarize( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
 			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None,
-			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
+			presence: float=None, max_tokens: int=None, stops: List[ str ]=None,
+			instruct: str=None ) -> str | None:
 		"""
 			
 			Purpose:
@@ -2801,8 +3411,8 @@ class Files( Gemini ):
 	
 	def search( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
 			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None,
-			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
+			presence: float=None, max_tokens: int=None, stops: List[ str ]=None,
+			instruct: str=None ) -> str | None:
 		"""
 			
 			Purpose:
@@ -2904,8 +3514,7 @@ class Files( Gemini ):
 			raise ex
 	
 	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
+			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 		
@@ -2935,7 +3544,8 @@ class Files( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [
+					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -2951,7 +3561,8 @@ class Files( Gemini ):
 			error.show( )
 	
 	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
+			temperature: float=None, top_p: float=None, frequency: float=None,
+			presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 		

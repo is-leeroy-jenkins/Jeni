@@ -3744,6 +3744,9 @@ if mode == 'Text':
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
 							safety_profile=st.session_state.get( 'text_safety_profile' ),
+							file_search_store_names=st.session_state.get(
+								'text_file_search_store_names', [ ] ),
+							
 							stream=st.session_state.get( 'text_stream', False ),
 							stream_handler=_on_stream_chunk if st.session_state.get(
 								'text_stream', False ) else None )
@@ -4919,11 +4922,10 @@ elif mode == 'Embedding':
 						# ----------------------------------------------------------
 						# Create Embeddings
 						# ----------------------------------------------------------
-						if embeddings_dimensions is not None:
-							vectors = embedding.create( text=chunks, model=embedding_model,
-								dimensions=embeddings_dimensions )
-						else:
-							vectors = embedding.create( text=chunks, model=embedding_model )
+						vectors = embedding.create( text=chunks, model=embedding_model,
+							dimensions=st.session_state.get( 'embeddings_dimensions' ),
+							encoding_format=st.session_state.get( 'embeddings_encoding_format' ),
+							task_type='RETRIEVAL_DOCUMENT' )
 						
 						# ----------------------------------------------------------
 						# Persist Results
@@ -5588,9 +5590,8 @@ elif mode == 'Files':
 				with resp_c5:
 					modality_options = list( files.modality_options )
 					set_files_modalities = st.multiselect( label='Response Modalities',
-						options=modality_options,
-						key='files_modalities', help='Optional. Modality of the response',
-						placeholder='Options' )
+						options=modality_options, key='files_modalities',
+						help='Optional. Modality of the response', placeholder='Options' )
 					
 					files_modalities = [ d.strip( ) for d in set_files_modalities
 					                     if d.strip( ) ]
