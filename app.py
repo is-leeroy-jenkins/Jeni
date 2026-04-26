@@ -5887,7 +5887,7 @@ elif mode == 'Google Cloud Buckets':
 					
 					opt_c1, opt_c2 = st.columns( [ 0.5, 0.5 ] )
 					with opt_c1:
-						if st.button( '📥  Cloud Bucket', key='retrieve_bucket' ):
+						if st.button( '📥  Cloud Bucket', key='retrieve_bucket', width='stretch' ):
 							if not sel_id:
 								st.warning( 'No Cloud Bucket Selected!' )
 							else:
@@ -5900,7 +5900,8 @@ elif mode == 'Google Cloud Buckets':
 									st.error( f'retrieve() failed: {exc}' )
 					
 					with opt_c2:
-						if st.button( '❌ Delete Cloud Bucket', key='delete_bucket' ):
+						if st.button( '❌ Delete Cloud Bucket', key='delete_bucket',
+								width='stretch' ):
 							if not sel_id:
 								st.warning( 'No Cloud Bucket Selected.' )
 							else:
