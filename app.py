@@ -82,7 +82,7 @@ from gemini import (
 	TTS,
 	Files,
 	FileSearch,
-	VectorStores )
+	CloudBuckets )
 
 # ======================================================================================
 # SESSION STATE INITIALIZATION
@@ -252,6 +252,9 @@ if 'files_model' not in st.session_state:
 
 if 'stores_model' not in st.session_state:
 	st.session_state[ 'stores_model' ] = ''
+
+if 'bucket_model' not in st.session_state:
+	st.session_state[ 'bucket_model' ] = ''
 
 if 'tts_model' not in st.session_state:
 	st.session_state[ 'tts_model' ] = ''
@@ -791,6 +794,73 @@ if 'stores_include' not in st.session_state:
 
 if 'stores_id' not in st.session_state:
 	st.session_state[ 'stores_id' ] = ''
+
+# -------- CLOUDBUCKET-GENERATION PARAMETERS --------------------
+
+if 'bucket_temperature' not in st.session_state:
+	st.session_state[ 'bucket_temperature' ] = 0.0
+
+if 'bucket_top_percent' not in st.session_state:
+	st.session_state[ 'bucket_top_percent' ] = 0.0
+
+if 'bucket_max_tokens' not in st.session_state:
+	st.session_state[ 'bucket_max_tokens' ] = 0
+
+if 'bucket_frequency_penalty' not in st.session_state:
+	st.session_state[ 'bucket_frequency_penalty' ] = 0.0
+
+if 'bucket_presence_penalty' not in st.session_state:
+	st.session_state[ 'bucket_presence_penalty' ] = 0.0
+
+if 'bucket_max_calls' not in st.session_state:
+	st.session_state[ 'bucket_max_calls' ] = 0
+
+if 'bucket_tool_choice' not in st.session_state:
+	st.session_state[ 'bucket_tool_choice' ] = ''
+
+if 'bucket_response_format' not in st.session_state:
+	st.session_state[ 'bucket_response_format' ] = ''
+
+if 'bucket_reasoning' not in st.session_state:
+	st.session_state[ 'bucket_reasoning' ] = ''
+
+if 'bucket_resolution' not in st.session_state:
+	st.session_state[ 'bucket_resolution' ] = ''
+
+if 'bucket_media_resolution' not in st.session_state:
+	st.session_state[ 'bucket_media_resolution' ] = ''
+
+if 'bucket_parallel_tools' not in st.session_state:
+	st.session_state[ 'bucket_parallel_tools' ] = False
+
+if 'bucket_background' not in st.session_state:
+	st.session_state[ 'bucket_background' ] = False
+
+if 'bucket_store' not in st.session_state:
+	st.session_state[ 'bucket_store' ] = False
+
+if 'bucket_stream' not in st.session_state:
+	st.session_state[ 'bucket_stream' ] = False
+
+if 'bucket_input' not in st.session_state:
+	st.session_state[ 'bucket_input' ] = [ ]
+
+if 'bucket_tools' not in st.session_state:
+	st.session_state[ 'bucket_tools' ] = [ ]
+
+if 'bucket_messages' not in st.session_state:
+	st.session_state[ 'bucket_messages' ] = [ ]
+
+if 'bucket_stops' not in st.session_state:
+	st.session_state[ 'bucket_stops' ] = [ ]
+
+if 'bucket_include' not in st.session_state:
+	st.session_state[ 'bucket_include' ] = [ ]
+
+# ------- CLOUDBUCKET-SPECIFIC PARAMETERS --------
+
+if 'bucket_id' not in st.session_state:
+	st.session_state[ 'bucket_id' ] = ''
 
 # ======================================================================================
 # Utilities
@@ -3362,51 +3432,37 @@ if mode == 'Text':
 				
 				# ---------- Model ------------
 				with model_c1:
-					text_model = st.selectbox( label='Model',
-						options=list( text.model_options ),
-						key='text_model',
-						placeholder='Options',
-						index=None,
+					text_model = st.selectbox( label='Model', options=list( text.model_options ),
+						key='text_model', placeholder='Options', index=None,
 						help='REQUIRED. Text Generation model used by the AI' )
 				
 				# ---------- Thinking Level ------------
 				with model_c2:
 					text_reasoning = st.selectbox( label='Thinking Level',
-						options=list( text.reasoning_options ),
-						key='text_reasoning',
-						help=cfg.REASONING,
-						index=None,
+						options=list( text.reasoning_options ), key='text_reasoning',
+						help=cfg.REASONING, index=None,
 						placeholder='Options' )
 				
 				# ---------- Response Modalities ------------
 				with model_c3:
 					text_modalities = st.multiselect( label='Response Modalities',
-						options=list( text.modality_options ),
-						key='text_modalities',
-						help='Optional. Modality of the response',
-						placeholder='Options' )
+						options=list( text.modality_options ), key='text_modalities',
+						help='Optional. Modality of the response', placeholder='Options' )
 				
 				# ---------- Media Resolution ------------
 				with model_c4:
 					text_media_resolution = st.selectbox( label='Resolution',
-						options=list( text.media_options ),
-						key='text_media_resolution',
+						options=list( text.media_options ), key='text_media_resolution',
 						help='Optional. Requested media resolution for supported outputs.',
-						index=None,
-						placeholder='Options' )
+						index=None, placeholder='Options' )
 				
 				# ---------- Number/Candidates ------------
 				with model_c5:
-					text_number = st.slider( label='Candidates',
-						min_value=0,
-						max_value=50,
-						step=1,
-						help='Optional. Upper limit on the responses returned by the model',
+					text_number = st.slider( label='Candidates', min_value=0, max_value=50,
+						step=1, help='Optional. Upper limit on the responses returned by the model',
 						key='text_number' )
 				
-				st.button( label='Reset',
-					key='text_model_reset',
-					width='stretch',
+				st.button( label='Reset', key='text_model_reset', width='stretch',
 					on_click=reset_text_model_settings )
 			
 			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
@@ -3415,52 +3471,32 @@ if mode == 'Text':
 				
 				# ---------- Temperature ------------
 				with prm_c1:
-					text_temperature = st.slider( label='Temperature',
-						min_value=-2.0,
-						max_value=2.0,
-						step=0.01,
-						help=cfg.TEMPERATURE,
-						key='text_temperature' )
+					text_temperature = st.slider( label='Temperature', min_value=-2.0,
+						max_value=2.0, step=0.01, help=cfg.TEMPERATURE, key='text_temperature' )
 				
 				# ---------- Top-P ------------
 				with prm_c2:
-					text_top_percent = st.slider( label='Top-P',
-						min_value=0.0,
-						max_value=1.0,
-						step=0.01,
-						help=cfg.TOP_P,
-						key='text_top_percent' )
+					text_top_percent = st.slider( label='Top-P', min_value=0.0, max_value=1.0,
+						step=0.01, help=cfg.TOP_P, key='text_top_percent' )
 				
 				# ---------- Top-K ------------
 				with prm_c3:
-					text_top_k = st.slider( label='Top K',
-						min_value=0,
-						max_value=20,
-						step=1,
-						help=cfg.TOP_K,
-						key='text_top_k' )
+					text_top_k = st.slider( label='Top K', min_value=0, max_value=20,
+						step=1, help=cfg.TOP_K, key='text_top_k' )
 				
 				# ---------- Frequency ------------
 				with prm_c4:
 					text_frequency_penalty = st.slider( label='Frequency Penalty',
-						min_value=-2.0,
-						max_value=2.0,
-						step=0.01,
-						help=cfg.FREQUENCY_PENALTY,
-						key='text_frequency_penalty' )
+						min_value=-2.0, max_value=2.0, step=0.01,
+						help=cfg.FREQUENCY_PENALTY, key='text_frequency_penalty' )
 				
 				# ---------- Presence ------------
 				with prm_c5:
-					text_presence_penalty = st.slider( label='Presence Penalty',
-						min_value=-2.0,
-						max_value=2.0,
-						step=0.01,
-						help=cfg.PRESENCE_PENALTY,
+					text_presence_penalty = st.slider( label='Presence Penalty', min_value=-2.0,
+						max_value=2.0, step=0.01, help=cfg.PRESENCE_PENALTY,
 						key='text_presence_penalty' )
 				
-				st.button( label='Reset',
-					key='text_inference_reset',
-					width='stretch',
+				st.button( label='Reset', key='text_inference_reset', width='stretch',
 					on_click=reset_text_inference_settings )
 			
 			with st.expander( label='Grounding / Context Settings', icon='🔎', expanded=False,
@@ -3481,25 +3517,19 @@ if mode == 'Text':
 				
 				# ---------- Max URLs ------------
 				with ground_c2:
-					text_max_urls = st.slider( label='Max URLs',
-						min_value=0,
-						max_value=25,
-						step=1,
-						key='text_max_urls',
+					text_max_urls = st.slider( label='Max URLs', min_value=0, max_value=25,
+						step=1, key='text_max_urls',
 						help='Optional. Maximum number of URLs from the URL list to include.',
 						width='stretch' )
 				
 				# ---------- URLs ------------
 				with ground_c3:
-					text_urls_input = st.text_input( label='URLs',
-						key='text_urls_input',
+					text_urls_input = st.text_input( label='URLs', key='text_urls_input',
 						help='Optional. Enter URLs separated by semicolons for added prompt context.',
 						width='stretch',
 						placeholder='https://example.com/page-1;https://example.com/page-2' )
 				
-				st.button( label='Reset',
-					key='reset_text_grounding',
-					width='stretch',
+				st.button( label='Reset', key='reset_text_grounding', width='stretch',
 					on_click=reset_text_grounding_settings )
 			
 			with st.expander( label='Output / Response Settings', icon='↔️', expanded=False,
@@ -3509,20 +3539,14 @@ if mode == 'Text':
 				
 				# ---------- Max Tokens ------------
 				with resp_c1:
-					text_max_tokens = st.slider( label='Max Tokens',
-						min_value=0,
-						max_value=100000,
-						step=500,
-						help=cfg.MAX_OUTPUT_TOKENS,
-						key='text_max_tokens' )
+					text_max_tokens = st.slider( label='Max Tokens', min_value=0, max_value=100000,
+						step=500, help=cfg.MAX_OUTPUT_TOKENS, key='text_max_tokens' )
 				
 				# ---------- Response Format ------------
 				with resp_c2:
 					text_response_format = st.selectbox( label='Response Format',
-						options=list( text.format_options ),
-						key='text_response_format',
-						help='Optional. Desired Gemini response MIME type.',
-						index=None,
+						options=list( text.format_options ), key='text_response_format',
+						help='Optional. Desired Gemini response MIME type.', index=None,
 						placeholder='Options' )
 				
 				# ---------- Response Schema ------------
@@ -3535,10 +3559,8 @@ if mode == 'Text':
 				
 				# ---------- Stops ------------
 				with resp_c4:
-					text_stops_input = st.text_input( label='Stop Sequences',
-						key='text_stops_input',
-						help=cfg.STOP_SEQUENCE,
-						width='stretch',
+					text_stops_input = st.text_input( label='Stop Sequences', key='text_stops_input',
+						help=cfg.STOP_SEQUENCE, width='stretch',
 						placeholder='Enter Stop Strings separated by commas' )
 				
 				# ---------- Safety ------------
@@ -3549,23 +3571,18 @@ if mode == 'Text':
 					                   'BLOCK_MEDIUM_AND_ABOVE',
 					                   'BLOCK_LOW_AND_ABOVE' ]
 					
-					text_safety_profile = st.selectbox( label='Safety',
-						options=safety_options,
+					text_safety_profile = st.selectbox( label='Safety', options=safety_options,
 						key='text_safety_profile',
 						help='Optional. Gemini safety profile for the request.',
-						index=None,
-						placeholder='Options' )
+						index=None, placeholder='Options' )
 				
 				# ---------- Stream ------------
 				with resp_c6:
-					text_stream = st.toggle( label='Stream',
-						key='text_stream',
+					text_stream = st.toggle( label='Stream', key='text_stream',
 						help=cfg.STREAM )
 				
-				st.button( label='Reset',
-					key='reset_text_response',
-					width='stretch',
-					on_click=reset_text_response_settings )
+				st.button( label='Reset', key='reset_text_response',
+					width='stretch', on_click=reset_text_response_settings )
 				
 		# ------------------------------------------------------------------
 		# Expander — Text System Instructions
@@ -4173,23 +4190,20 @@ elif mode == "Images":
 					st.rerun( )
 		
 		with tab_analyze:
-			uploaded_img = st.file_uploader(
-				'Upload an image for analysis',
-				type=[ 'png', 'jpg', 'jpeg', 'webp' ],
-				accept_multiple_files=False,
-				key='images_analyze_uploader'
-			)
+			uploaded_img = st.file_uploader( 'Upload an image for analysis',
+				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
+				key='images_analyze_uploader' )
 			
 			tmp_path = None
 			if uploaded_img:
 				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', use_column_width=True )
-			
+				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
+		
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
 					with st.chat_message( msg[ 'role' ], avatar='' ):
 						st.markdown( msg[ 'content' ] )
-			
+						
 			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 			
 			prompt = st.chat_input( 'Enter image analysis prompt …' )
@@ -4242,17 +4256,14 @@ elif mode == "Images":
 					st.rerun( )
 		
 		with tab_edit:
-			uploaded_img = st.file_uploader(
-				'Upload Image for Edit',
-				type=[ 'png', 'jpg', 'jpeg', 'webp' ],
-				accept_multiple_files=False,
-				key='images_edit_uploader'
-			)
+			uploaded_img = st.file_uploader( 'Upload Image for Edit',
+				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
+				key='images_edit_uploader' )
 			
 			tmp_path = None
 			if uploaded_img:
 				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', use_column_width=True )
+				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
 			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
@@ -5685,9 +5696,9 @@ elif mode == 'Files':
 			st.rerun( )
 
 # ======================================================================================
-# VECTORSTORES MODE
+# FILE SEARCH STORES MODE
 # ======================================================================================
-elif mode == 'Vector Stores':
+elif mode == 'File Search Stores':
 	stores_model = st.session_state.get( 'stores_model', None )
 	stores_format = st.session_state.get( 'stores_response_format', None )
 	stores_top_percent = st.session_state.get( 'stores_top_percent', None )
@@ -5782,6 +5793,122 @@ elif mode == 'Vector Stores':
 				uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
 					type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
 			
+				if uploaded_file:
+					tmp_path = save_temp( uploaded_file )
+					upload_fn = None
+					for name in ('upload_file', 'upload', 'files_upload'):
+						if hasattr( searcher, name ):
+							upload_fn = getattr( searcher, name )
+							break
+					
+					if not upload_fn:
+						st.warning( 'No upload function found on chat object.' )
+					else:
+						with st.spinner( 'Uploading to Files API...' ):
+							try:
+								fid = upload_fn( tmp_path )
+								st.success( f'Uploaded; file id: {fid}' )
+							except Exception as exc:
+								st.error( f"Upload failed: {exc}" )
+
+# ======================================================================================
+# CLOUD BUCKET MODE
+# ======================================================================================
+elif mode == 'Google Cloud Buckets':
+	bucket_model = st.session_state.get( 'bucket_model', None )
+	bucket_format = st.session_state.get( 'bucket_response_format', None )
+	bucket_top_percent = st.session_state.get( 'bucket_top_percent', None )
+	bucket_frequency = st.session_state.get( 'bucket_frequency_penalty', None )
+	bucket_presence = st.session_state.get( 'bucket_presence_penalty', None )
+	bucket_number = st.session_state.get( 'bucket_number', None )
+	bucket_temperature = st.session_state.get( 'bucket_temperature', None )
+	bucket_stream = st.session_state.get( 'bucket_stream', None )
+	bucket_store = st.session_state.get( 'bucket_store', None )
+	bucket_input = st.session_state.get( 'bucket_input', None )
+	bucket_reasoning = st.session_state.get( 'bucket_reasoning', None )
+	bucket_tool_choice = st.session_state.get( 'bucket_tool_choice', None )
+	bucket_messages = st.session_state.get( 'bucket_messages', None )
+	bucket_background = st.session_state.get( 'bucket_background', None )
+	searcher = None
+	
+	# ------------------------------------------------------------------
+	# Main Chat UI
+	# ------------------------------------------------------------------
+	searcher = CloudBuckets( )
+	
+	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
+	with center:
+		st.subheader( '🧊 Google Cloud Buckets', help=cfg.VECTORSTORES_API )
+		st.divider( )
+		st.caption( 'Cloud Bucket Management' )
+		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
+		with stores_left:
+			# --------------------------------------------------------------
+			# Expander - Create File Search Store
+			# --------------------------------------------------------------
+			with st.expander( 'Create:', expanded=True ):
+				new_store_name = st.text_input( 'New Cloud Bucket name' )
+				if st.button( '➕ Create' ):
+					if not new_store_name:
+						st.warning( 'Enter a Cloud Bucket Name.' )
+					else:
+						try:
+							res = searcher.create( new_store_name )
+							created_name = getattr( res, 'name', None ) or new_store_name
+							st.success( f"Created Cloud Bucket: {created_name}" )
+						except Exception as exc:
+							st.error( f'Create bucket failed: {exc}' )
+			vs_map = getattr( searcher, 'collections', None )
+			# --------------------------------------------------------------
+			# Expander - Retreive Files
+			# --------------------------------------------------------------
+			with st.expander( 'Retreive:', expanded=True ):
+				options = [ ]
+				if vs_map and isinstance( vs_map, dict ):
+					options = list( vs_map.items( ) )
+				
+				# --------------------------------------------------------------
+				# Select / Retrieve / Delete
+				# --------------------------------------------------------------
+				if options:
+					names = [ f'{n} — {i}' for n, i in options ]
+					sel = st.selectbox( 'Select Cloud Bucket', options=names,
+						key='select_buckets' )
+					
+					sel_id = ''
+					for n, i in options:
+						if f'{n} — {i}' == sel:
+							sel_id = i
+							break
+					
+					opt_c1, opt_c2 = st.columns( [ 0.5, 0.5 ] )
+					with opt_c1:
+						if st.button( '📥  Cloud Bucket', key='retrieve_bucket' ):
+							if not sel_id:
+								st.warning( 'No Cloud Bucket Selected!' )
+							else:
+								try:
+									vs = searcher.retrieve( store_id=sel_id )
+									st.write( 'Name:', vs.name )
+									st.write( 'Files:', vs.file_counts )
+									st.write( 'Size (MB):', round( vs.usage_bytes / 1_048_576, 2 ) )
+								except Exception as exc:
+									st.error( f'retrieve() failed: {exc}' )
+					
+					with opt_c2:
+						if st.button( '❌ Delete Cloud Bucket', key='delete_bucket' ):
+							if not sel_id:
+								st.warning( 'No Cloud Bucket Selected.' )
+							else:
+								try:
+									vs = searcher.delete( store_id=sel_id )
+								except Exception as exc:
+									st.error( f'Delete failed: {exc}' )
+			# --------- Uploader
+			with stores_right:
+				uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
+					type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
+				
 				if uploaded_file:
 					tmp_path = save_temp( uploaded_file )
 					upload_fn = None
@@ -6610,7 +6737,8 @@ _mode_to_model_key = \
 			'Embedding': 'embedding_model',
 			'Document Q&A': 'docqna_model',
 			'Files': 'files_model',
-			'Vector Stores': 'stores_model',
+			'File Search Stores': 'stores_model',
+			'Google Cloud Buckets': 'bucket_model',
 			'Prompt Engineering': 'text_model',
 			'Data Management': 'text_model'
 	}

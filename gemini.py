@@ -1474,57 +1474,63 @@ class Images( Gemini ):
 			
 		'''
 		return [ '1K', '2K', '4K' ]
-	
+		
 	def supports_image_size( self, model: str='gemini-2.5-flash-image' ) -> bool:
 		"""
 			
 			Purpose:
 			-----------
-			Determines whether the selected image model supports Google Image Size.
+			Determines whether the selected Gemini image model supports explicit image-size
+			configuration through types.ImageConfig.image_size.
 			
 			Parameters:
 			-----------
-			model: str - The Gemini image model identifier.
+			model: str - Gemini image model identifier selected by the UI.
 			
 			Returns:
 			--------
-			bool - True when Google Image Search grounding is supported; otherwise False.
+			bool - True when the model supports image_size; otherwise False.
 			
 		"""
 		try:
-			self.model_name = model
-			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
+			self.model_name = str( model or '' ).strip( ).lower( )
+			self.image_size_models = [ 'gemini-3.1-flash-image-preview',
+					'gemini-3-pro-image-preview' ]
+			return self.model_name in self.image_size_models
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'supports_image_size( self, model=None ) -> bool'
+			exception.method = 'supports_image_size( self, model: str ) -> bool'
 			raise exception
 	
-	def supports_search_grounding( self, model: str='gemini-2.5-flash-image') -> bool:
+	def supports_search_grounding( self, model: str='gemini-2.5-flash-image' ) -> bool:
 		"""
 			
 			Purpose:
 			-----------
-			Determines whether the selected image model supports Google Image Search grounding.
+			Determines whether the selected Gemini image model should expose standard Google
+			Search grounding in Image mode.
 			
 			Parameters:
 			-----------
-			model: str - The Gemini image model identifier.
+			model: str - Gemini image model identifier selected by the UI.
 			
 			Returns:
 			--------
-			bool - True when Google Image Search grounding is supported; otherwise False.
+			bool - True when Google Search grounding is supported; otherwise False.
 			
 		"""
 		try:
-			self.model_name = model
-			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
+			self.model_name = str( model or '' ).strip( ).lower( )
+			self.search_grounding_models = [ 'gemini-3.1-flash-image-preview',
+					'gemini-3-pro-image-preview' ]
+			return self.model_name in self.search_grounding_models
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'supports_search_grounding( self, model=None ) -> bool'
+			exception.method = 'supports_search_grounding( self, model: str ) -> bool'
 			raise exception
 	
 	def supports_image_search( self, model: str='gemini-2.5-flash-image' ) -> bool:
@@ -1532,11 +1538,12 @@ class Images( Gemini ):
 			
 			Purpose:
 			-----------
-			Determines whether the selected image model supports Google Image Search grounding.
+			Determines whether the selected Gemini image model supports Google Image Search
+			grounding through the google_search.search_types.image_search configuration.
 			
 			Parameters:
 			-----------
-			model: str - The Gemini image model identifier.
+			model: str - Gemini image model identifier selected by the UI.
 			
 			Returns:
 			--------
@@ -1544,7 +1551,7 @@ class Images( Gemini ):
 			
 		"""
 		try:
-			self.model_name = model
+			self.model_name = str( model or '' ).strip( ).lower( )
 			return self.model_name == 'gemini-3.1-flash-image-preview'
 		except Exception as e:
 			exception = Error( e )
@@ -1559,7 +1566,8 @@ class Images( Gemini ):
 			
 			Purpose:
 			-----------
-			Normalizes the UI response-mode selection into Gemini response modalities.
+			Normalizes the UI response-mode selection into a Gemini-compatible response
+			modalities list.
 			
 			Parameters:
 			-----------
@@ -1572,7 +1580,6 @@ class Images( Gemini ):
 			
 		"""
 		try:
-			throw_if( 'response_modalities', response_modalities)
 			self.mode_name = str( response_modalities or '' ).strip( ).upper( )
 			if self.mode_name == 'TEXT_AND_IMAGE':
 				return [ 'TEXT', 'IMAGE' ]
@@ -1583,13 +1590,20 @@ class Images( Gemini ):
 			if self.mode_name == 'IMAGE':
 				return [ 'IMAGE' ]
 			
+			if self.mode_name == 'TEXT,IMAGE':
+				return [ 'TEXT', 'IMAGE' ]
+			
+			if self.mode_name == 'TEXT, IMAGE':
+				return [ 'TEXT', 'IMAGE' ]
+			
 			return [ 'IMAGE' ] if image_only else [ 'TEXT' ]
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = ('normalize_response_modalities( self, response_modalities=None, '
-			                    'image_only=False ) -> List[ str ]')
+			exception.method = (
+					'normalize_response_modalities( self, response_modalities: Optional[str], '
+					'image_only: bool=False ) -> List[str]')
 			raise exception
 	
 	def build_grounding_tool( self, image_search: bool=False ) -> Optional[ Tool ]:
@@ -1597,15 +1611,16 @@ class Images( Gemini ):
 			
 			Purpose:
 			-----------
-			Builds a Google Search grounding tool for supported image llm.
+			Builds a Gemini Google Search grounding tool for image workflows.
 			
 			Parameters:
 			-----------
-			image_search: bool - Includes Google Image Search when supported by the model.
+			image_search: bool - Indicates whether Google Image Search should be requested
+			when supported by the selected model.
 			
 			Returns:
 			--------
-			Optional[ Tool ] - Search grounding tool or None.
+			Optional[ Tool ] - Configured Google Search tool, or None when unsupported.
 			
 		"""
 		try:
@@ -1613,44 +1628,41 @@ class Images( Gemini ):
 				return None
 			
 			self.use_image_search = bool( image_search )
-			self.model_name = str( self.model ).strip( )
-			
+			self.model_name = str( self.model or '' ).strip( ).lower( )
 			if self.use_image_search and self.supports_image_search( self.model_name ):
-				try:
-					return Tool( google_search=types.GoogleSearch( search_types=types.SearchTypes(
-								web_search=types.WebSearch( ), image_search=types.ImageSearch( ) ) )
-					)
-				except Exception:
-					return Tool( google_search=types.GoogleSearch( ) )
+				return Tool( google_search=types.GoogleSearch( search_types=types.SearchTypes(
+							web_search=types.WebSearch( ), image_search=types.ImageSearch( ) ) ) )
 			
 			return Tool( google_search=types.GoogleSearch( ) )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'build_grounding_tool( self, image_search=False ) -> Optional[ Tool ]'
+			exception.method = 'build_grounding_tool( self, image_search: bool=False ) -> Optional[Tool]'
 			raise exception
 	
 	def get_content_config( self, response_modalities: Optional[ str ], image_only: bool=False,
-			image_search: bool=False, grounded: bool = False,
+			image_search: bool=False, grounded: bool=False,
 			output_mime_type: Optional[ str ]=None ) -> GenerateContentConfig:
 		"""
 			
 			Purpose:
 			-----------
-			Creates a Gemini GenerateContentConfig for image workflows.
+			Creates a Gemini GenerateContentConfig for image-generation, image-analysis, and
+			image-editing workflows using SDK-compatible request fields.
 			
 			Parameters:
 			-----------
-			image_only: bool - Indicates whether only image output should be returned by default.
-			grounded: bool - Indicates whether Google Search grounding should be enabled.
+			response_modalities: Optional[str] - UI-selected response mode.
+			image_only: bool - Indicates whether the workflow defaults to image output.
 			image_search: bool - Indicates whether Google Image Search grounding should be used.
-			response_modalities: Optional[ str ] - UI-selected response mode.
-			output_mime_type: Optional[ str ] - Desired output image MIME type.
+			grounded: bool - Indicates whether Google Search grounding should be enabled.
+			output_mime_type: Optional[str] - Local output preference retained for UI use; not
+			passed into types.ImageConfig.
 			
 			Returns:
 			--------
-			GenerateContentConfig - Configured content generation settings.
+			GenerateContentConfig - Configured Gemini content-generation settings.
 			
 		"""
 		try:
@@ -1658,15 +1670,15 @@ class Images( Gemini ):
 			self.image_config = None
 			self.tool_config = None
 			self.grounding_metadata = None
+			self.output_mime_type = str( output_mime_type or '' ).strip( ) or None
 			self.image_kwargs = { }
-			if self.aspect_ratio:
-				self.image_kwargs[ 'aspect_ratio' ]=self.aspect_ratio
+			self.aspect_value = str( self.aspect_ratio or '' ).strip( )
+			if self.aspect_value:
+				self.image_kwargs[ 'aspect_ratio' ] = self.aspect_value
 			
-			if self.size and self.supports_image_size( self.model ):
-				self.image_kwargs[ 'image_size' ]=self.size
-			
-			if output_mime_type:
-				self.image_kwargs[ 'output_mime_type' ]=output_mime_type
+			self.size_value = str( self.size or '' ).strip( )
+			if self.size_value and self.supports_image_size( self.model ):
+				self.image_kwargs[ 'image_size' ] = self.size_value
 			
 			if len( self.image_kwargs ) > 0:
 				self.image_config = types.ImageConfig( **self.image_kwargs )
@@ -1676,22 +1688,30 @@ class Images( Gemini ):
 				if self.grounding_tool is not None:
 					self.tool_config = [ self.grounding_tool ]
 			
-			self.response_modalities = response_modalities
+			self.response_modalities = self.normalize_response_modalities(
+				response_modalities=response_modalities, image_only=image_only )
 			
-			self.config_kwargs = {
-					'temperature': self.temperature,
-					'top_p': self.top_p,
-					'candidate_count': self.number,
-					'max_output_tokens': self.max_output_tokens,
-					'system_instruction': self.instructions,
-					'response_modalities': self.response_modalities
-			}
+			self.config_kwargs = { 'response_modalities': self.response_modalities }
+			if self.temperature is not None:
+				self.config_kwargs[ 'temperature' ] = self.temperature
+			
+			if self.top_p is not None:
+				self.config_kwargs[ 'top_p' ] = self.top_p
+			
+			if self.number is not None and int( self.number or 0 ) > 0:
+				self.config_kwargs[ 'candidate_count' ] = int( self.number )
+			
+			if self.max_output_tokens is not None and int( self.max_output_tokens or 0 ) > 0:
+				self.config_kwargs[ 'max_output_tokens' ] = int( self.max_output_tokens )
+			
+			if self.instructions is not None and str( self.instructions ).strip( ):
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
 			
 			if self.image_config is not None:
-				self.config_kwargs[ 'image_config' ]=self.image_config
+				self.config_kwargs[ 'image_config' ] = self.image_config
 			
 			if self.tool_config is not None and len( self.tool_config ) > 0:
-				self.config_kwargs[ 'tools' ]=self.tool_config
+				self.config_kwargs[ 'tools' ] = self.tool_config
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			return self.content_config
@@ -1699,9 +1719,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = ('get_content_config( self, image_only=False, grounded=False, '
-			                    'image_search=False, response_modalities=None, '
-			                    'output_mime_type=None ) -> GenerateContentConfig')
+			exception.method = 'get_content_config( self, **kwargs ) -> GenerateContentConfig'
 			raise exception
 	
 	def open_image( self, path: str ) -> PIL.Image.Image:
@@ -2419,33 +2437,22 @@ class TTS( Gemini ):
 		self.input_text = None
 		self.audio_bytes = None
 		self.response_modalities = [ ]
-	
+		
 	@property
 	def model_options( self ) -> List[ str ] | None:
 		"""
 
 			Purpose:
 			--------
-			Returns list of TTS-capable Gemini llm.
+			Returns list of TTS-capable Gemini models.
 
-		"""
-		return [ 'gemini-2.5-flash-preview-tts',
-		         'gemini-2.5-pro-preview-tts' ]
-	
-	@property
-	def voice_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
+			Returns:
 			--------
-			Returns list of available prebuilt voices.
+			List[str] | None - Supported Gemini TTS model identifiers.
 
 		"""
-		return [ 'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda', 'Orus', 'Aoede', 'Callirhoe',
-		         'Autonoe', 'Enceladus', 'Iapetus', 'Umbriel', 'Algieba', 'Despina', 'Erinome',
-		         'Algenib', 'Rasalgethi', 'Laomedeia', 'Achernar', 'Alnilam', 'Schedar', 'Gacrux',
-		         'Pulcherrima', 'Achird', 'Zubenelgenubi', 'Vindemiatrix', 'Sadachbia',
-		         'Sadaltager', 'Sulafar' ]
+		return [ 'gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts',
+				'gemini-2.5-pro-preview-tts' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
@@ -2454,6 +2461,10 @@ class TTS( Gemini ):
 			Purpose:
 			--------
 			Returns the supported output container formats for this wrapper.
+
+			Returns:
+			--------
+			List[str] | None - Supported local output formats.
 
 		"""
 		return [ 'audio/wav' ]
@@ -2469,8 +2480,8 @@ class TTS( Gemini ):
 			Parameters:
 			-----------
 			pcm_data: bytes - Raw PCM audio bytes.
-			rate: int - Sample rate.
-			channels: int - Number of channels.
+			rate: int - Sample rate in Hz.
+			channels: int - Number of audio channels.
 			sample_width: int - Sample width in bytes.
 
 			Returns:
@@ -2478,29 +2489,110 @@ class TTS( Gemini ):
 			bytes - WAV file bytes.
 
 		"""
-		import io
-		import wave
-		
-		with io.BytesIO( ) as buffer:
-			with wave.open( buffer, 'wb' ) as wf:
-				wf.setnchannels( channels )
-				wf.setsampwidth( sample_width )
-				wf.setframerate( rate )
-				wf.writeframes( pcm_data )
-			
-			return buffer.getvalue( )
+		try:
+			import io
+			import wave
+			throw_if( 'pcm_data', pcm_data )
+			with io.BytesIO( ) as buffer:
+				with wave.open( buffer, 'wb' ) as wf:
+					wf.setnchannels( channels )
+					wf.setsampwidth( sample_width )
+					wf.setframerate( rate )
+					wf.writeframes( pcm_data )
+				
+				return buffer.getvalue( )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'TTS'
+			exception.method = 'to_wave_bytes( self, **kwargs) -> bytes'
+			raise exception
 	
-	def create_speech( self, text: str, filepath: str=None,
-			model: str='gemini-2.5-flash-preview-tts', format: str='audio/wav',
-			speed: float=None, voice: str=None, frequency: float=None,
-			presense: float=None, max_tokens: int=None, instruct: str=None,
-			temperature: float=None, top_p: float=None ) -> bytes | str | None:
+	def normalize_voice( self, voice: Optional[ str ]=None ) -> str:
 		"""
 
 			Purpose:
 			--------
-			Converts text to speech using Gemini TTS. If filepath is provided,
-			the generated WAV is written to disk; otherwise WAV bytes are returned.
+			Normalizes the UI-selected voice into a valid Gemini prebuilt voice name.
+
+			Parameters:
+			-----------
+			voice: Optional[str] - UI-selected voice name.
+
+			Returns:
+			--------
+			str - Valid Gemini TTS voice name.
+
+		"""
+		try:
+			self.voice_name = str( voice or '' ).strip( )
+			self.valid_voices = set( self.voice_options or [ ] )
+			if self.voice_name in self.valid_voices:
+				return self.voice_name
+			
+			return 'Kore'
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'TTS'
+			exception.method = 'normalize_voice( self, voice: Optional[str]=None ) -> str'
+			raise exception
+	
+	def normalize_tts_prompt( self, text: str, speed: Optional[ float ]=None,
+			instruct: Optional[ str ]=None ) -> str:
+		"""
+
+			Purpose:
+			--------
+			Builds a Gemini TTS prompt using natural-language delivery instructions instead
+			of unsupported request parameters.
+
+			Parameters:
+			-----------
+			text: str - Text to synthesize.
+			speed: Optional[float] - Optional UI speed hint.
+			instruct: Optional[str] - Optional user/system delivery instruction.
+
+			Returns:
+			--------
+			str - Prompt text sent to the TTS model.
+
+		"""
+		try:
+			throw_if( 'text', text )
+			self.prompt_parts = [ ]
+			
+			if instruct is not None and str( instruct ).strip( ):
+				self.prompt_parts.append( str( instruct ).strip( ) )
+			
+			if speed is not None:
+				self.speed_value = float( speed )
+				if self.speed_value < 0.85:
+					self.prompt_parts.append( 'Read the following text at a slow, clear pace.' )
+				elif self.speed_value > 1.15:
+					self.prompt_parts.append(
+						'Read the following text at a faster, energetic pace.' )
+			
+			self.prompt_parts.append( str( text ).strip( ) )
+			return '\n\n'.join( self.prompt_parts )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'TTS'
+			exception.method = 'normalize_tts_prompt( self, **kwargs ) -> str'
+			raise exception
+	
+	def create_speech( self, text: str, filepath: str = None,
+			model: str = 'gemini-3.1-flash-tts-preview', format: str = 'audio/wav',
+			speed: float = None, voice: str = None, frequency: float = None,
+			presense: float = None, max_tokens: int = None, instruct: str = None,
+			temperature: float = None, top_p: float = None ) -> bytes | str | None:
+		"""
+
+			Purpose:
+			--------
+			Converts text to speech using Gemini TTS. If filepath is provided, the generated
+			WAV is written to disk; otherwise WAV bytes are returned.
 
 			Parameters:
 			-----------
@@ -2508,12 +2600,12 @@ class TTS( Gemini ):
 			filepath: str - Optional target local path.
 			model: str - Gemini TTS model identifier.
 			format: str - Output audio format.
-			speed: float - Playback rate hint.
-			voice: str - Persona name.
-			frequency: float - Frequency penalty.
-			presense: float - Presence penalty.
-			max_tokens: int - Maximum output tokens.
-			instruct: str - Optional system instruction.
+			speed: float - Optional delivery pace hint converted into prompt text.
+			voice: str - Gemini prebuilt voice name.
+			frequency: float - UI-retained value; not sent to Gemini TTS.
+			presense: float - UI-retained value; not sent to Gemini TTS.
+			max_tokens: int - Maximum output token budget.
+			instruct: str - Optional delivery/system instruction.
 			temperature: float - Sampling temperature.
 			top_p: float - Nucleus sampling threshold.
 
@@ -2524,19 +2616,28 @@ class TTS( Gemini ):
 		"""
 		try:
 			throw_if( 'text', text )
-			self.input_text = text
+			self.input_text = self.normalize_tts_prompt(
+				text=text,
+				speed=speed,
+				instruct=instruct )
 			self.audio_path = filepath
 			self.response_format = str( format or 'audio/wav' ).strip( )
 			self.speed = speed
-			self.voice = str( voice or 'Kore' ).strip( )
-			self.max_tokens = max_tokens
-			self.model = str( model or self.model or 'gemini-2.5-flash-preview-tts' ).strip( )
+			self.voice = self.normalize_voice( voice )
 			self.frequency_penalty = frequency
 			self.presence_penalty = presense
-			self.instructions = instruct
+			self.max_tokens = max_tokens
+			self.model = str( model or self.model or 'gemini-3.1-flash-tts-preview' ).strip( )
 			self.temperature = temperature
 			self.top_p = top_p
 			self.response_modalities = [ 'AUDIO' ]
+			
+			if self.response_format != 'audio/wav':
+				raise ValueError( 'Gemini TTS wrapper currently supports local WAV output only.' )
+			
+			if self.model not in self.model_options:
+				raise ValueError( f'Unsupported Gemini TTS model: {self.model}' )
+			
 			self.voice_config = VoiceConfig(
 				prebuilt_voice_config=types.PrebuiltVoiceConfig(
 					voice_name=self.voice ) )
@@ -2547,21 +2648,20 @@ class TTS( Gemini ):
 			}
 			
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ]=self.temperature
+				self.config_kwargs[ 'temperature' ] = self.temperature
 			
 			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ]=self.top_p
+				self.config_kwargs[ 'top_p' ] = self.top_p
 			
-			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
-			
-			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
+			if self.max_tokens is not None and int( self.max_tokens or 0 ) > 0:
+				self.config_kwargs[ 'max_output_tokens' ] = int( self.max_tokens )
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.response = self.client.models.generate_content( model=self.model,
-				contents=self.input_text, config=self.content_config )
+			self.response = self.client.models.generate_content(
+				model=self.model,
+				contents=self.input_text,
+				config=self.content_config )
 			
 			self.audio_bytes = None
 			for part in self.response.candidates[ 0 ].content.parts:
@@ -2583,9 +2683,15 @@ class TTS( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'TTS'
-			exception.method = 'create_speech( self, text, filepath, model, format, speed, voice )'
+			exception.method = (
+					'create_speech( self, text: str, filepath: str=None, '
+					'model: str="gemini-3.1-flash-tts-preview", format: str="audio/wav", '
+					'speed: float=None, voice: str=None, frequency: float=None, '
+					'presense: float=None, max_tokens: int=None, instruct: str=None, '
+					'temperature: float=None, top_p: float=None ) -> bytes | str | None')
 			error = ErrorDialog( exception )
 			error.show( )
+			return None
 
 class Transcription( Gemini ):
 	"""
@@ -2657,20 +2763,93 @@ class Transcription( Gemini ):
 		         'Japanese',
 		         'German',
 		         'Chinese' ]
-	
+		
 	@property
+
 	def format_options( self ) -> List[ str ] | None:
 		"""
 
 			Purpose:
 			--------
-			Returns supported audio mime hints.
+			Returns supported Gemini audio input MIME types.
+
+			Returns:
+			--------
+			List[str] | None - Supported audio MIME types.
 
 		"""
-		return [ 'audio/wav',
-		         'audio/mp3',
-		         'audio/x-m4a',
-		         'audio/flac' ]
+		return [
+				'audio/wav',
+				'audio/mp3',
+				'audio/aiff',
+				'audio/aac',
+				'audio/ogg',
+				'audio/flac'
+		]
+	
+	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
+		"""
+
+			Purpose:
+			--------
+			Normalizes UI-provided or filename-derived audio MIME types into Gemini-supported
+			audio MIME types.
+
+			Parameters:
+			-----------
+			path: str - Local audio file path.
+			mime_type: str - Optional UI-selected MIME type.
+
+			Returns:
+			--------
+			str - Gemini-supported audio MIME type.
+
+		"""
+		try:
+			import mimetypes
+			self.raw_mime_type = str( mime_type or '' ).strip( )
+			if not self.raw_mime_type:
+				self.raw_mime_type = mimetypes.guess_type( path )[ 0 ] or ''
+			
+			self.mime_aliases = {
+					'audio/mpeg': 'audio/mp3',
+					'audio/x-mp3': 'audio/mp3',
+					'audio/x-wav': 'audio/wav',
+					'audio/wave': 'audio/wav',
+					'audio/x-m4a': 'audio/aac',
+					'audio/m4a': 'audio/aac',
+					'audio/mp4': 'audio/aac',
+					'audio/x-aiff': 'audio/aiff',
+					'audio/aif': 'audio/aiff',
+					'audio/x-flac': 'audio/flac'
+			}
+			self.mime_type = self.mime_aliases.get( self.raw_mime_type, self.raw_mime_type )
+			
+			if self.mime_type in self.format_options:
+				return self.mime_type
+			
+			self.suffix = str( Path( path ).suffix or '' ).strip( ).lower( )
+			self.extension_map = {
+					'.wav': 'audio/wav',
+					'.mp3': 'audio/mp3',
+					'.aiff': 'audio/aiff',
+					'.aif': 'audio/aiff',
+					'.aac': 'audio/aac',
+					'.m4a': 'audio/aac',
+					'.ogg': 'audio/ogg',
+					'.flac': 'audio/flac'
+			}
+			
+			if self.suffix in self.extension_map:
+				return self.extension_map[ self.suffix ]
+			
+			return 'audio/wav'
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Transcription'
+			exception.method = 'normalize_mime_type( self, path: str, mime_type: str=None ) -> str'
+			raise exception
 	
 	def build_prompt( self, language: str=None, start_time: float=None,
 			end_time: float=None ) -> str:
@@ -2748,10 +2927,8 @@ class Transcription( Gemini ):
 			self.presence_penalty = presence if presence is not None else self.presence_penalty
 			self.max_tokens = max_tokens if max_tokens is not None else self.max_tokens
 			self.instructions = instruct if instruct is not None else self.instructions
-			self.mime_type = mime_type or mimetypes.guess_type( self.file_path )[ 0 ] or 'audio/wav'
-			self.prompt = self.build_prompt(
-				language=language,
-				start_time=start_time,
+			self.mime_type = self.normalize_mime_type( path=self.file_path, mime_type=mime_type )
+			self.prompt = self.build_prompt( language=language, start_time=start_time,
 				end_time=end_time )
 			
 			self.config_kwargs = { }
@@ -2841,20 +3018,93 @@ class Translation( Gemini ):
 		"""
 		return [ 'gemini-3-flash-preview',
 		         'gemini-2.0-flash' ]
-	
+		
 	@property
 	def format_options( self ) -> List[ str ] | None:
 		"""
 
 			Purpose:
 			--------
-			Returns supported audio mime hints.
+			Returns supported Gemini audio input MIME types.
+
+			Returns:
+			--------
+			List[str] | None - Supported audio MIME types.
 
 		"""
-		return [ 'audio/wav',
-		         'audio/mp3',
-		         'audio/x-m4a',
-		         'audio/flac' ]
+		return [
+				'audio/wav',
+				'audio/mp3',
+				'audio/aiff',
+				'audio/aac',
+				'audio/ogg',
+				'audio/flac'
+		]
+	
+	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
+		"""
+
+			Purpose:
+			--------
+			Normalizes UI-provided or filename-derived audio MIME types into Gemini-supported
+			audio MIME types.
+
+			Parameters:
+			-----------
+			path: str - Local audio file path.
+			mime_type: str - Optional UI-selected MIME type.
+
+			Returns:
+			--------
+			str - Gemini-supported audio MIME type.
+
+		"""
+		try:
+			import mimetypes
+			
+			self.raw_mime_type = str( mime_type or '' ).strip( )
+			if not self.raw_mime_type:
+				self.raw_mime_type = mimetypes.guess_type( path )[ 0 ] or ''
+			
+			self.mime_aliases = {
+					'audio/mpeg': 'audio/mp3',
+					'audio/x-mp3': 'audio/mp3',
+					'audio/x-wav': 'audio/wav',
+					'audio/wave': 'audio/wav',
+					'audio/x-m4a': 'audio/aac',
+					'audio/m4a': 'audio/aac',
+					'audio/mp4': 'audio/aac',
+					'audio/x-aiff': 'audio/aiff',
+					'audio/aif': 'audio/aiff',
+					'audio/x-flac': 'audio/flac'
+			}
+			self.mime_type = self.mime_aliases.get( self.raw_mime_type, self.raw_mime_type )
+			
+			if self.mime_type in self.format_options:
+				return self.mime_type
+			
+			self.suffix = str( Path( path ).suffix or '' ).strip( ).lower( )
+			self.extension_map = {
+					'.wav': 'audio/wav',
+					'.mp3': 'audio/mp3',
+					'.aiff': 'audio/aiff',
+					'.aif': 'audio/aiff',
+					'.aac': 'audio/aac',
+					'.m4a': 'audio/aac',
+					'.ogg': 'audio/ogg',
+					'.flac': 'audio/flac'
+			}
+			
+			if self.suffix in self.extension_map:
+				return self.extension_map[ self.suffix ]
+			
+			return 'audio/wav'
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Translation'
+			exception.method = 'normalize_mime_type( self, path: str, mime_type: str=None ) -> str'
+			raise exception
 	
 	@property
 	def language_options( self ) -> List[ str ] | None:
@@ -2950,7 +3200,7 @@ class Translation( Gemini ):
 			self.presence_penalty = presence if presence is not None else self.presence_penalty
 			self.max_tokens = max_tokens if max_tokens is not None else self.max_tokens
 			self.instructions = instruct if instruct is not None else self.instructions
-			self.mime_type = mime_type or mimetypes.guess_type( self.file_path )[ 0 ] or 'audio/wav'
+			self.mime_type = self.normalize_mime_type( path=self.file_path, mime_type=mime_type )
 			self.prompt = self.build_prompt( target=self.target_language, source=self.source_language,
 				start_time=start_time, end_time=end_time )
 			
@@ -3590,37 +3840,9 @@ class FileSearch( Gemini ):
 		self.store_name = None
 		self.collections = { }
 		self.stores = [ ]
-		self._refresh_collections( )
+		self.refresh_collections( )
 	
-	def _get_client( self ) -> genai.Client:
-		"""
-
-			Purpose:
-			--------
-			Create a Gemini client for File Search Store operations.
-
-			Parameters:
-			-----------
-			None
-
-			Returns:
-			--------
-			genai.Client
-
-		"""
-		try:
-			self.api_key = cfg.GEMINI_API_KEY
-			throw_if( 'api_key', self.api_key )
-			self.client = genai.Client( api_key=self.api_key )
-			return self.client
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'FileSearch'
-			exception.method = '_get_client( self ) -> genai.Client'
-			raise exception
-	
-	def _refresh_collections( self ) -> Dict[ str, str ]:
+	def refresh_collections( self ) -> Dict[ str, str ]:
 		"""
 
 			Purpose:
@@ -3637,10 +3859,9 @@ class FileSearch( Gemini ):
 
 		"""
 		try:
-			self.client = self._get_client( )
+			self.client = genai.Client( api_key=cfg.GEMINI_API_KEY )
 			self.collections = { }
 			self.stores = [ ]
-			
 			for store in self.client.file_search_stores.list( ):
 				self.stores.append( store )
 				self.display_name = getattr( store, 'display_name', None )
@@ -3679,11 +3900,9 @@ class FileSearch( Gemini ):
 		try:
 			throw_if( 'name', name )
 			self.store_name = str( name ).strip( )
-			self.client = self._get_client( )
-			self.response = self.client.file_search_stores.create(
-				config={ 'display_name': self.store_name }
-			)
-			self._refresh_collections( )
+			self.client = genai.Client( api_key=cfg.GEMINI_API_KEY )
+			self.response = self.client.file_search_stores.create( config={ 'display_name': self.store_name } )
+			self.refresh_collections( )
 			return self.response
 		except Exception as e:
 			exception = Error( e )
@@ -3712,7 +3931,7 @@ class FileSearch( Gemini ):
 		try:
 			throw_if( 'store_id', store_id )
 			self.store_id = str( store_id ).strip( )
-			self.client = self._get_client( )
+			self.client = genai.Client( api_key=cfg.GEMINI_API_KEY )
 			self.response = self.client.file_search_stores.get( name=self.store_id )
 			return self.response
 		except Exception as e:
@@ -3739,7 +3958,7 @@ class FileSearch( Gemini ):
 
 		"""
 		try:
-			self._refresh_collections( )
+			self.refresh_collections( )
 			return self.stores
 		except Exception as e:
 			exception = Error( e )
@@ -3770,12 +3989,10 @@ class FileSearch( Gemini ):
 		try:
 			throw_if( 'store_id', store_id )
 			self.store_id = str( store_id ).strip( )
-			self.client = self._get_client( )
-			self.client.file_search_stores.delete(
-				name=self.store_id,
-				config={ 'force': bool( force ) }
-			)
-			self._refresh_collections( )
+			self.client = genai.Client( api_key=cfg.GEMINI_API_KEY )
+			self.client.file_search_stores.delete( name=self.store_id,
+				config={ 'force': bool( force ) } )
+			self.refresh_collections( )
 			return True
 		except Exception as e:
 			exception = Error( e )
@@ -3784,7 +4001,7 @@ class FileSearch( Gemini ):
 			exception.method = 'delete( self, store_id: str, force: bool=True ) -> bool | Any'
 			raise exception
 		
-class VectorStores( Gemini ):
+class CloudBuckets( Gemini ):
 	'''
 
 		Purpose:
@@ -4020,8 +4237,7 @@ class VectorStores( Gemini ):
 			raise ex
 	
 	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
+			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
 			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
 		"""
 		

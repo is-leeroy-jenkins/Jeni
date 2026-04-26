@@ -84,8 +84,8 @@ MODE_CLASS_MAP = {
 		'Embedding': [ 'Embeddings' ],
 		'Document Q&A': [ 'Files' ],
 		'Files': [ 'Files' ],
-		'File Search Store': [ 'FileSearch' ],
-		'Vector Stores': [ 'VectorStores' ],
+		'File Search Stores': [ 'FileSearch' ],
+		'Google Cloud Buckets': [ 'CloudBuckets' ],
 }
 
 # ---------------- GEMINI CONFIG ------------------
@@ -97,7 +97,8 @@ GEMINI_MODES = [ 'Text',
                  'Document Q&A',
                  'Embedding',
                  'Files',
-                 'Vector Stores',
+                 'File Search Stores',
+                 'Google Cloud Buckets',
                  'Prompt Engineering',
                  'Data Management',
                  'Data Export' ]
