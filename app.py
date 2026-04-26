@@ -210,6 +210,9 @@ if 'files_model' not in st.session_state:
 if 'stores_model' not in st.session_state:
 	st.session_state[ 'stores_model' ] = ''
 
+if 'bucket_model' not in st.session_state:
+	st.session_state[ 'bucket_model' ] = ''
+	
 # -------- INSTRUCTION VARIABLES ----------------------
 
 if 'instructions' not in st.session_state:
