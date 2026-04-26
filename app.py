@@ -281,7 +281,10 @@ if 'text_top_k' not in st.session_state:
 
 if 'text_max_urls' not in st.session_state:
 	st.session_state[ 'text_max_urls' ] = 0
-
+	
+if 'text_google_grounding' not in st.session_state:
+	st.session_state[ 'text_google_grounding' ] = False
+	
 if 'text_max_tokens' not in st.session_state:
 	st.session_state[ 'text_max_tokens' ] = 0
 
@@ -3305,331 +3308,264 @@ if mode == 'Text':
 			st.session_state[ 'instructions_last_loaded' ] = ''
 			st.session_state[ 'clear_instructions' ] = False
 		
+		# ------------------------------------------------------------------
+		# Expander — Text Mind Controls
+		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+		
+			def reset_text_model_settings( ) -> None:
+				for key in [ 'text_model',
+				             'text_reasoning',
+				             'text_modalities',
+				             'text_media_resolution',
+				             'text_number',
+				             'thinking_level' ]:
+					if key in st.session_state:
+						del st.session_state[ key ]
 			
-			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
-				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
+			def reset_text_inference_settings( ) -> None:
+				for key in [ 'text_temperature',
+				             'text_top_percent',
+				             'text_top_k',
+				             'text_frequency_penalty',
+				             'text_presence_penalty' ]:
+					if key in st.session_state:
+						del st.session_state[ key ]
+			
+			def reset_text_grounding_settings( ) -> None:
+				for key in [ 'text_google_grounding',
+				             'text_urls_input',
+				             'text_max_urls',
+				             'text_tools',
+				             'text_urls',
+				             'selected_filestore_id',
+				             'selected_filestore_label',
+				             'text_file_search_store_names',
+				             'text_file_search_store_select' ]:
+					if key in st.session_state:
+						del st.session_state[ key ]
+			
+			def reset_text_response_settings( ) -> None:
+				for key in [ 'text_max_tokens',
+				             'text_response_format',
+				             'text_response_schema',
+				             'text_stops',
+				             'text_stops_input',
+				             'text_safety_profile',
+				             'text_stream' ]:
+					if key in st.session_state:
+						del st.session_state[ key ]
+			
+			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
+				model_c1, model_c2, model_c3, model_c4, model_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
 				# ---------- Model ------------
-				with llm_c1:
-					model_options = list( text.model_options )
-					set_text_model = st.selectbox( label='Model', options=model_options,
-						key='text_model', placeholder='Options', index=None,
-						help='REQUIRED. Text Generation model used by the AI', )
-					
-					text_model = st.session_state[ 'text_model' ]
-				
-				# ---------- Response Schema ------------
-				with llm_c2:
-					set_text_response_schema = st.text_input(
-						label='Response Schema',
-						key='text_response_schema',
-						value=st.session_state.get( 'text_response_schema', '' ),
-						help='Optional. JSON schema used when Response Format is application/json.',
-						width='stretch',
-						placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}' )
-					
-					text_response_schema = st.session_state[ 'text_response_schema' ]
-				
-				# ---------- Max URLs ------------
-				with llm_c3:
-					set_text_max_urls = st.slider( label='Max URLs', min_value=0, max_value=25,
-						key='text_max_urls', step=1,
-						help='Optional. Maximum number of URLs from the URL list to include.',
-						width='stretch' )
-					
-					text_max_urls = st.session_state[ 'text_max_urls' ]
+				with model_c1:
+					text_model = st.selectbox( label='Model',
+						options=list( text.model_options ),
+						key='text_model',
+						placeholder='Options',
+						index=None,
+						help='REQUIRED. Text Generation model used by the AI' )
 				
 				# ---------- Thinking Level ------------
-				with llm_c4:
-					reasoning_options = list( text.reasoning_options )
-					set_text_reasoning = st.selectbox( label='Thinking Level',
-						options=reasoning_options, key='text_reasoning',
-						help=cfg.REASONING, index=None, placeholder='Options' )
-					
-					text_reasoning = st.session_state[ 'text_reasoning' ]
+				with model_c2:
+					text_reasoning = st.selectbox( label='Thinking Level',
+						options=list( text.reasoning_options ),
+						key='text_reasoning',
+						help=cfg.REASONING,
+						index=None,
+						placeholder='Options' )
 				
-				# ---------- Tools ------------
-				with llm_c5:
-					text.model = st.session_state.get( 'text_model' ) or text.model
-					tool_options = list( text.get_supported_tool_options( text.model ) )
-					set_text_tools = st.multiselect( label='Tools', options=tool_options,
-						key='text_tools', help=cfg.TOOLS, placeholder='Options' )
-					
-					text_tools = [ d.strip( ) for d in set_text_tools if d.strip( ) ]
+				# ---------- Response Modalities ------------
+				with model_c3:
+					text_modalities = st.multiselect( label='Response Modalities',
+						options=list( text.modality_options ),
+						key='text_modalities',
+						help='Optional. Modality of the response',
+						placeholder='Options' )
 				
-				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='text_model_reset', width='stretch' ):
-					for key in [ 'text_model',
-					             'text_max_urls',
-					             'text_reasoning',
-								 'thinking_level',
-					             'text_response_schema',
-					             'text_tools' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
-					st.rerun( )
+				# ---------- Media Resolution ------------
+				with model_c4:
+					text_media_resolution = st.selectbox( label='Resolution',
+						options=list( text.media_options ),
+						key='text_media_resolution',
+						help='Optional. Requested media resolution for supported outputs.',
+						index=None,
+						placeholder='Options' )
+				
+				# ---------- Number/Candidates ------------
+				with model_c5:
+					text_number = st.slider( label='Candidates',
+						min_value=0,
+						max_value=50,
+						step=1,
+						help='Optional. Upper limit on the responses returned by the model',
+						key='text_number' )
+				
+				st.button( label='Reset',
+					key='text_model_reset',
+					width='stretch',
+					on_click=reset_text_model_settings )
 			
 			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
-				# ---------- Top-P ------------
-				with prm_c1:
-					set_text_top_p = st.slider( label='Top-P', min_value=0.0, max_value=1.0,
-						value=float( st.session_state.get( 'text_top_percent' ) ),
-						step=0.01, help=cfg.TOP_P, key='text_top_percent' )
-					
-					text_top_percent = st.session_state[ 'text_top_percent' ]
-				
-				# ---------- Frequency ------------
-				with prm_c2:
-					set_text_freq = st.slider( label='Frequency Penalty', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'text_frequency_penalty', 0.0 ) ),
-						step=0.01, help=cfg.FREQUENCY_PENALTY, key='text_frequency_penalty' )
-					
-					text_fequency = st.session_state[ 'text_frequency_penalty' ]
-				
-				# ---------- Presense ------------
-				with prm_c3:
-					set_text_presence = st.slider( label='Presense Penalty', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'text_presence_penalty', 0.0 ) ),
-						step=0.01, help=cfg.PRESENCE_PENALTY, key='text_presence_penalty' )
-					
-					text_presence = st.session_state[ 'text_presence_penalty' ]
-				
 				# ---------- Temperature ------------
-				with prm_c4:
-					set_text_temperature = st.slider( label='Temperature', min_value=-2.0, max_value=2.0,
-						value=float( st.session_state.get( 'text_temperature', 0.0 ) ), step=0.01,
-						help=cfg.TEMPERATURE, key='text_temperature' )
-					
-					text_temperature = st.session_state[ 'text_temperature' ]
+				with prm_c1:
+					text_temperature = st.slider( label='Temperature',
+						min_value=-2.0,
+						max_value=2.0,
+						step=0.01,
+						help=cfg.TEMPERATURE,
+						key='text_temperature' )
+				
+				# ---------- Top-P ------------
+				with prm_c2:
+					text_top_percent = st.slider( label='Top-P',
+						min_value=0.0,
+						max_value=1.0,
+						step=0.01,
+						help=cfg.TOP_P,
+						key='text_top_percent' )
 				
 				# ---------- Top-K ------------
-				with prm_c5:
-					set_text_topk = st.slider( label='Top K', min_value=0, max_value=20,
-						value=int( st.session_state.get( 'text_top_k', 0 ) ), step=1,
+				with prm_c3:
+					text_top_k = st.slider( label='Top K',
+						min_value=0,
+						max_value=20,
+						step=1,
 						help=cfg.TOP_K,
 						key='text_top_k' )
-					
-					text_number = st.session_state[ 'text_top_k' ]
 				
-				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='text_inference_reset', width='stretch' ):
-					for key in [ 'text_top_percent',
-					             'text_frequency_penalty',
-					             'text_presence_penalty',
-					             'text_temperature',
-					             'text_top_k' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
-					st.rerun( )
-					
-			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
-				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
+				# ---------- Frequency ------------
+				with prm_c4:
+					text_frequency_penalty = st.slider( label='Frequency Penalty',
+						min_value=-2.0,
+						max_value=2.0,
+						step=0.01,
+						help=cfg.FREQUENCY_PENALTY,
+						key='text_frequency_penalty' )
 				
-				# ---------- Number/Candidates ------------
-				with tool_c1:
-					set_text_number = st.slider( label='Candidates', min_value=0, max_value=50,
-						value=int( st.session_state.get( 'text_number', 0 ) ), step=1,
-						help='Optional. Upper limit on the responses returned by the model',
-						key='text_number' )
-					
-					text_number = st.session_state[ 'text_number' ]
+				# ---------- Presence ------------
+				with prm_c5:
+					text_presence_penalty = st.slider( label='Presence Penalty',
+						min_value=-2.0,
+						max_value=2.0,
+						step=0.01,
+						help=cfg.PRESENCE_PENALTY,
+						key='text_presence_penalty' )
 				
-				# ---------- Calling Mode ------------
-				with tool_c2:
-					choice_options = list( text.choice_options )
-					set_text_choice = st.selectbox( label='Calling Mode', options=choice_options,
-						key='text_tool_choice', help=cfg.CHOICE, index=None, placeholder='Options' )
-					
-					text_tool_choice = st.session_state[ 'text_tool_choice' ]
+				st.button( label='Reset',
+					key='text_inference_reset',
+					width='stretch',
+					on_click=reset_text_inference_settings )
+			
+			with st.expander( label='Grounding / Context Settings', icon='🔎', expanded=False,
+					width='stretch' ):
+				ground_c1, ground_c2, ground_c3 = st.columns(
+					[ 0.25, 0.25, 0.50 ], border=True, gap='xxsmall' )
 				
-				# ---------- Resolution ------------
-				with tool_c3:
-					media_options = list( text.media_options )
-					set_text_media_resolution = st.selectbox( label='Resolution',
-						options=media_options,
-						key='text_media_resolution',
-						help='Optional. Requested media resolution for supported outputs.',
-						index=None,
-						placeholder='Options' )
+				# ---------- Google Grounding ------------
+				with ground_c1:
+					text_google_grounding = st.toggle( label='Google Grounding',
+						key='text_google_grounding',
+						help='When enabled, Gemini grounds this Text response using Google Search.' )
 					
-					text_media_resolution = st.session_state[ 'text_media_resolution' ]
+					if text_google_grounding:
+						st.caption( 'Google Search grounding is enabled.' )
+					else:
+						st.caption( 'Google Search grounding is disabled.' )
+				
+				# ---------- Max URLs ------------
+				with ground_c2:
+					text_max_urls = st.slider( label='Max URLs',
+						min_value=0,
+						max_value=25,
+						step=1,
+						key='text_max_urls',
+						help='Optional. Maximum number of URLs from the URL list to include.',
+						width='stretch' )
 				
 				# ---------- URLs ------------
-				with tool_c4:
-					set_text_urls = st.text_input( label='URLs',
+				with ground_c3:
+					text_urls_input = st.text_input( label='URLs',
 						key='text_urls_input',
-						value=';'.join( st.session_state.get( 'text_urls', [ ] ) ),
-						help='Optional. Enter URLs separated by semicolons for grounding.',
+						help='Optional. Enter URLs separated by semicolons for added prompt context.',
 						width='stretch',
 						placeholder='https://example.com/page-1;https://example.com/page-2' )
-					
-					normalized_text_urls = [ line.strip( ) for line in set_text_urls.split( ';' )
-							if line.strip( ) ]
-					
-					st.session_state[ 'text_urls' ] = normalized_text_urls
-					text_urls = st.session_state[ 'text_urls' ]
 				
-				# ---------- Modalities ------------
-				with tool_c5:
-					modality_options = list( text.modality_options )
-					set_text_modalities = st.multiselect( label='Response Modalities',
-						options=modality_options, key='text_modalities',
-						help='Optional. Modality of the response', placeholder='Options' )
-					
-					text_modalities = [ d.strip( ) for d in set_text_modalities if d.strip( ) ]
-					text_modalities = st.session_state[ 'text_modalities' ]
-					
-					if 'file_search' in st.session_state.get( 'text_tools', [ ] ):
-						try:
-							tool_searcher = FileSearch( )
-							file_store_map = getattr( tool_searcher, 'collections', { } ) or { }
-							file_store_options = list( file_store_map.items( ) )
-						except Exception:
-							file_store_map = { }
-							file_store_options = [ ]
-						
-						if file_store_options:
-							file_store_labels = [ f'{n} — {i}' for n, i in file_store_options ]
-							
-							default_index = None
-							current_store_id = st.session_state.get( 'selected_filestore_id', '' )
-							if current_store_id:
-								for idx, (_, store_id) in enumerate( file_store_options ):
-									if str( store_id ) == str( current_store_id ):
-										default_index = idx
-										break
-							
-							selected_file_store = st.selectbox( label='File Search Store',
-								options=file_store_labels, index=default_index,
-								key='text_file_search_store_select',
-								help='Optional. Gemini File Search Store' )
-							
-							selected_store_id = ''
-							selected_store_label = ''
-							for name, store_id in file_store_options:
-								if f'{name} — {store_id}' == selected_file_store:
-									selected_store_label = str( name )
-									selected_store_id = str( store_id )
-									break
-							
-							st.session_state[ 'selected_filestore_id' ] = selected_store_id
-							st.session_state[ 'selected_filestore_label' ] = selected_store_label
-							st.session_state[ 'text_file_search_store_names' ] = (
-									[ selected_store_id ] if selected_store_id else [ ]
-							)
-						else:
-							st.session_state[ 'selected_filestore_id' ] = ''
-							st.session_state[ 'selected_filestore_label' ] = ''
-							st.session_state[ 'text_file_search_store_names' ] = [ ]
-							st.caption( 'No Gemini File Search Stores found.' )
-					else:
-						st.session_state[ 'text_file_search_store_names' ] = [ ]
-				
-				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='reset_text_tools', width='stretch' ):
-					for key in [ 'text_number',
-					             'text_tool_choice',
-					             'text_media_resolution',
-					             'text_urls',
-					             'text_urls_input',
-					             'text_modalities' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
-					st.rerun( )
-					
-			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
-				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
-					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
+				st.button( label='Reset',
+					key='reset_text_grounding',
+					width='stretch',
+					on_click=reset_text_grounding_settings )
+			
+			with st.expander( label='Output / Response Settings', icon='↔️', expanded=False,
+					width='stretch' ):
+				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5, resp_c6 = st.columns(
+					[ 0.16, 0.16, 0.17, 0.17, 0.17, 0.17 ], border=True, gap='xxsmall' )
 				
 				# ---------- Max Tokens ------------
 				with resp_c1:
-					set_text_tokens = st.slider(
-						label='Max Tokens',
+					text_max_tokens = st.slider( label='Max Tokens',
 						min_value=0,
 						max_value=100000,
-						value=int( st.session_state.get( 'text_max_tokens', 0 ) ),
 						step=500,
 						help=cfg.MAX_OUTPUT_TOKENS,
-						key='text_max_tokens'
-					)
-					
-					text_tokens = st.session_state[ 'text_max_tokens' ]
+						key='text_max_tokens' )
+				
+				# ---------- Response Format ------------
+				with resp_c2:
+					text_response_format = st.selectbox( label='Response Format',
+						options=list( text.format_options ),
+						key='text_response_format',
+						help='Optional. Desired Gemini response MIME type.',
+						index=None,
+						placeholder='Options' )
+				
+				# ---------- Response Schema ------------
+				with resp_c3:
+					text_response_schema = st.text_input( label='Response Schema',
+						key='text_response_schema',
+						help='Optional. JSON schema used when Response Format is application/json.',
+						width='stretch',
+						placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}' )
 				
 				# ---------- Stops ------------
-				with resp_c2:
-					set_text_stops = st.text_input(
-						label='Stop Sequences',
+				with resp_c4:
+					text_stops_input = st.text_input( label='Stop Sequences',
 						key='text_stops_input',
-						value=','.join( st.session_state.get( 'text_stops', [ ] ) ),
 						help=cfg.STOP_SEQUENCE,
 						width='stretch',
-						placeholder='Enter Stop Strings'
-					)
-					
-					text_stops = [ d.strip( ) for d in set_text_stops.split( ',' ) if d.strip( ) ]
-					st.session_state[ 'text_stops' ] = text_stops
+						placeholder='Enter Stop Strings separated by commas' )
 				
 				# ---------- Safety ------------
-				with resp_c3:
-					safety_options = list( text.safety_options )
-					set_text_safety_profile = st.selectbox(
-						label='Safety',
+				with resp_c5:
+					safety_options = [ 'OFF',
+					                   'BLOCK_NONE',
+					                   'BLOCK_ONLY_HIGH',
+					                   'BLOCK_MEDIUM_AND_ABOVE',
+					                   'BLOCK_LOW_AND_ABOVE' ]
+					
+					text_safety_profile = st.selectbox( label='Safety',
 						options=safety_options,
 						key='text_safety_profile',
 						help='Optional. Gemini safety profile for the request.',
 						index=None,
-						placeholder='Options'
-					)
-					
-					text_safety_profile = st.session_state[ 'text_safety_profile' ]
+						placeholder='Options' )
 				
 				# ---------- Stream ------------
-				with resp_c4:
-					set_text_stream = st.toggle(
-						label='Stream',
+				with resp_c6:
+					text_stream = st.toggle( label='Stream',
 						key='text_stream',
-						help=cfg.STREAM
-					)
-					
-					text_stream = st.session_state[ 'text_stream' ]
+						help=cfg.STREAM )
 				
-				# ---------- Response Format ------------
-				with resp_c5:
-					format_options = list( text.format_options )
-					set_text_response_format = st.selectbox(
-						label='Response Format',
-						options=format_options,
-						key='text_response_format',
-						help='Optional. Desired Gemini response MIME type.',
-						index=None,
-						placeholder='Options'
-					)
-					
-					text_response_format = st.session_state[ 'text_response_format' ]
-				
-				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='reset_text_response', width='stretch' ):
-					for key in [ 'text_max_tokens',
-					             'text_stops',
-					             'text_safety_profile',
-					             'text_stream',
-					             'text_response_format' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
-					if 'text_stops_input' in st.session_state:
-						del st.session_state[ 'text_stops_input' ]
-					
-					st.rerun( )
+				st.button( label='Reset',
+					key='reset_text_response',
+					width='stretch',
+					on_click=reset_text_response_settings )
 				
 		# ------------------------------------------------------------------
 		# Expander — Text System Instructions
@@ -3720,9 +3656,32 @@ if mode == 'Text':
 						structured_context = st.session_state.get( 'text_gemini_history', [ ] )
 						if structured_context is None or len( structured_context ) == 0:
 							structured_context = st.session_state.get( 'text_messages', [ ] )[ :-1 ]
+							selected_text_model = st.session_state.get( 'text_model' )
+							
+						if not selected_text_model:
+							selected_text_model = text.model
+							
+						grounding_enabled = bool(
+							st.session_state.get( 'text_google_grounding', False ) )
+					
+						derived_text_tools = [ 'google_search' ] if grounding_enabled else [ ]
+						
+						raw_text_urls = str( st.session_state.get( 'text_urls_input', '' ) or '' )
+						derived_text_urls = [ url.strip( )
+								for url in raw_text_urls.split( ';' )
+								if url.strip( ) ]
+						
+						raw_text_stops = str( st.session_state.get( 'text_stops_input', '' ) or '' )
+						derived_text_stops = [ stop.strip( )
+								for stop in raw_text_stops.split( ',' )
+								if stop.strip( ) ]
+						
+						derived_text_modalities = [ str( modality ).strip( )
+								for modality in st.session_state.get( 'text_modalities', [ ] )
+								if str( modality ).strip( ) ]
 						
 						response = text.generate_text( prompt=prompt,
-							model=st.session_state.get( 'text_model' ),
+							model=selected_text_model,
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
 							top_p=st.session_state.get( 'text_top_percent' ),
@@ -3730,23 +3689,21 @@ if mode == 'Text':
 							frequency=st.session_state.get( 'text_frequency_penalty' ),
 							presence=st.session_state.get( 'text_presence_penalty' ),
 							max_tokens=st.session_state.get( 'text_max_tokens' ),
-							stops=st.session_state.get( 'text_stops', [ ] ),
+							stops=derived_text_stops,
 							instruct=st.session_state.get( 'text_system_instructions' ),
 							response_format=st.session_state.get( 'text_response_format' ),
-							tools=st.session_state.get( 'text_tools', [ ] ),
-							tool_choice=st.session_state.get( 'text_tool_choice' ),
+							tools=derived_text_tools,
+							tool_choice=None,
 							reasoning=st.session_state.get( 'text_reasoning' ),
-							modalities=st.session_state.get( 'text_modalities', [ ] ),
+							modalities=derived_text_modalities,
 							media_resolution=st.session_state.get( 'text_media_resolution' ),
 							context=structured_context,
 							content=st.session_state.get( 'text_content' ),
-							urls=st.session_state.get( 'text_urls', [ ] ),
+							urls=derived_text_urls,
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
 							safety_profile=st.session_state.get( 'text_safety_profile' ),
-							file_search_store_names=st.session_state.get(
-								'text_file_search_store_names', [ ] ),
-							
+							file_search_store_names=[ ],
 							stream=st.session_state.get( 'text_stream', False ),
 							stream_handler=_on_stream_chunk if st.session_state.get(
 								'text_stream', False ) else None )
@@ -3760,7 +3717,19 @@ if mode == 'Text':
 							stream_placeholder.markdown( str( response ).strip( ) )
 						else:
 							st.markdown( response )
-						
+							grounding_sources = text.get_grounding_sources( )
+					
+						if grounding_sources:
+							st.session_state.last_sources = grounding_sources
+							with st.expander( label='Grounding Sources', icon='🔎',
+									expanded=False, width='stretch' ):
+								for source in grounding_sources:
+									title = source.get( 'title', '' ) or source.get( 'url', '' )
+									url = source.get( 'url', '' )
+									
+									if url:
+										st.markdown( f'- [{title}]({url})' )
+									
 						st.session_state.text_messages.append(
 						{
 							'role': 'assistant',
@@ -3871,14 +3840,8 @@ elif mode == "Images":
 				
 				with llm_c1:
 					_modes = [ 'Generation', 'Analysis', 'Editing' ]
-					st.selectbox(
-						label='Image Mode',
-						options=_modes,
-						key='image_mode',
-						help='Available Gemini image workflows.',
-						index=None,
-						placeholder='Options'
-					)
+					st.selectbox( label='Image Mode', options=_modes, key='image_mode',
+						help='Available Gemini image workflows.', index=None, placeholder='Options' )
 					image_mode = st.session_state.get( 'image_mode', '' )
 				
 				with llm_c2:
@@ -3891,38 +3854,21 @@ elif mode == "Images":
 					else:
 						models = list( image.model_options )
 					
-					st.selectbox(
-						label='Select Model',
-						options=models,
+					st.selectbox( label='Select Model', options=models,
 						help='REQUIRED. Gemini model used by the selected image workflow.',
-						key='image_model',
-						placeholder='Options',
-						index=None
-					)
+						key='image_model', placeholder='Options', index=None )
 					image_model = st.session_state.get( 'image_model', '' )
 				
 				with llm_c3:
-					st.slider(
-						label='Top-P',
-						key='image_top_percent',
+					st.slider( label='Top-P', key='image_top_percent',
 						value=float( st.session_state.get( 'image_top_percent', 0.0 ) ),
-						min_value=0.0,
-						max_value=1.0,
-						step=0.01,
-						help=cfg.TOP_P
-					)
+						min_value=0.0, max_value=1.0, step=0.01, help=cfg.TOP_P )
 					image_top_percent = st.session_state.get( 'image_top_percent', 0.0 )
 				
 				with llm_c4:
-					st.slider(
-						label='Temperature',
-						key='image_temperature',
+					st.slider( label='Temperature', key='image_temperature',
 						value=float( st.session_state.get( 'image_temperature', 0.0 ) ),
-						min_value=0.0,
-						max_value=1.0,
-						step=0.01,
-						help=cfg.TEMPERATURE
-					)
+						min_value=0.0, max_value=1.0, step=0.01, help=cfg.TEMPERATURE )
 					image_temperature = st.session_state.get( 'image_temperature', 0.0 )
 				
 				if st.button( label='Reset', key='image_model_reset', width='stretch' ):
@@ -3937,27 +3883,16 @@ elif mode == "Images":
 					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
 				
 				with resp_c1:
-					st.slider(
-						label='Max Output Tokens',
-						min_value=0,
-						max_value=100000,
+					st.slider( label='Max Output Tokens', min_value=0, max_value=100000,
 						value=int( st.session_state.get( 'image_max_tokens', 0 ) ),
-						step=1000,
-						help=cfg.MAX_OUTPUT_TOKENS,
-						key='image_max_tokens'
-					)
+						step=1000, help=cfg.MAX_OUTPUT_TOKENS, key='image_max_tokens' )
 					image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
 				
 				with resp_c2:
-					st.slider(
-						label='Candidates',
-						min_value=1,
-						max_value=8,
+					st.slider( label='Candidates', min_value=1, max_value=8,
 						value=int( st.session_state.get( 'image_number', 1 ) ),
-						step=1,
-						help='Optional. Upper bound on generated image candidates.',
-						key='image_number'
-					)
+						step=1, help='Optional. Upper bound on generated image candidates.',
+						key='image_number' )
 					image_number = st.session_state.get( 'image_number', 1 )
 				
 				with resp_c3:
@@ -3968,33 +3903,22 @@ elif mode == "Images":
 					else:
 						modality_options = [ 'IMAGE', 'TEXT_AND_IMAGE' ]
 					
-					st.selectbox(
-						label='Response Mode',
-						options=modality_options,
+					st.selectbox( label='Response Mode', options=modality_options,
 						key='image_modality',
-						help='Gemini response modalities used by the Image wrapper.',
-						index=None,
-						placeholder='Select Modality'
-					)
+						help='Gemini response modalities used by the Image wrapper.', index=None,
+						placeholder='Select Modality' )
 					image_modality = st.session_state.get( 'image_modality', '' )
 				
 				with resp_c4:
 					mime_enabled = image_mode in [ 'Generation', 'Editing' ]
 					if mime_enabled:
-						st.selectbox(
-							label='Output MIME Type',
-							options=image.mime_options,
+						st.selectbox( label='Output MIME Type', options=image.mime_options,
 							key='image_mime_type',
 							help='Optional. Output image MIME type when the model returns an image.',
-							index=None,
-							placeholder='Options'
-						)
+							index=None, placeholder='Options' )
 					else:
-						st.text_input(
-							label='Output MIME Type',
-							value='Not used for Analysis',
-							disabled=True
-						)
+						st.text_input( label='Output MIME Type', value='Not used for Analysis',
+							disabled=True )
 						st.session_state[ 'image_mime_type' ] = ''
 					
 					image_mime_type = st.session_state.get( 'image_mime_type', '' )

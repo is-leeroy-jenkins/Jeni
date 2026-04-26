@@ -235,6 +235,8 @@ class Chat( Gemini ):
 	
 	def __init__( self, model: str='gemini-2.5-flash-lite' ):
 		super( ).__init__( )
+		self.gemini_api_key = cfg.GEMINI_API_KEY
+		self.google_api_key = cfg.GOOGLE_API_KEY
 		self.api_version = None
 		self.client = None
 		self.content_config = None
@@ -261,6 +263,7 @@ class Chat( Gemini ):
 		self.media_resolution = None
 		self.tool_choice = None
 		self.contents = None
+		self.grounding_metadata = None
 		self.content_block = None
 		self.context = [ ]
 		self.client = None
@@ -473,9 +476,8 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			throw_if( 'urls', urls )
 			throw_if( 'max_urls', max_urls )
-			self.urls = [ ]
+			self.urls = urls if urls is not None else [ ]
 			for url in urls:
 				if url is None:
 					continue
@@ -516,8 +518,6 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			throw_if( 'content', content )
-			throw_if( 'urls', urls )
 			self.content_blocks = [ ]
 			self.content_blocks.append( content.strip( ) )
 			self.urls = urls 
@@ -531,63 +531,40 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = ('append_urls_to_content( self, **kwargs ) -> str')
 			raise exception
-	
-	def build_tools( self, tools: List[ str ], file_search_store_names: List[ str ] ) -> List[ Tool ] | None:
+		
+	def build_tools( self, tools: List[ str ] ) -> List[ Tool ] | None:
 		"""
 		
 			Purpose:
 			--------
-			Builds Gemini built-in tool objects from UI-selected tool names.
+			Builds the Google Search grounding tool for Text mode when explicitly enabled.
 			
 			Parameters:
 			-----------
-			tools: List[ str ] - Tool names selected in the UI.
-			file_search_store_names: List[ str ] - Gemini File Search Store resource names.
+			tools: List[ str ] - Derived tool names for the request.
+			file_search_store_names: List[ str ] - Ignored for Google Search-only grounding.
 			
 			Returns:
 			--------
-			List[ Tool ] | None - Configured Gemini tool objects or None.
+			List[ Tool ] | None - Google Search tool list or None.
 		
 		"""
 		try:
-			throw_if( tools, 'tools' )
-			throw_if( file_search_store_names, 'file_search_store_names' )
-			self.tools = tools
-			self.file_search_store_names = [ str( name ).strip( )
-			                                 for name in (file_search_store_names or [ ])
-			                                 if str( name ).strip( ) ]
+			self.tools = [
+					str( tool ).strip( )
+					for tool in (tools or [ ])
+					if str( tool ).strip( )
+			]
 			
-			self.tool_objects = [ ]
-			self.supported_tools = set( self.get_supported_tools( self.model ) )
-			for name in self.tools:
-				self.name = name
-				if not self.name or self.name not in self.supported_tools:
-					continue
-				
-				if self.name == 'google_search':
-					self.tool_objects.append( Tool( google_search=GoogleSearch( ) ) )
-				
-				elif self.name == 'url_context':
-					self.tool_objects.append( Tool( url_context=UrlContext( ) ) )
-				
-				elif self.name == 'code_execution':
-					self.tool_objects.append( Tool( code_execution=types.ToolCodeExecution ) )
-				
-				elif self.name == 'google_maps':
-					self.tool_objects.append( Tool( google_maps=types.GoogleMaps( ) ) )
-				
-				elif self.name == 'file_search':
-					if len( self.file_search_store_names ) > 0:
-						self.tool_objects.append( Tool( file_search=types.FileSearch(
-							file_search_store_names=self.file_search_store_names ) ) )
+			if 'google_search' not in self.tools:
+				return None
 			
-			return self.tool_objects if len( self.tool_objects ) > 0 else None
+			return [ Tool( google_search=GoogleSearch( ) ) ]
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = ('build_tools( self, tools: List[ str ]=None, '
-			                    'file_search_store_names: List[ str ]=None )')
+			exception.method = 'build_tools( self, tools: List[ str ], file_search_store_names: List[ str ] )'
 			raise exception
 	
 	def build_tool_config( self, tool_choice: str, tools: List[ Tool ] ) -> ToolConfig | None:
@@ -629,32 +606,32 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = ('build_tool_config( self, **kwargs) -> ToolConfig | None')
 			raise exception
-	
+		
 	def build_modalities( self, modalities: List[ str ] ) -> List[ str ] | None:
 		"""
-		
-			Purpose:
-			--------
-			Normalizes response modality values selected in the UI.
 			
-			Parameters:
-			-----------
-			modalities: List[ str ] - Candidate response modalities.
+				Purpose:
+				--------
+				Normalizes optional response modality values selected in the UI.
+				
+				Parameters:
+				-----------
+				modalities: List[ str ] - Candidate response modalities.
+				
+				Returns:
+				--------
+				List[ str ] | None - Clean response modality list or None.
 			
-			Returns:
-			--------
-			List[ str ] | None - Clean response modality list or None.
-		
-		"""
+			"""
 		try:
-			throw_if( modalities, 'modalities')
 			self.modalities = [ ]
-			for modality in modalities:
+			
+			for modality in (modalities or [ ]):
 				if modality is None:
 					continue
 				
-				self.modality = modality.strip( ).upper( )
-				if self.modality in [ 'text', 'image', 'audio' ]:
+				self.modality = str( modality ).strip( ).upper( )
+				if self.modality in [ 'TEXT', 'IMAGE', 'AUDIO' ]:
 					self.modalities.append( self.modality )
 			
 			return self.modalities if len( self.modalities ) > 0 else None
@@ -662,9 +639,9 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'build_modalities( self, modalities: List[ str ]=None )'
+			exception.method = 'build_modalities( self, modalities: List[ str ] )'
 			raise exception
-	
+		
 	def build_reasoning( self, reasoning: str ) -> ThinkingConfig | None:
 		"""
 		
@@ -682,19 +659,76 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			throw_if( reasoning, 'reasoning' )
-			self.reasoning = reasoning
-			if not self.reasoning or self.reasoning == 'unspecified':
+			self.reasoning = str( reasoning or '' ).strip( ).upper( )
+			
+			if not self.reasoning:
 				return None
 			
-			if self.reasoning not in [ 'miniL', 'LOW', 'MEDIUM', 'HIGH' ]:
+			if self.reasoning == 'THINKING_LEVEL_UNSPECIFIED':
+				return None
+			
+			if self.reasoning not in [ 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH' ]:
 				return None
 			
 			return ThinkingConfig( thinking_level=self.reasoning )
-		except Exception:
-			return None
-	
-	
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_reasoning( self, reasoning: str ) -> ThinkingConfig | None'
+			raise exception
+		
+	def build_safety_settings( self, safety_profile: str ) -> List[ SafetySetting ] | None:
+		"""
+		
+			Purpose:
+			--------
+			Builds Gemini safety settings from the optional UI safety profile.
+			
+			Parameters:
+			-----------
+			safety_profile: str - Safety threshold name selected in the UI.
+			
+			Returns:
+			--------
+			List[ SafetySetting ] | None - Safety settings or None.
+		
+		"""
+		try:
+			self.safety_profile = str( safety_profile or '' ).strip( ).upper( )
+			
+			if not self.safety_profile:
+				return None
+			
+			self.threshold = getattr( HarmBlockThreshold, self.safety_profile, None )
+			if self.threshold is None:
+				return None
+			
+			self.categories = [ ]
+			for name in [
+					'HARM_CATEGORY_HATE_SPEECH',
+					'HARM_CATEGORY_HARASSMENT',
+					'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+					'HARM_CATEGORY_DANGEROUS_CONTENT',
+					'HARM_CATEGORY_CIVIC_INTEGRITY' ]:
+				self.category = getattr( HarmCategory, name, None )
+				if self.category is not None:
+					self.categories.append( self.category )
+			
+			if len( self.categories ) == 0:
+				return None
+			
+			return [
+					SafetySetting( category=category, threshold=self.threshold )
+					for category in self.categories
+			]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_safety_settings( self, safety_profile: str )'
+			raise exception
+		
 	def get_output_text( self ) -> Optional[ str ]:
 		"""
 		
@@ -749,8 +783,8 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'get_output_text( self ) -> Optional[ str ]'
 			raise exception
-	
-	def parse_response_schema( self, response_schema: str ) -> Any:
+		
+	def parse_response_schema( self, response_schema: Any ) -> Any:
 		"""
 		
 			Purpose:
@@ -767,7 +801,15 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			throw_if( response_schema, 'response_schema' )
+			if response_schema is None:
+				return None
+			
+			if isinstance( response_schema, dict ):
+				return response_schema
+			
+			if not isinstance( response_schema, str ):
+				return response_schema
+			
 			self.schema_text = response_schema.strip( )
 			if not self.schema_text:
 				return None
@@ -777,10 +819,10 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'parse_response_schema( self, response_schema: Any=None )'
+			exception.method = 'parse_response_schema( self, response_schema: Any )'
 			raise exception
-	
-	def build_contents( self, prompt: str, content: str, context: List[ Any ]=None ) -> str | List[ Content ]:
+		
+	def build_contents( self, prompt: str, content: str, context: List[ Any ]=None ) -> str |  List[ Content ]:
 		"""
 		
 			Purpose:
@@ -790,21 +832,22 @@ class Chat( Gemini ):
 			Parameters:
 			-----------
 			prompt: str - Current user prompt.
-			context: List[ Any ] - Prior chat messages or Gemini Content objects.
 			content: str - Optional prepended content block.
+			context: List[ Any ] - Prior chat messages or Gemini Content objects.
 			
 			Returns:
 			--------
 			Union[ str, List[ Content ] ] - Contents payload for Gemini.
 		
 		"""
+		
 		try:
 			throw_if( 'prompt', prompt )
-			throw_if( content, 'content' )
-			self.prompt = prompt
+			self.prompt = str( prompt ).strip( )
 			self.context = context if context is not None else [ ]
-			self.content_block = content
+			self.content_block = str( content or '' ).strip( )
 			self.contents = [ ]
+			
 			for item in self.context:
 				if item is None:
 					continue
@@ -816,7 +859,7 @@ class Chat( Gemini ):
 				if not isinstance( item, dict ):
 					continue
 				
-				role = item.get( 'role', 'user' )
+				role = str( item.get( 'role', 'user' ) or 'user' ).strip( )
 				text = item.get( 'content', None )
 				if text is None:
 					continue
@@ -832,22 +875,125 @@ class Chat( Gemini ):
 					self.contents.append( Content( role='user',
 						parts=[ Part.from_text( text=text ) ] ) )
 			
-			self.user_text = str( self.prompt ).strip( )
-			if self.content_block is not None and str( self.content_block ).strip( ):
-				self.user_text = f"{str( self.content_block ).strip( )}\n\n{self.user_text}"
+			self.user_text = self.prompt
+			if self.content_block:
+				self.user_text = f'{self.content_block}\n\n{self.user_text}'
 			
 			self.contents.append( Content( role='user',
 				parts=[ Part.from_text( text=self.user_text ) ] ) )
 			
-			return self.contents if len( self.contents ) > 0 else self.prompt
+			return self.contents
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = ('build_contents( self, prompt: str, context: List[ Any ]=None, '
-			                    'content: str=None )')
+			exception.method = 'build_contents( self, prompt: str, content: str, context: List[ Any ]=None )'
+			raise exception
+		
+	def capture_grounding_metadata( self ) -> None:
+		"""
+		
+			Purpose:
+			--------
+			Captures grounding metadata from the most recent Gemini text response.
+			
+			Parameters:
+			-----------
+			None
+			
+			Returns:
+			--------
+			None
+		
+		"""
+		try:
+			self.grounding_metadata = None
+			
+			if self.content_response is None:
+				return
+			
+			self.candidates = getattr( self.content_response, 'candidates', None )
+			if not self.candidates:
+				return
+			
+			for candidate in self.candidates:
+				self.metadata = getattr( candidate, 'grounding_metadata', None )
+				if self.metadata is None:
+					self.metadata = getattr( candidate, 'groundingMetadata', None )
+				
+				if self.metadata is not None:
+					self.grounding_metadata = self.metadata
+					return
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'capture_grounding_metadata( self )'
 			raise exception
 	
+	def get_grounding_sources( self ) -> List[ Dict[ str, str ] ]:
+		"""
+		
+			Purpose:
+			--------
+			Extracts displayable source links from Gemini grounding metadata.
+			
+			Parameters:
+			-----------
+			None
+			
+			Returns:
+			--------
+			List[ Dict[ str, str ] ] - Grounding source dictionaries.
+		
+		"""
+		try:
+			self.sources = [ ]
+			
+			if self.grounding_metadata is None:
+				return self.sources
+			
+			self.chunks = getattr( self.grounding_metadata, 'grounding_chunks', None )
+			if self.chunks is None:
+				self.chunks = getattr( self.grounding_metadata, 'groundingChunks', None )
+			
+			if not self.chunks:
+				return self.sources
+			
+			for chunk in self.chunks:
+				self.web = getattr( chunk, 'web', None )
+				if self.web is None and isinstance( chunk, dict ):
+					self.web = chunk.get( 'web' )
+				
+				if self.web is None:
+					continue
+				
+				if isinstance( self.web, dict ):
+					self.uri = self.web.get( 'uri' ) or self.web.get( 'url' )
+					self.title = self.web.get( 'title' ) or self.uri
+				else:
+					self.uri = getattr( self.web, 'uri', None )
+					if self.uri is None:
+						self.uri = getattr( self.web, 'url', None )
+					
+					self.title = getattr( self.web, 'title', None ) or self.uri
+				
+				if self.uri:
+					self.sources.append(
+						{
+								'title': str( self.title or self.uri ),
+								'url': str( self.uri ),
+								'snippet': ''
+						} )
+			
+			return self.sources
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'get_grounding_sources( self ) -> List[ Dict[ str, str ] ]'
+			raise exception
+		
 	def get_structured_history( self ) -> List[ Content ] | None:
 		"""
 		
@@ -862,14 +1008,20 @@ class Chat( Gemini ):
 		"""
 		try:
 			self.history = [ ]
+			
 			if self.contents is not None and isinstance( self.contents, list ):
 				for item in self.contents:
 					if isinstance( item, Content ):
 						self.history.append( item )
 			
-			self.response_content = self.contents
-			if self.response_content is not None:
-				self.history.append( self.response_content )
+			if self.content_response is not None:
+				self.candidates = getattr( self.content_response, 'candidates', None )
+				if self.candidates:
+					for candidate in self.candidates:
+						self.response_content = getattr( candidate, 'content', None )
+						if isinstance( self.response_content, Content ):
+							self.history.append( self.response_content )
+							break
 			
 			return self.history if len( self.history ) > 0 else None
 		except Exception as e:
@@ -878,8 +1030,8 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'get_structured_history( self ) -> List[ Content ] | None'
 			raise exception
-	
-	def build_config( self, model: str='gemini-2.5-flash-lite', number: int=None,
+		
+	def build_config( self, model: str = 'gemini-2.5-flash-lite', number: int=None,
 			temperature: float=None, top_p: float=None, top_k: int=None,
 			frequency: float=None, presence: float=None, max_tokens: int=None,
 			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
@@ -921,83 +1073,84 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			self.model = model
+			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
+			throw_if( 'model', self.model )
+			
 			self.number = number
-			self.candidate_count = self.number
+			self.candidate_count = int( self.number or 0 )
 			self.temperature = temperature
 			self.top_p = top_p
-			self.top_k = top_k
+			self.top_k = int( top_k or 0 )
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
-			self.max_tokens = max_tokens
+			self.max_tokens = int( max_tokens or 0 )
 			self.stops = stops if stops is not None else [ ]
 			self.instructions = instruct
-			self.response_mime_type = response_format
-			self.response_schema = response_schema 
-			self.safety_settings = safety_profile 
+			self.response_mime_type = str( response_format or '' ).strip( )
+			self.response_schema = self.parse_response_schema( response_schema )
+			self.safety_settings = self.build_safety_settings( safety_profile )
 			self.tool_choice = tool_choice
 			self.media_resolution = str( media_resolution ).strip( ) if media_resolution else None
-			self.tool_objects = self.build_tools( tools=tools,
-				file_search_store_names=file_search_store_names )
+			self.tool_objects = self.build_tools( tools=tools )
 			self.function_tool_config = self.build_tool_config( tool_choice=self.tool_choice,
 				tools=self.tool_objects )
 			self.response_modalities = self.build_modalities( modalities=modalities )
-			self.thought_config = reasoning
+			self.thought_config = self.build_reasoning( reasoning )
 			self.config_kwargs = { }
 			
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ]=self.temperature
+				self.config_kwargs[ 'temperature' ] = self.temperature
 			
-			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ]=self.top_p
+			if self.top_p is not None and float( self.top_p ) > 0:
+				self.config_kwargs[ 'top_p' ] = self.top_p
 			
-			if self.top_k is not None:
-				self.config_kwargs[ 'top_k' ]=self.top_k
+			if self.top_k > 0:
+				self.config_kwargs[ 'top_k' ] = self.top_k
 			
-			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
+			if self.max_tokens > 0:
+				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
 			
-			if self.candidate_count is not None:
-				self.config_kwargs[ 'candidate_count' ]=self.candidate_count
+			if self.candidate_count > 0:
+				self.config_kwargs[ 'candidate_count' ] = self.candidate_count
 			
 			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
 			
 			if self.frequency_penalty is not None:
-				self.config_kwargs[ 'frequency_penalty' ]=self.frequency_penalty
+				self.config_kwargs[ 'frequency_penalty' ] = self.frequency_penalty
 			
 			if self.presence_penalty is not None:
-				self.config_kwargs[ 'presence_penalty' ]=self.presence_penalty
+				self.config_kwargs[ 'presence_penalty' ] = self.presence_penalty
 			
 			if self.stops is not None and len( self.stops ) > 0:
-				self.config_kwargs[ 'stop_sequences' ]=self.stops
+				self.config_kwargs[ 'stop_sequences' ] = self.stops
 			
-			if self.response_mime_type is not None:
-				self.config_kwargs[ 'response_mime_type' ]= self.response_mime_type
+			if self.response_mime_type:
+				self.config_kwargs[ 'response_mime_type' ] = self.response_mime_type
 			
 			if self.response_schema is not None:
 				if isinstance( self.response_schema, dict ):
-					self.config_kwargs[ 'response_json_schema' ]=self.response_schema
+					self.config_kwargs[ 'response_json_schema' ] = self.response_schema
 				else:
-					self.config_kwargs[ 'response_schema' ]=self.response_schema
+					self.config_kwargs[ 'response_schema' ] = self.response_schema
 			
 			if self.media_resolution is not None:
-				self.config_kwargs[ 'media_resolution' ]=self.media_resolution
+				self.config_kwargs[ 'media_resolution' ] = self.media_resolution
 			
 			if self.tool_objects is not None and len( self.tool_objects ) > 0:
-				self.config_kwargs[ 'tools' ]=self.tool_objects
+				self.config_kwargs[ 'tools' ] = self.tool_objects
 			
 			if self.function_tool_config is not None:
-				self.config_kwargs[ 'tool_config' ]=self.function_tool_config
+				self.config_kwargs[ 'tool_config' ] = self.function_tool_config
 			
 			if self.safety_settings is not None and len( self.safety_settings ) > 0:
-				self.config_kwargs[ 'safety_settings' ]=self.safety_settings
+				self.config_kwargs[ 'safety_settings' ] = self.safety_settings
 			
 			if self.response_modalities is not None and len( self.response_modalities ) > 0:
-				self.config_kwargs[ 'response_modalities' ]=self.response_modalities
+				self.config_kwargs[ 'response_modalities' ] = self.response_modalities
 			
 			if self.thought_config is not None:
-				self.config_kwargs[ 'thinking_config' ]=self.thought_config
+				self.config_kwargs[ 'thinking_config' ] = self.thought_config
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			return self.content_config
@@ -1007,17 +1160,17 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'build_config( self, model ) -> GenerateContentConfig'
 			raise exception
-	
-	def generate_text( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			number: int=None, temperature: float=None, top_p: float=None, top_k: int=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
+		
+	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+			number: int=None, temperature: float=None, top_p: float=None,
+			top_k: int=None, frequency: float=None, presence: float=None, max_tokens: int=None,
 			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
 			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
 			modalities: List[ str ]=None, media_resolution: str=None,
 			context: List[ Dict[ str, Any ] ]=None, content: str=None,
 			urls: List[ str ]=None, max_urls: int=None, response_schema: Any=None,
 			safety_profile: str=None, file_search_store_names: List[ str ]=None,
-			stream: bool=False, stream_handler: Any=None ) -> str | None:
+			stream: bool = False, stream_handler: Any=None ) -> str | None:
 		"""
 		
 			Purpose:
@@ -1057,11 +1210,20 @@ class Chat( Gemini ):
 			--------
 			str | None - The generated text response or None.
 		
-		"""
+		"""		
 		try:
 			throw_if( 'prompt', prompt )
-			throw_if( 'api_key', self.api_key )
 			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
+			throw_if( 'model', self.model )
+			
+			self.gemini_api_key = (
+					self.gemini_api_key
+					or self.google_api_key
+					or os.environ.get( 'GEMINI_API_KEY' )
+					or os.environ.get( 'GOOGLE_API_KEY' )
+			)
+			throw_if( 'gemini_api_key', self.gemini_api_key )
+			
 			self.stream = bool( stream )
 			self.urls = self.build_urls( urls=urls, max_urls=max_urls )
 			self.content_block = self.append_urls_to_content( content=content, urls=self.urls )
@@ -1075,7 +1237,7 @@ class Chat( Gemini ):
 				response_schema=response_schema, safety_profile=safety_profile,
 				file_search_store_names=file_search_store_names )
 			
-			self.client = genai.Client( api_key=self.api_key )
+			self.client = genai.Client( api_key=self.gemini_api_key )
 			if self.stream:
 				self.stream_response = self.client.models.generate_content_stream(
 					model=self.model, contents=self.contents, config=self.content_config )
@@ -1100,6 +1262,7 @@ class Chat( Gemini ):
 			
 			self.content_response = self.client.models.generate_content( model=self.model,
 				contents=self.contents, config=self.content_config )
+			self.capture_grounding_metadata( )
 			
 			return self.get_output_text( )
 		except Exception as e:
@@ -1312,10 +1475,24 @@ class Images( Gemini ):
 		'''
 		return [ '1K', '2K', '4K' ]
 	
-	def supports_image_size( self, model: str, ) -> bool:
+	def supports_image_size( self, model: str='gemini-2.5-flash-image' ) -> bool:
+		"""
+			
+			Purpose:
+			-----------
+			Determines whether the selected image model supports Google Image Size.
+			
+			Parameters:
+			-----------
+			model: str - The Gemini image model identifier.
+			
+			Returns:
+			--------
+			bool - True when Google Image Search grounding is supported; otherwise False.
+			
+		"""
 		try:
-			throw_if( 'model', model )
-			self.model_name = model.strip( )
+			self.model_name = model
 			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
 		except Exception as e:
 			exception = Error( e )
@@ -1324,19 +1501,7 @@ class Images( Gemini ):
 			exception.method = 'supports_image_size( self, model=None ) -> bool'
 			raise exception
 	
-	def supports_search_grounding( self, model: str=None ) -> bool:
-		try:
-			throw_if( 'model', model )
-			self.model_name = model.strip( )
-			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Images'
-			exception.method = 'supports_search_grounding( self, model=None ) -> bool'
-			raise exception
-	
-	def supports_image_search( self, model: str=None ) -> bool:
+	def supports_search_grounding( self, model: str='gemini-2.5-flash-image') -> bool:
 		"""
 			
 			Purpose:
@@ -1353,14 +1518,39 @@ class Images( Gemini ):
 			
 		"""
 		try:
-			throw_if( 'model', model )
-			self.model_name = model.strip( )
+			self.model_name = model
+			return self.model_name in [ 'gemini-3.1-flash-image-preview' ]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'supports_search_grounding( self, model=None ) -> bool'
+			raise exception
+	
+	def supports_image_search( self, model: str='gemini-2.5-flash-image' ) -> bool:
+		"""
+			
+			Purpose:
+			-----------
+			Determines whether the selected image model supports Google Image Search grounding.
+			
+			Parameters:
+			-----------
+			model: str - The Gemini image model identifier.
+			
+			Returns:
+			--------
+			bool - True when Google Image Search grounding is supported; otherwise False.
+			
+		"""
+		try:
+			self.model_name = model
 			return self.model_name == 'gemini-3.1-flash-image-preview'
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'supports_image_search( self, model=None ) -> bool'
+			exception.method = 'supports_image_search( self, model: str ) -> bool'
 			raise exception
 	
 	def normalize_response_modalities( self, response_modalities: Optional[ str ],
@@ -1382,6 +1572,7 @@ class Images( Gemini ):
 			
 		"""
 		try:
+			throw_if( 'response_modalities', response_modalities)
 			self.mode_name = str( response_modalities or '' ).strip( ).upper( )
 			if self.mode_name == 'TEXT_AND_IMAGE':
 				return [ 'TEXT', 'IMAGE' ]
@@ -1440,8 +1631,8 @@ class Images( Gemini ):
 			exception.method = 'build_grounding_tool( self, image_search=False ) -> Optional[ Tool ]'
 			raise exception
 	
-	def get_content_config( self, image_only: bool=False, grounded: bool=False,
-			image_search: bool=False, response_modalities: Optional[ str ]=None,
+	def get_content_config( self, response_modalities: Optional[ str ], image_only: bool=False,
+			image_search: bool=False, grounded: bool = False,
 			output_mime_type: Optional[ str ]=None ) -> GenerateContentConfig:
 		"""
 			
@@ -1463,6 +1654,7 @@ class Images( Gemini ):
 			
 		"""
 		try:
+			self.image_only = image_only
 			self.image_config = None
 			self.tool_config = None
 			self.grounding_metadata = None
@@ -1484,9 +1676,7 @@ class Images( Gemini ):
 				if self.grounding_tool is not None:
 					self.tool_config = [ self.grounding_tool ]
 			
-			self.response_modalities = self.normalize_response_modalities(
-				response_modalities=response_modalities,
-				image_only=image_only )
+			self.response_modalities = response_modalities
 			
 			self.config_kwargs = {
 					'temperature': self.temperature,
@@ -1777,7 +1967,7 @@ class Images( Gemini ):
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.output_mime_type = output_mime_type
-			self.response_mode = response_modalities or 'TEXT'
+			self.response_mode = response_modalities or 'text'
 			self.client = genai.Client( api_key=self.gemini_api_key )
 			self.content_config = self.get_content_config( image_only=False,
 				grounded=grounded, image_search=image_search, response_modalities=self.response_mode,
@@ -1837,20 +2027,13 @@ class Images( Gemini ):
 			self.max_output_tokens = max_tokens
 			self.instructions = instruct
 			self.output_mime_type = output_mime_type
-			self.response_mode = response_modalities
+			self.response_mode = response_modalities or 'image'
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self.get_content_config(
-				image_only=True,
-				grounded=grounded,
-				image_search=image_search,
-				response_modalities=self.response_mode,
-				output_mime_type=self.output_mime_type
-			)
-			self.content_response = self.client.models.generate_content(
-				model=self.model,
-				contents=[ self.prompt, self.open_image( path ) ],
-				config=self.content_config
-			)
+			self.content_config = self.get_content_config( image_only=True,
+				grounded=grounded, image_search=image_search, response_modalities=self.response_mode,
+				output_mime_type=self.output_mime_type )
+			self.content_response = self.client.models.generate_content( model=self.model,
+				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
 			self.response = self.content_response
 			self.capture_metadata( )
 			return self.get_first_image( )
@@ -1976,7 +2159,7 @@ class Embeddings( Gemini ):
 		         'FACT_VERIFICATION',
 		         'CODE_RETRIEVAL_QUERY' ]
 	
-	def normalize_dimensions( self, dimensions: int=None ) -> int | None:
+	def normalize_dimensions( self, dimensions: int ) -> int | None:
 		"""
 		
 			Purpose:
@@ -1993,10 +2176,8 @@ class Embeddings( Gemini ):
 		
 		"""
 		try:
-			if dimensions is None:
-				return None
-			
-			self.dimensions = int( dimensions )
+			throw_if( 'dimensions', dimensions)
+			self.dimensions = dimensions
 			if self.dimensions <= 0:
 				return None
 			
@@ -2047,8 +2228,7 @@ class Embeddings( Gemini ):
 			raise exception
 	
 	def build_embedding_config( self, model: str='gemini-embedding-001',
-			dimensions: int=None, task_type: str=None,
-			title: str=None ) -> EmbedContentConfig:
+			dimensions: int=None, task_type: str=None, title: str=None ) -> EmbedContentConfig:
 		"""
 		
 			Purpose:
@@ -2068,10 +2248,10 @@ class Embeddings( Gemini ):
 		
 		"""
 		try:
-			self.model = str( model or self.model or 'gemini-embedding-001' ).strip( )
-			self.dimensions = self.normalize_dimensions( dimensions=dimensions )
-			self.task_type = str( task_type or '' ).strip( ).upper( )
-			self.title = str( title or '' ).strip( )
+			self.model = model
+			self.dimensions = dimensions
+			self.task_type = task_type.strip( ).upper( )
+			self.title = title.strip( )
 			self.config_kwargs = { }
 			
 			if self.dimensions is not None:
@@ -2160,13 +2340,18 @@ class Embeddings( Gemini ):
 		
 		"""
 		try:
+			throw_if( 'text', text )
 			self.api_key = cfg.GEMINI_API_KEY
 			throw_if( 'api_key', self.api_key )
+			self.dimensions = dimensions
+			self.task_type = task_type
+			self.title = title
+			self.encoding_format = encoding_format
 			self.input_text = self.normalize_contents( text=text )
-			self.model = str( model or self.model or 'gemini-embedding-001' ).strip( )
-			self.encoding_format = str( encoding_format or 'float' ).strip( ).lower( )
+			self.model = model.strip( )
+			self.encoding_format = encoding_format
 			self.embedding_config = self.build_embedding_config( model=self.model,
-				dimensions=dimensions, task_type=task_type, title=title )
+				dimensions=self.imensions, task_type=self.task_type, title=self.title )
 			self.client = genai.Client( api_key=self.api_key )
 			self.response = self.client.models.embed_content( model=self.model,
 				contents=self.input_text, config=self.embedding_config )
