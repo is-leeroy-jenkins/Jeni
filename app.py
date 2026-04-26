@@ -5006,7 +5006,7 @@ elif mode == 'Document Q&A':
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
-		st.subheader( '📖 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
+		st.subheader( '📓 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
 		st.divider( )
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
@@ -5333,7 +5333,7 @@ elif mode == 'Document Q&A':
 # FILES API MODE
 # ======================================================================================
 elif mode == 'Files':
-	st.subheader( '📁 Files API', help=cfg.FILES_API )
+	st.subheader( '📚 Files API', help=cfg.FILES_API )
 	st.divider( )
 	files = Files( )
 	files_model = st.session_state.get( 'files_model', '' )
@@ -5725,7 +5725,7 @@ elif mode == 'File Search Stores':
 	
 	left, center, right = st.columns( [ 0.025, 0.95, 0.025 ] )
 	with center:
-		st.subheader( '🧊 File Search Stores', help=cfg.VECTORSTORES_API )
+		st.subheader( '📦 File Search Stores', help=cfg.VECTORSTORES_API )
 		st.divider( )
 		st.caption( 'File Search Store Management' )
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
