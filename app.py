@@ -968,24 +968,40 @@ def resolve_gemini_api_key( ) -> Optional[ str ]:
 
 def apply_gemini_runtime_config( ) -> None:
 	"""
-	Ensure Gemini client initializes in API-key mode (not Vertex AI).
+	Ensure Gemini client initializes in API-key mode.
 
-	This avoids: "Project/location and API key are mutually exclusive in the client initializer."
+	This removes Vertex AI routing variables from the process environment and clears
+	the matching config attributes before the Gemini wrapper creates a genai.Client.
+
+	Parameters:
+	-----------
+	None
+
+	Returns:
+	--------
+	None
 	"""
 	key = resolve_gemini_api_key( )
 	if key:
+		os.environ[ "GEMINI_API_KEY" ] = key
 		os.environ[ "GOOGLE_API_KEY" ] = key
 	
-	# Ensure project/location do not get passed when using API key mode.
-	# gemini.py reads these from the shared config module at runtime.
-	try:
-		setattr( cfg, "GOOGLE_CLOUD_PROJECT", None )
-	except Exception:
-		pass
-	try:
-		setattr( cfg, "GOOGLE_CLOUD_LOCATION", None )
-	except Exception:
-		pass
+	for env_name in (
+				"GOOGLE_GENAI_USE_VERTEXAI",
+				"GOOGLE_CLOUD_PROJECT",
+				"GOOGLE_CLOUD_PROJECT_ID",
+				"GOOGLE_CLOUD_LOCATION"):
+		os.environ.pop( env_name, None )
+	
+	for attr_name in (
+				"GOOGLE_GENAI_USE_VERTEXAI",
+				"GOOGLE_CLOUD_PROJECT",
+				"GOOGLE_CLOUD_PROJECT_ID",
+				"GOOGLE_CLOUD_LOCATION"):
+		try:
+			setattr( cfg, attr_name, None )
+		except Exception:
+			pass
 
 # ----------- RESPONSE/CHAT UTILITIES ------------
 
