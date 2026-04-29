@@ -233,7 +233,7 @@ class Chat( Gemini ):
 	safety_profile: Optional[ str ]
 	safety_settings: Optional[ List[ SafetySetting ] ]
 	
-	def __init__( self, model: str='gemini-2.5-flash-lite' ):
+	def __init__( self, model: str = 'gemini-2.5-flash-lite' ):
 		super( ).__init__( )
 		self.gemini_api_key = cfg.GEMINI_API_KEY
 		self.google_api_key = cfg.GOOGLE_API_KEY
@@ -389,7 +389,7 @@ class Chat( Gemini ):
 		return [ 'text/plain',
 		         'application/json',
 		         'text/x.enum' ]
-
+	
 	def get_supported_tools( self, model: str ) -> List[ str ]:
 		"""
 		
@@ -458,7 +458,7 @@ class Chat( Gemini ):
 			exception.method = 'supports_google_maps( self, model: str=None ) -> bool'
 			raise exception
 	
-	def build_urls( self, urls: List[ str ], max_urls: int=10 ) -> List[ str ]:
+	def build_urls( self, urls: List[ str ], max_urls: int = 10 ) -> List[ str ]:
 		"""
 		
 			Purpose:
@@ -520,7 +520,7 @@ class Chat( Gemini ):
 		try:
 			self.content_blocks = [ ]
 			self.content_blocks.append( content.strip( ) )
-			self.urls = urls 
+			self.urls = urls
 			if len( self.urls ) > 0:
 				self.content_blocks.append( 'Reference URLs:\n' + '\n'.join( self.urls ) )
 			
@@ -531,7 +531,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = ('append_urls_to_content( self, **kwargs ) -> str')
 			raise exception
-		
+	
 	def build_tools( self, tools: List[ str ] ) -> List[ Tool ] | None:
 		"""
 		
@@ -566,8 +566,9 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'build_tools( self, tools: List[ str ], file_search_store_names: List[ str ] )'
 			raise exception
-	
-	def build_tool_config( self, tool_choice: str, tools: List[ Tool ] ) -> ToolConfig | None:
+		
+	def build_tool_config( self, tool_choice: str = None,
+			tools: List[ Tool ] = None ) -> ToolConfig | None:
 		"""
 		
 			Purpose:
@@ -585,28 +586,30 @@ class Chat( Gemini ):
 		
 		"""
 		try:
-			throw_if( tool_choice, 'tool_choice' )
-			throw_if( tools, 'tools' )
-			self.tool_choice = tool_choice.strip( ).upper( )
+			self.tool_choice = str( tool_choice or '' ).strip( ).lower( )
 			self.tool_objects = tools if tools is not None else [ ]
-			if not self.tool_choice or self.tool_choice == 'auto':
+			
+			if not self.tool_choice:
+				return None
+			
+			if self.tool_choice == 'auto':
 				return None
 			
 			if len( self.tool_objects ) == 0:
 				return None
 			
-			if self.tool_choice not in [ 'any', 'none', 'validated' ]:
+			if self.tool_choice not in [ 'any', 'none' ]:
 				return None
 			
 			return ToolConfig( function_calling_config=FunctionCallingConfig(
-				mode=self.tool_choice ) )
+				mode=self.tool_choice.upper( ) ) )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = ('build_tool_config( self, **kwargs) -> ToolConfig | None')
 			raise exception
-		
+	
 	def build_modalities( self, modalities: List[ str ] ) -> List[ str ] | None:
 		"""
 			
@@ -641,7 +644,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'build_modalities( self, modalities: List[ str ] )'
 			raise exception
-		
+	
 	def build_reasoning( self, reasoning: str ) -> ThinkingConfig | None:
 		"""
 		
@@ -677,7 +680,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'build_reasoning( self, reasoning: str ) -> ThinkingConfig | None'
 			raise exception
-		
+	
 	def build_safety_settings( self, safety_profile: str ) -> List[ SafetySetting ] | None:
 		"""
 		
@@ -728,7 +731,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'build_safety_settings( self, safety_profile: str )'
 			raise exception
-		
+	
 	def get_output_text( self ) -> Optional[ str ]:
 		"""
 		
@@ -783,7 +786,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'get_output_text( self ) -> Optional[ str ]'
 			raise exception
-		
+	
 	def parse_response_schema( self, response_schema: Any ) -> Any:
 		"""
 		
@@ -821,8 +824,8 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'parse_response_schema( self, response_schema: Any )'
 			raise exception
-		
-	def build_contents( self, prompt: str, content: str, context: List[ Any ]=None ) -> str |  List[ Content ]:
+	
+	def build_contents( self, prompt: str, content: str, context: List[ Any ] = None ) -> str | List[ Content ]:
 		"""
 		
 			Purpose:
@@ -840,7 +843,6 @@ class Chat( Gemini ):
 			Union[ str, List[ Content ] ] - Contents payload for Gemini.
 		
 		"""
-		
 		try:
 			throw_if( 'prompt', prompt )
 			self.prompt = str( prompt ).strip( )
@@ -889,7 +891,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'build_contents( self, prompt: str, content: str, context: List[ Any ]=None )'
 			raise exception
-		
+	
 	def capture_grounding_metadata( self ) -> None:
 		"""
 		
@@ -993,7 +995,7 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'get_grounding_sources( self ) -> List[ Dict[ str, str ] ]'
 			raise exception
-		
+	
 	def get_structured_history( self ) -> List[ Content ] | None:
 		"""
 		
@@ -1030,15 +1032,15 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'get_structured_history( self ) -> List[ Content ] | None'
 			raise exception
-		
-	def build_config( self, model: str = 'gemini-2.5-flash-lite', number: int=None,
-			temperature: float=None, top_p: float=None, top_k: int=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
-			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
-			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
-			modalities: List[ str ]=None, media_resolution: str=None,
-			response_schema: Any=None, safety_profile: str=None,
-			file_search_store_names: List[ str ]=None ) -> GenerateContentConfig:
+	
+	def build_config( self, model: str = 'gemini-2.5-flash-lite', number: int = None,
+			temperature: float = None, top_p: float = None, top_k: int = None,
+			frequency: float = None, presence: float = None, max_tokens: int = None,
+			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
+			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
+			modalities: List[ str ] = None, media_resolution: str = None,
+			response_schema: Any = None, safety_profile: str = None,
+			file_search_store_names: List[ str ] = None ) -> GenerateContentConfig:
 		"""
 		
 			Purpose:
@@ -1086,6 +1088,7 @@ class Chat( Gemini ):
 			self.max_tokens = int( max_tokens or 0 )
 			self.stops = stops if stops is not None else [ ]
 			self.instructions = instruct
+			self.file_search_store_names = file_search_store_names
 			self.response_mime_type = str( response_format or '' ).strip( )
 			self.response_schema = self.parse_response_schema( response_schema )
 			self.safety_settings = self.build_safety_settings( safety_profile )
@@ -1160,17 +1163,18 @@ class Chat( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'build_config( self, model ) -> GenerateContentConfig'
 			raise exception
-		
+	
 	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-			number: int=None, temperature: float=None, top_p: float=None,
-			top_k: int=None, frequency: float=None, presence: float=None, max_tokens: int=None,
-			stops: List[ str ]=None, instruct: str=None, response_format: str=None,
-			tools: List[ str ]=None, tool_choice: str=None, reasoning: str=None,
-			modalities: List[ str ]=None, media_resolution: str=None,
-			context: List[ Dict[ str, Any ] ]=None, content: str=None,
-			urls: List[ str ]=None, max_urls: int=None, response_schema: Any=None,
-			safety_profile: str=None, file_search_store_names: List[ str ]=None,
-			stream: bool = False, stream_handler: Any=None ) -> str | None:
+			number: int = None, temperature: float = None, top_p: float = None,
+			top_k: int = None, frequency: float = None, presence: float = None,
+			max_tokens: int = None,
+			stops: List[ str ] = None, instruct: str = None, response_format: str = None,
+			tools: List[ str ] = None, tool_choice: str = None, reasoning: str = None,
+			modalities: List[ str ] = None, media_resolution: str = None,
+			context: List[ Dict[ str, Any ] ] = None, content: str = None,
+			urls: List[ str ] = None, max_urls: int = None, response_schema: Any = None,
+			safety_profile: str = None, file_search_store_names: List[ str ] = None,
+			stream: bool = False, stream_handler: Any = None ) -> str | None:
 		"""
 		
 			Purpose:
@@ -1210,7 +1214,7 @@ class Chat( Gemini ):
 			--------
 			str | None - The generated text response or None.
 		
-		"""		
+		"""
 		try:
 			throw_if( 'prompt', prompt )
 			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
@@ -3291,6 +3295,7 @@ class Files( Gemini ):
 		self.response_modalities = [ ]
 		self.tools = [ ]
 		self.domains = [ ]
+		self.files = [ ]
 		self.http_options = { }
 		self.storage_client = None
 		self.bucket_id = None
@@ -3453,10 +3458,73 @@ class Files( Gemini ):
 			ex.cause = 'Files'
 			ex.method = 'upload( self, path: str, name: str ) -> Optional[ File ]'
 			raise ex
-	
-	def list( self, model: str='gemini-2.0-flash', temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None, stops: List[ str ]=None ) -> List[ str ]:
+		
+	def list( self, model: str = 'gemini-3.0-flash', top_p: float = 0.8, top_k: int = 50,
+			temperature: float = 0.5, frequency: float = 0.0, presence: float = 0.0,
+			max_tokens: int = 8192, tool_choice: str = 'auto', stops: List[ str ] = None,
+			tools: List[ str ] = None, domains: List[ str ] = None,
+			modalities: List[ str ] = None,
+			media_resolution: str = 'media_resolution_medium' ) -> Any | None:
+		"""
+		
+			Purpose:
+			--------
+			Lists files from the existing Google Cloud Storage-backed file listing path.
+			
+			Parameters:
+			-----------
+			model: str - Gemini model identifier retained for UI compatibility.
+			top_p: float - Nucleus sampling value retained for UI compatibility.
+			top_k: int - Top-k token selection count retained for UI compatibility.
+			temperature: float - Sampling temperature retained for UI compatibility.
+			frequency: float - Frequency penalty retained for UI compatibility.
+			presence: float - Presence penalty retained for UI compatibility.
+			max_tokens: int - Maximum output tokens retained for UI compatibility.
+			tool_choice: str - Tool-choice value retained for UI compatibility.
+			stops: List[ str ] - Stop sequences retained for UI compatibility.
+			tools: List[ str ] - Tool names retained for UI compatibility.
+			domains: List[ str ] - Domain filters retained for UI compatibility.
+			modalities: List[ str ] - Modalities retained for UI compatibility.
+			media_resolution: str - Media resolution retained for UI compatibility.
+			
+			Returns:
+			--------
+			Any | None - List of file names or None.
+			
+		"""
+		try:
+			self.files = [ ]
+			self.model = model
+			self.top_p = top_p
+			self.top_k = top_k
+			self.temperature = temperature
+			self.frequency_penalty = frequency
+			self.presence_penalty = presence
+			self.max_tokens = max_tokens
+			self.tool_choice = tool_choice
+			self.stops = stops if stops is not None else [ ]
+			self.tools = tools if tools is not None else [ ]
+			self.domains = domains if domains is not None else [ ]
+			self.response_modalities = modalities if modalities is not None else [ ]
+			self.media_resolution = media_resolution
+			
+			self.storage_client = storage.Client( )
+			name = 'jeni-financial'
+			prefix = 'regulations'
+			bucket = self.storage_client.bucket( bucket_name=name )
+			
+			for blob in bucket.list_blobs( prefix=prefix ):
+				self.files.append( blob.name )
+			
+			self.file_list = self.files
+			return self.files
+		except Exception as e:
+			ex = Error( e )
+			ex.module = 'gemini'
+			ex.cause = 'Files'
+			ex.method = 'list( self ) -> Any | None'
+			raise ex
+		
 		"""
 			
 			Purpose:

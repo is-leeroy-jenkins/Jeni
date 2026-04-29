@@ -5621,36 +5621,91 @@ elif mode == 'Files':
 						if isinstance( files_resp, list ) else [ ])
 						
 						for f in files_list:
-							rows.append( { 'id': str( getattr( f, 'id', "" ) ),
-							               'filename': str( getattr( f, 'filename', "" ) ),
-							               'files_purpose': str( getattr( f, 'files_purpose', "" ) ), } )
+							if isinstance( f, str ):
+								rows.append( {
+										'id': f,
+										'filename': f,
+										'files_purpose': '',
+								} )
+							elif isinstance( f, dict ):
+								name = (
+										f.get( 'name' )
+										or f.get( 'id' )
+										or f.get( 'filename' )
+										or f.get( 'display_name' )
+										or ''
+								)
+								rows.append( {
+										'id': str( name ),
+										'filename': str( name ),
+										'files_purpose': str( f.get( 'files_purpose', '' ) ),
+								} )
+							else:
+								name = (
+										getattr( f, 'name', None )
+										or getattr( f, 'id', None )
+										or getattr( f, 'filename', None )
+										or getattr( f, 'display_name', None )
+										or ''
+								)
+								rows.append( {
+										'id': str( name ),
+										'filename': str( name ),
+										'files_purpose': str( getattr( f, 'files_purpose', '' ) ),
+								} )
 						
 						st.session_state.files_table = rows
 				
 				except Exception as exc:
 					st.session_state.files_table = None
 					st.error( f'List files failed: {exc}' )
+			
+			files_list = st.session_state.get( 'files_table', [ ] )
+			if files_list:
+				file_ids = [ ]
 				
-				if 'files_list' in locals( ) and files_list:
-					file_ids = [ r.get( 'filename' ) if isinstance( r, dict )
-					             else getattr( r, 'id', None ) for r in files_list ]
-					sel = st.selectbox( label='Select File to Delete', options=file_ids,
-						index=None, placeholder='Options' )
-					if st.button( 'Delete File' ):
-						del_fn = None
-						for name in ('delete_file', 'delete', 'files_delete'):
-							if hasattr( files, name ):
-								del_fn = getattr( files, name )
-								break
-						if not del_fn:
-							st.warning( 'No delete function found on chat object.' )
-						else:
-							with st.spinner( 'Deleting file...' ):
-								try:
-									res = del_fn( sel )
-									st.success( f'Delete result: {res}' )
-								except Exception as exc:
-									st.error( f'Delete failed: {exc}' )
+				for row in files_list:
+					if isinstance( row, dict ):
+						value = (
+								row.get( 'id' )
+								or row.get( 'filename' )
+								or row.get( 'name' )
+								or row.get( 'display_name' )
+						)
+					elif isinstance( row, str ):
+						value = row
+					else:
+						value = (
+								getattr( row, 'name', None )
+								or getattr( row, 'id', None )
+								or getattr( row, 'filename', None )
+								or getattr( row, 'display_name', None )
+						)
+					
+					if value:
+						file_ids.append( str( value ) )
+				
+				file_ids = sorted( set( file_ids ) )
+				
+				sel = st.selectbox( label='Select File to Delete', options=file_ids,
+					index=None, placeholder='Options' )
+				
+				if st.button( 'Delete File' ):
+					del_fn = None
+					for name in ('delete_file', 'delete', 'files_delete'):
+						if hasattr( files, name ):
+							del_fn = getattr( files, name )
+							break
+					
+					if not del_fn:
+						st.warning( 'No delete function found on chat object.' )
+					else:
+						with st.spinner( 'Deleting file...' ):
+							try:
+								res = del_fn( sel )
+								st.success( f'Delete result: {res}' )
+							except Exception as exc:
+								st.error( f'Delete failed: {exc}' )
 		
 		with fls_c2:
 			list_method = None
@@ -5931,7 +5986,6 @@ elif mode == 'Google Cloud Buckets':
 								st.success( f'Uploaded; file id: {fid}' )
 							except Exception as exc:
 								st.error( f"Upload failed: {exc}" )
-
 
 # ======================================================================================
 # PROMPT ENGINEERING MODE
