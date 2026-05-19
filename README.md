@@ -16,7 +16,9 @@ automation of analytical tasks.
 - Vector Store Integration: Embedded vector store lookups for domain-specific knowledge retrieval.
 - Web & File Search: Built-in support for semantic document and web search.
 
-![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/Jeni-streamlit.gif)
+## Demo
+
+![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
   
 
 ## 🔑 API KEY SETUP
