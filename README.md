@@ -18,43 +18,11 @@ automation of analytical tasks.
 
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/Jeni-streamlit.gif)
   
-## 🧠 LLMs 
 
-### ⚙️ [Leeroy](https://huggingface.co/leeroy-jankins/leeroy) 
-Leeroy is a LLM fine-tuned variant of Meta's Llama 3.2 1B Instruct, 
-quantized to Q4_K_M GGUF format for high-efficiency, low-latency inference. 
-Named after the legendary charge-forward ethos, Leeroy specializes in executing user 
-instructions with speed and accuracy — making it the ideal local LLM for 
-both professional tasks and experimental builds. With strong alignment
-capabilities, multilingual robustness, and support for complex multi-step 
-reasoning. Leeroy strikes a balance between performance, size, 
-and instruction quality. Designed for use on CPUs and modest GPUs, 
-Leeroy runs natively in llama.cpp, LM Studio, Ollama, and similar GGUF-compatible environments.  
+## 🔑 API KEY SETUP
 
-- [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://leeroy-py.streamlit.app/)
-- [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/leeroy) 
+- [Gemini API Key](https://github.com/is-leeroy-jenkins/Buddy/blob/main/resources/setup/gemini.md)
 
-### ⚙️  [Bro](https://huggingface.co/leeroy-jankins/bro) 
-Bro is a LLM fine-tuned variant of the gemma-3-1b-it transformer model, optimized for 
-enhanced contextual comprehension, instruction following, and domain-specific reasoning. 
-The fine-tuning process used supervised instruction tuning across multiple NLP domains, 
-with a focus on factual recall, multi-step reasoning, and document comprehension. 
-Built on the lightweight yet powerful Gemma 3 1B architecture, Bro provides a balance 
-between inference speed and linguistic depth — making it suitable for both production 
-deployment and academic research.
-
-- [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://bro-py.streamlit.app/)
-- [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/bro)
-
-### ⚙️  [Bubba](https://huggingface.co/leeroy-jankins/bubba) 
-Bubba is a fine-tuned LLM based on OpenAI’s Chat GPT-5. This release packages the 
-fine-tuned weights (or adapters) for practical, low-latency instruction following, 
-summarization, reasoning, and light code generation. It is intended for local or
-self-hosted environments and RAG (Retrieval-Augmented Generation) stacks that
-require predictable, fast outputs.
-
-- [![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://gipity.streamlit.app/)
-- [![HuggingFace](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/leeroy-jankins/bubba) 
 
 ## 🧭 Table of Contents
 
@@ -73,6 +41,30 @@ require predictable, fast outputs.
   - 🧬 [Embeddings](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-embeddings)
   - 🔊 [Text-to-Speech](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-text-to-speech-tts) (TTS)
   - 🎙️ [Transcription/Translation](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#%EF%B8%8F-transcription--translation-whisper) (Whisper)
+
+## 🧰 Overview
+
+Jeni wraps the latest **Gemini Python SDK** with a thin class hierarchy:
+
+- **Gemini(base)** – holds the single `Gemini` client, env config, and shared helpers.
+- **Chat / Assistant / Bro / Bubba** – opinionated text assistants using the **Responses API**.
+- **Image / LargeImage** – image generation and vision analysis.
+- **Embedding** – small/large/legacy embeddings with consistent return types.
+- **TTS** – text-to-speech helpers (streaming to file).
+- **Transcription / Translation** – Whisper-powered speech-to-text (+ translate).
+- **Vector Store helpers** – list files, search via `file_search` tool, merge results.
+
+### ✨ Features
+
+- **Responses-first**: consistent `input=[{role, content:[{type:...}]}]` builders.
+- **One client**: a single `OpenAI` instance per process for reliability and testability.
+- **Typed containers**: Pydantic models for prompts/messages with pass-through `__init__`.
+- **Vector search**: easy `file_search` tools + helpers to fetch file IDs from vector stores.
+- **Audio**: TTS (stream-to-file), ASR (transcribe), and translate via Whisper.
+- **Vision & Images**: multimodal analysis (4o/4o-mini) and image generation (DALL·E 3).
+- **Guardrails**: tiny helpers that prevent recurring mistakes (e.g., `inputs` vs `input`,
+  content `type` keys, size strings, binary file handling).
+- **Uniform errors**: `GptError` + `ErrorDialog` with `module/cause/method` metadata.
 
 ## 📦 Installation
 
@@ -208,30 +200,6 @@ http://localhost:8501
   model availability and configuration.
 * If a capability is unavailable in a given environment, the UI will **degrade gracefully**
   and display an informational message rather than failing.
-
-## 🧰 Overview
-
-Jeni wraps the latest **Gemini Python SDK** with a thin class hierarchy:
-
-- **Gemini(base)** – holds the single `Gemini` client, env config, and shared helpers.
-- **Chat / Assistant / Bro / Bubba** – opinionated text assistants using the **Responses API**.
-- **Image / LargeImage** – image generation and vision analysis.
-- **Embedding** – small/large/legacy embeddings with consistent return types.
-- **TTS** – text-to-speech helpers (streaming to file).
-- **Transcription / Translation** – Whisper-powered speech-to-text (+ translate).
-- **Vector Store helpers** – list files, search via `file_search` tool, merge results.
-
-### ✨ Features
-
-- **Responses-first**: consistent `input=[{role, content:[{type:...}]}]` builders.
-- **One client**: a single `OpenAI` instance per process for reliability and testability.
-- **Typed containers**: Pydantic models for prompts/messages with pass-through `__init__`.
-- **Vector search**: easy `file_search` tools + helpers to fetch file IDs from vector stores.
-- **Audio**: TTS (stream-to-file), ASR (transcribe), and translate via Whisper.
-- **Vision & Images**: multimodal analysis (4o/4o-mini) and image generation (DALL·E 3).
-- **Guardrails**: tiny helpers that prevent recurring mistakes (e.g., `inputs` vs `input`,
-  content `type` keys, size strings, binary file handling).
-- **Uniform errors**: `GptError` + `ErrorDialog` with `module/cause/method` metadata.
 
 ## ⚡ Quickstart
 
