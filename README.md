@@ -1,569 +1,579 @@
 ###### Jeni
+
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni_project.png)
 
-A Python framework for building, deploying, and managing AI-powered assistants
-tailored for federal data analysis, budget execution, and data science. Jeni integrates OpenAI's GPT, 
-Google's Gemini API with multimodal support for text, image, audio, and file analysis 
-and is designed with extensibility and federal applications in mind, it enables secure, scalable, and intelligent
-automation of analytical tasks.
+<p align="center">
+  <a href="#-overview">Overview</a> |
+  <a href="#-features">Features</a> |
+  <a href="#-application-modes">Application Modes</a> |
+  <a href="#-requirements">Requirements</a> |
+  <a href="#-api-key-setup">API Key Setup</a> |
+  <a href="#-installation">Installation</a> |
+  <a href="#-running-the-streamlit-application">Run App</a> |
+  <a href="#-configuration">Configuration</a> |
+  <a href="#-design-and-architecture">Architecture</a> |
+  <a href="#-capabilities">Capabilities</a> |
+  <a href="#-data-management">Data Management</a> |
+  <a href="#-file-organization">File Organization</a> |
+  <a href="#-license">License</a>
+</p>
+
+Jeni is a Python and Streamlit application for building, running, and managing
+Gemini-powered analytical assistants. It supports text generation, image generation and
+analysis, image editing, audio transcription, audio translation, text-to-speech, embeddings,
+document question answering, Gemini file operations, file-search stores, Google Cloud bucket
+management, prompt engineering, SQLite-backed data management, and export workflows.
+
+Jeni is designed for federal data analysis, budget execution support, document review,
+knowledge retrieval, prompt management, and multimodal artificial intelligence experimentation.
 
 ## 🎥 Demo
 
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
-  
 
 ## 🧱 Databricks
-[![Jeni](https://img.shields.io/badge/Databricks-Jeni-FF3621?logo=databricks&logoColor=white)](https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351)
-- A data engineering, analytics, and artificial intelligence collaborative workspace
-- Codebase
 
-## 🛠️ Features
+[![Jeni](https://img.shields.io/badge/Databricks-Jeni-FF3621?logo=databricks\&logoColor=white)](https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351)
 
-- Unified AI Framework: Integrates OpenAI APIs for text, image, audio, file analysis, transcription,
-  and translation.
-- Multimodal Capabilities: Supports text generation, image creation, image analysis, and document
-  summarization.
-- Vector Store Integration: Embedded vector store lookups for domain-specific knowledge retrieval.
-- Web & File Search: Built-in support for semantic document and web search.
+* Databricks workspace repository for the Jeni codebase.
+* Supports collaborative development, analytics, notebook execution, and application deployment.
 
-## 🔑 API KEY SETUP
+## 🚀 Application Badges
 
-- [Gemini API Key](https://github.com/is-leeroy-jenkins/Buddy/blob/main/resources/setup/gemini.md)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python\&logoColor=white)](#-requirements)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit\&logoColor=white)](#-running-the-streamlit-application)
+[![Gemini](https://img.shields.io/badge/Google-Gemini-4285F4?logo=google\&logoColor=white)](#-api-key-setup)
+[![SQLite](https://img.shields.io/badge/SQLite-Data%20Store-003B57?logo=sqlite\&logoColor=white)](#-data-management)
+[![Google Cloud](https://img.shields.io/badge/Google%20Cloud-Buckets-4285F4?logo=googlecloud\&logoColor=white)](#-google-cloud-buckets)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](#-license)
 
 
-## 🧭 Table of Contents
-
-- 🧰 [Overview](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-overview)
-- ✨ [Features](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-features)
-- ⚡ [Quickstart](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-quickstart)
-- 🔧 [Configuration](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-configuration)
-- 🧩 [Design & Architecture](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-design--architecture)
-- 🧪 Usage Examples
-  - 📝 [Text generation](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-text-generation)
-  - 🌐 [Web Search](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-web-search-responses) (Responses)
-  - 📄 [Document Summarization](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-summarize-a-document-file-grounded) (file-grounded)
-  - 🗂️ [File search](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#%EF%B8%8F-file-search-vector-stores) (vector stores)
-  - 👀 [Vision](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-vision-analyze-an-image): analyze an image
-  - 🖼️ Images: [generate](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-image-generation) / [edit](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#%EF%B8%8F-images-generate--edit)
-  - 🧬 [Embeddings](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-embeddings)
-  - 🔊 [Text-to-Speech](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#-text-to-speech-tts) (TTS)
-  - 🎙️ [Transcription/Translation](https://github.com/is-leeroy-jenkins/Jeni?tab=readme-ov-file#%EF%B8%8F-transcription--translation-whisper) (Whisper)
 
 ## 🧰 Overview
 
-Jeni wraps the latest **Gemini Python SDK** with a thin class hierarchy:
+- Core classes imported by the application include:
 
-- **Gemini(base)** – holds the single `Gemini` client, env config, and shared helpers.
-- **Chat / Assistant / Bro / Bubba** – opinionated text assistants using the **Responses API**.
-- **Image / LargeImage** – image generation and vision analysis.
-- **Embedding** – small/large/legacy embeddings with consistent return types.
-- **TTS** – text-to-speech helpers (streaming to file).
-- **Transcription / Translation** – Whisper-powered speech-to-text (+ translate).
-- **Vector Store helpers** – list files, search via `file_search` tool, merge results.
+| Class           | Purpose                                                                    |
+| --------------- | -------------------------------------------------------------------------- |
+| `Chat`          | Text generation and Google-grounded Gemini chat workflows                  |
+| `Images`        | Image generation, image analysis, image editing, and image search support  |
+| `Embeddings`    | Text embedding generation and vector preparation                           |
+| `Transcription` | Audio-to-text transcription                                                |
+| `Translation`   | Audio translation workflows                                                |
+| `TTS`           | Text-to-speech generation                                                  |
+| `Files`         | Gemini Files API workflows                                                 |
+| `FileSearch`    | File-search store creation, retrieval, deletion, and file upload workflows |
+| `CloudBuckets`  | Google Cloud bucket creation, retrieval, deletion, and upload workflows    |
 
-### ✨ Features
+## ✨ Features
 
-- **Responses-first**: consistent `input=[{role, content:[{type:...}]}]` builders.
-- **One client**: a single `OpenAI` instance per process for reliability and testability.
-- **Typed containers**: Pydantic models for prompts/messages with pass-through `__init__`.
-- **Vector search**: easy `file_search` tools + helpers to fetch file IDs from vector stores.
-- **Audio**: TTS (stream-to-file), ASR (transcribe), and translate via Whisper.
-- **Vision & Images**: multimodal analysis (4o/4o-mini) and image generation (DALL·E 3).
-- **Guardrails**: tiny helpers that prevent recurring mistakes (e.g., `inputs` vs `input`,
-  content `type` keys, size strings, binary file handling).
-- **Uniform errors**: `GptError` + `ErrorDialog` with `module/cause/method` metadata.
+* **Gemini-first interface** for text, image, audio, document, embedding, file, and cloud workflows.
+* **Single Streamlit application** with explicit mode selection in the sidebar.
+* **Text generation controls** for model selection, temperature, Top-P, Top-K, frequency penalty,
+  presence penalty, output format, response schema, safety profile, stop sequences, stream mode,
+  Google Search grounding, and URL context.
+* **Image workflows** for generation, analysis, and editing with aspect ratio, output MIME type,
+  response modality, Google Search grounding, and image-search options where supported.
+* **Audio workflows** for transcription, translation, and text-to-speech using uploaded audio files
+  or recorded browser audio.
+* **Document Q&A** with local document loading, text extraction, chunking, embeddings, and
+  SQLite vector retrieval with fallback cosine similarity.
+* **Embedding mode** with text normalization, chunking, token metrics, vector display, and
+  configurable embedding dimensions and encoding format.
+* **Files API mode** for server-side file upload and file operations.
+* **File Search Stores mode** for creating, retrieving, deleting, and uploading files to file-search
+  stores.
+* **Google Cloud Buckets mode** for creating, retrieving, deleting, and uploading files to cloud
+  bucket-backed workflows.
+* **Prompt Engineering mode** backed by a local SQLite `Prompts` table.
+* **Data Export mode** for exporting prompt and data assets.
+* **Data Management mode** for SQLite import, browsing, CRUD operations, profiling, filtering,
+  aggregation, visualization, administration, and safe SQL queries.
+* **Footer status bar** showing provider, mode, model, and active runtime settings.
 
-## 📦 Installation
+## 🧩 Application Modes
 
-#### 1. Clone the Repository
-
-```
-bash
-git clone https://github.com/your-username/Jeni.git
-cd Jeni
-```
-
-#### 2. Create and Activate a Virtual Environment
-
-```
-bash
-python -m venv venv
-venv\Scripts\activate
-```
-
-#### 3. Install Dependencies
-
-```
-bash
-pip install -r requirements.txt
-```
-
-## ⚙️ Core Classes
-
-- `Gemini`: Base class that provides shared API setup, keys, and model configurations.
-- `Chat`, `Assistant`, `Bubba`, `Bro`: Extend `AI` to provide domain-specific implementations.
-- `Schemas`, `Header`, `EndPoint`: Configuration utilities for model selection, headers, and
-  endpoints.
-- `Prompt`, `Message`, `Response`, `File`, `Reasoning`: Pydantic models for structured data
-  exchange.
-
-## 💻 Capabilities
-
-| Capability        | Description                                                                 |
-|-------------------|-----------------------------------------------------------------------------|
-| Text Generation   | GPT-powered completions, instructions, and prompts                          |
-| Image Generation  | DALL·E 3-based prompt-to-image generation                                   |
-| Image Analysis    | Multimodal image+text inference using vision models                         |
-| Document Summary  | File upload + prompt-driven summarization via OpenAI file API               |
-| Web Search        | Integrated API call to perform web-based lookups                            |
-| File Search       | Vector store lookup with prompt-based semantic matching                     |
-| Model Registry    | Fine-tuned and base model tracking for GPT-4, GPT-4o, and others            |
-| Assistant List    | Query and list named assistant objects from the OpenAI API                  |
+| Mode                   | Description                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `Text`                 | Gemini text generation with system prompts, templates, grounding, URL context, schema output, and streaming. |
+| `Images`               | Image generation, image analysis, and image editing using Gemini image-capable models.                       |
+| `Audio`                | Audio transcription, audio translation, browser recording, uploaded audio processing, and text-to-speech.    |
+| `Embedding`            | Text normalization, chunking, embedding generation, metrics, and vector inspection.                          |
+| `Document Q&A`         | Upload and preview documents, build a local retrieval index, and ask document-grounded questions.            |
+| `Files`                | Manage Gemini Files API operations and related file metadata.                                                |
+| `File Search Stores`   | Create, retrieve, delete, and upload files to file-search stores.                                            |
+| `Google Cloud Buckets` | Create, retrieve, delete, and upload files to Google Cloud bucket-backed workflows.                          |
+| `Prompt Engineering`   | Manage reusable prompts in the local SQLite `Prompts` table.                                                 |
+| `Data Export`          | Export prompts, system instructions, and local data assets.                                                  |
+| `Data Management`      | Import, browse, edit, profile, filter, aggregate, visualize, administer, and query SQLite data.              |
 
 ## 🛠️ Requirements
 
-- Python 3.10+
-- OpenAI Python SDK
-- Pydantic
-- Numpy, Pandas
-- Tiktoken
-- Requests
-- Custom dependencies: `boogr`, `static`, `guro`
+| Requirement                            | Purpose                                                                    |
+| -------------------------------------- | -------------------------------------------------------------------------- |
+| Python 3.10+                           | Runtime environment                                                        |
+| Streamlit                              | Web application framework                                                  |
+| google-genai / Gemini SDK dependencies | Gemini client access                                                       |
+| pandas                                 | DataFrame operations and SQLite table display                              |
+| numpy                                  | Vector math and cosine similarity                                          |
+| plotly                                 | Interactive visualizations                                                 |
+| tiktoken                               | Token counting                                                             |
+| sentence-transformers                  | Local document embedding model                                             |
+| sqlite-vec                             | SQLite vector table support                                                |
+| PyMuPDF / `fitz`                       | PDF text extraction                                                        |
+| reportlab                              | PDF export support                                                         |
+| boogr                                  | Application error handling                                                 |
+| config.py                              | Application constants, model lists, paths, labels, and API defaults        |
+| SQLite                                 | Local persistence for prompts, chat history, embeddings, and imported data |
 
-## 📁 File Organization
+## 🔑 API Key Setup
 
-- [boo](https://github.com/is-leeroy-jenkins/Jeni/blob/main/boo.py) – Main application framework
-- [schema](https://github.com/is-leeroy-jenkins/Jeni/blob/main/models.py) – Models used for structured output
-- [boogr](https://github.com/is-leeroy-jenkins/Jeni/blob/main/boogr.py) – a GUI
-- [agents](https://github.com/is-leeroy-jenkins/Jeni/blob/main/guro.py) – a prompt library w/ over 100 agents.
-- [data](https://github.com/is-leeroy-jenkins/Jeni/tree/main/dbops.py) - Local persistance of embeddings for retreival augmentation base on SLQite. 
+Jeni reads API and cloud configuration from `config.py`, environment variables, and Streamlit session
+state. Sidebar-entered values override configuration defaults for the current session.
 
-## 🔐 Environment Variables
+| Key / Setting             | Used For                                           |
+| ------------------------- | -------------------------------------------------- |
+| `GEMINI_API_KEY`          | Gemini API access                                  |
+| `GOOGLE_API_KEY`          | Google API access and Gemini API-key mode fallback |
+| `GOOGLE_CSE_ID`           | Google Custom Search integration                   |
+| `GOOGLEMAPS_API_KEY`      | Google Maps-related workflows                      |
+| `GOOGLE_CLOUD_PROJECT_ID` | Google Cloud project routing                       |
+| `GOOGLE_CLOUD_LOCATION`   | Google Cloud regional configuration                |
 
-Set the following in your environment or `.env` file:
+Helpful setup references:
+
+* [Gemini API Key](https://github.com/is-leeroy-jenkins/Buddy/blob/main/resources/setup/gemini.md)
+
+## 📦 Installation
+
+### 1. Clone the Repository
 
 ```bash
-
-  GOOGLE_API_KEY=<your_api_key>
-
+git clone https://github.com/is-leeroy-jenkins/Jeni.git
+cd Jeni
 ```
 
-## 🚀 Streamlit Application
+### 2. Create and Activate a Virtual Environment
 
-Jeni includes a **first-class, single-page Streamlit application** that exposes the framework’s
-core capabilities through a unified graphical interface.
+Windows PowerShell:
 
-The Streamlit app is designed for:
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
 
-* Interactive analysis
-* Multimodal experimentation
-* Demonstrations and internal tools
-* Rapid prototyping on top of Jeni’s agents and models
+Command Prompt:
 
-The application runs entirely on top of Jeni’s core APIs and does **not** modify or duplicate
-framework logic.
+```cmd
+python -m venv .venv
+.venv\Scripts\activate.bat
+```
 
-[![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://boo-py.streamlit.app/)
+macOS / Linux:
 
-![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/Jeni-streamlit.gif)
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
 
-## Supported Capabilities
+### 3. Install Dependencies
 
-The Streamlit application supports the following workflows:
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-* 💬 **Chat-based Q&A**
-* 📄 **Document-grounded question answering**
-* 🖼️ **Image generation**
-* ✏️ **Image editing**
-* 🔍 **Image analysis (vision)**
-* 🎙️ **Audio transcription**
-* 🌍 **Audio translation**
-* 🧠 **Dynamic model switching**
-* 🧩 **Tool, reasoning, and source inspection (when available)**
+## ⚙️ Configuration
 
-All workflows are exposed from a **single application page** with explicit mode selection,
-ensuring clear separation between text, document, image, and audio tasks.
+Set the required values in `config.py`, environment variables, or the Streamlit sidebar.
 
----
+Example environment variables:
 
-### Running the Streamlit Application
+```bash
+export GEMINI_API_KEY="your-gemini-api-key"
+export GOOGLE_API_KEY="your-google-api-key"
+export GOOGLE_CSE_ID="your-google-custom-search-id"
+export GOOGLEMAPS_API_KEY="your-google-maps-api-key"
+export GOOGLE_CLOUD_PROJECT_ID="your-google-cloud-project-id"
+export GOOGLE_CLOUD_LOCATION="us-central1"
+```
+
+Windows PowerShell:
+
+```powershell
+setx GEMINI_API_KEY "your-gemini-api-key"
+setx GOOGLE_API_KEY "your-google-api-key"
+setx GOOGLE_CSE_ID "your-google-custom-search-id"
+setx GOOGLEMAPS_API_KEY "your-google-maps-api-key"
+setx GOOGLE_CLOUD_PROJECT_ID "your-google-cloud-project-id"
+setx GOOGLE_CLOUD_LOCATION "us-central1"
+```
+
+## 🚀 Running the Streamlit Application
 
 From the project root:
 
 ```bash
-pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Once running, the application will be available at:
+Once running, the application is available at:
 
-```
+```text
 http://localhost:8501
 ```
 
-### Notes
+## 🧠 Text Generation
 
-* Some capabilities (image generation, audio transcription, translation, etc.) depend on
-  model availability and configuration.
-* If a capability is unavailable in a given environment, the UI will **degrade gracefully**
-  and display an informational message rather than failing.
+The `Text` mode provides Gemini chat and text generation through the `Chat` wrapper.
 
-## ⚡ Quickstart
+Supported controls include:
 
-1) **Install**
+| Control Group                | Options                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| Model Settings               | Model, thinking level, response modalities, media resolution, candidates                          |
+| Inference Settings           | Temperature, Top-P, Top-K, frequency penalty, presence penalty                                    |
+| Grounding / Context Settings | Google Search grounding, URL list, maximum URLs                                                   |
+| Output / Response Settings   | Max tokens, response MIME type, JSON response schema, stop sequences, safety profile, stream mode |
+| System Prompt                | Manual system instructions, prompt-template loading, clear button, XML-to-Markdown conversion     |
+
+## 📷 Images
+
+The `Images` mode supports three tabs:
+
+| Tab      | Purpose                                          |
+| -------- | ------------------------------------------------ |
+| Generate | Create images from text prompts                  |
+| Analyze  | Upload an image and ask Gemini to analyze it     |
+| Edit     | Upload an image and provide editing instructions |
+
+Image controls include:
+
+* Image mode: `Generation`, `Analysis`, or `Editing`
+* Model selection by workflow type
+* Temperature and Top-P
+* Max output tokens
+* Candidate count
+* Response mode
+* Output MIME type
+* Aspect ratio
+* Image size where supported
+* Google Search grounding where supported
+* Google Image Search where supported
+
+## 🎧 Audio
+
+The `Audio` mode supports:
+
+| Workflow       | Description                                  |
+| -------------- | -------------------------------------------- |
+| Transcribe     | Convert uploaded or recorded audio into text |
+| Translate      | Translate uploaded or recorded audio         |
+| Text-to-Speech | Generate speech from typed text              |
+
+Audio controls include:
+
+* Task selection
+* Model selection
+* Language selection
+* Voice selection for TTS
+* Sample rate
+* Output format
+* Temperature
+* Top-P
+* frequency penalty
+* presence penalty
+* loop and autoplay
+* start and end time
+* max output tokens
+* system prompt template support
+
+## 🔢 Embeddings
+
+The `Embedding` mode supports:
+
+* Embedding model selection
+* Encoding format selection
+* Dimension selection
+* Chunk-size control
+* Chunk-overlap control
+* Text normalization
+* Text chunking
+* Embedding generation
+* Token, word, unique-word, type-token ratio, and character metrics
+* Vector display in a Streamlit data editor
+
+## 📓 Document Q&A
+
+The `Document Q&A` mode supports local document upload and retrieval-augmented question answering.
+
+Supported document loading includes:
+
+* `pdf`
+* `txt`
+* `md`
+* `docx`
+
+The workflow includes:
+
+1. Upload a document.
+2. Preview the document when possible.
+3. Extract text from the file.
+4. Normalize and chunk the text.
+5. Generate embeddings using `sentence-transformers`.
+6. Store vectors in `sqlite-vec` when available.
+7. Fall back to in-memory cosine similarity when vector-table support is unavailable.
+8. Retrieve relevant chunks.
+9. Build a document-grounded prompt.
+10. Return an answer through the chat pipeline.
+
+## 📚 Files API
+
+The `Files` mode exposes Gemini file-oriented workflows through the `Files` wrapper.
+
+Common workflows include:
+
+* File upload
+* File ID tracking
+* File metadata review
+* File purpose/type management
+* File-backed prompt workflows where supported by the selected model
+
+## 📦 File Search Stores
+
+The `File Search Stores` mode supports file-search store management through the `FileSearch`
+wrapper.
+
+Supported workflows include:
+
+| Workflow | Description                                  |
+| -------- | -------------------------------------------- |
+| Create   | Create a new file-search store               |
+| Retrieve | Retrieve store metadata                      |
+| Delete   | Delete a selected file-search store          |
+| Upload   | Upload supported files to the selected store |
+
+Supported upload types include:
+
+* `pdf`
+* `txt`
+* `md`
+* `docx`
+* `png`
+* `jpg`
+* `jpeg`
+
+## 🧊 Google Cloud Buckets
+
+The `Google Cloud Buckets` mode supports cloud bucket management through the `CloudBuckets`
+wrapper.
+
+Supported workflows include:
+
+| Workflow | Description                                                        |
+| -------- | ------------------------------------------------------------------ |
+| Create   | Create a new cloud bucket                                          |
+| Retrieve | Retrieve cloud bucket metadata                                     |
+| Delete   | Delete a selected cloud bucket                                     |
+| Upload   | Upload supported files through the available wrapper upload method |
+
+## 📝 Prompt Engineering
+
+The `Prompt Engineering` mode manages reusable prompts stored in the local SQLite `Prompts`
+table.
+
+Prompt records include:
+
+| Field       | Description                                |
+| ----------- | ------------------------------------------ |
+| `PromptsId` | Primary key                                |
+| `Caption`   | Display caption used by template selectors |
+| `Name`      | Prompt name                                |
+| `Text`      | Prompt body                                |
+| `Version`   | Prompt version                             |
+| `ID`        | External or user-defined identifier        |
+
+Prompt Engineering supports:
+
+* Prompt search
+* Prompt sorting
+* Prompt pagination
+* Prompt selection
+* Prompt editing
+* Prompt insertion
+* Prompt update
+* Prompt deletion
+* Cascading selected prompts into system instructions
+
+## 📭 Data Export
+
+The `Data Export` mode supports application export workflows, including prompt/system-instruction
+export and local data export where configured.
+
+## 🏛️ Data Management
+
+The `Data Management` mode provides a SQLite administration and exploration interface.
+
+Tabs include:
+
+| Tab       | Purpose                                                  |
+| --------- | -------------------------------------------------------- |
+| Import    | Import external data into SQLite                         |
+| Browse    | Browse local SQLite tables                               |
+| CRUD      | Insert, update, and delete rows                          |
+| Explore   | Preview and inspect current data                         |
+| Filter    | Apply advanced filters                                   |
+| Aggregate | Run aggregation operations                               |
+| Visualize | Build charts from table data                             |
+| Admin     | Drop tables, create tables, create indexes, alter schema |
+| SQL       | Execute safe read-only SQL queries                       |
+
+Visualization options include:
+
+* Histogram
+* Bar chart
+* Line chart
+* Scatter plot
+* Box plot
+* Pie chart
+* Correlation heatmap
+
+SQL execution is guarded by a read-only validator that allows `SELECT`, `WITH`, `EXPLAIN`, and
+read-oriented `PRAGMA` statements while blocking destructive operations such as `INSERT`, `UPDATE`,
+`DELETE`, `DROP`, `ALTER`, `CREATE`, `ATTACH`, `DETACH`, `VACUUM`, `REPLACE`, and `TRIGGER`.
+
+## 🧩 Design and Architecture
+
+Jeni uses a traditional layered Streamlit architecture:
+
+| Layer             | Description                                                                                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI Layer          | Streamlit sidebar, expanders, tabs, chat messages, uploaders, data editors, and charts                                                                   |
+| Mode Layer        | Mode-specific Streamlit blocks for Text, Images, Audio, Embedding, Document Q&A, Files, Stores, Buckets, Prompt Engineering, Export, and Data Management |
+| Wrapper Layer     | Gemini helper classes imported from `gemini.py`                                                                                                          |
+| Persistence Layer | SQLite database under `stores/sqlite`                                                                                                                    |
+| Retrieval Layer   | `sentence-transformers`, `sqlite-vec`, chunking, and cosine similarity fallback                                                                          |
+| Utility Layer     | Token counting, file saving, text normalization, markdown/XML conversion, usage tracking, and error handling                                             |
+
+## 💻 Capabilities
+
+| Capability           | Description                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| Text Generation      | Gemini-powered chat and prompt response generation                                                      |
+| Google Grounding     | Optional Google Search grounding in Text and supported Image workflows                                  |
+| URL Context          | URL inputs can be added to text-generation context                                                      |
+| System Prompts       | System-instruction text areas with template loading and XML/Markdown conversion                         |
+| Image Generation     | Prompt-to-image generation through Gemini image models                                                  |
+| Image Analysis       | Uploaded image analysis using Gemini multimodal models                                                  |
+| Image Editing        | Uploaded image editing with text instructions                                                           |
+| Audio Transcription  | Uploaded or recorded audio converted to text                                                            |
+| Audio Translation    | Uploaded or recorded audio translated into the selected language                                        |
+| Text-to-Speech       | Text converted into generated audio                                                                     |
+| Embeddings           | Text chunking and vector generation                                                                     |
+| Document Q&A         | Local retrieval-augmented document question answering                                                   |
+| Files API            | Gemini file upload and metadata workflows                                                               |
+| File Search Stores   | File-search store creation, retrieval, deletion, and upload                                             |
+| Google Cloud Buckets | Cloud bucket creation, retrieval, deletion, and upload                                                  |
+| Prompt Engineering   | SQLite-backed reusable prompt management                                                                |
+| Data Export          | Export workflows for prompt and local data assets                                                       |
+| Data Management      | SQLite import, browse, CRUD, profile, filter, aggregate, visualize, administer, and SQL query workflows |
+
+## 📁 File Organization
+
+| File / Folder                                                                              | Description                                                                    |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| [`app.py`](https://github.com/is-leeroy-jenkins/Jeni/blob/main/app.py)                     | Main Streamlit application                                                     |
+| [`gemini.py`](https://github.com/is-leeroy-jenkins/Jeni/blob/main/gemini.py)               | Gemini wrapper classes                                                         |
+| [`config.py`](https://github.com/is-leeroy-jenkins/Jeni/blob/main/config.py)               | Constants, paths, model lists, API defaults, UI labels, and help text          |
+| [`requirements.txt`](https://github.com/is-leeroy-jenkins/Jeni/blob/main/requirements.txt) | Python package requirements                                                    |
+| `stores/sqlite/Data.db`                                                                    | Local SQLite database for prompts, chat history, embeddings, and imported data |
+| `resources/images`                                                                         | Project images, logos, and README assets                                       |
+| `resources/setup`                                                                          | API key and setup documentation                                                |
+
+## 🧪 Example Usage
+
+### Text Generation
 
 ```python
+from gemini import Chat
 
-  pip install google-genai google pydantic
+chat = Chat()
+response = chat.generate_text(
+    prompt="Explain how random forests reduce overfitting.",
+    model="gemini-2.0-flash"
+)
 
+print(response)
 ```
 
-2) **Configure**
+### Embeddings
 
 ```python
+from gemini import Embeddings
 
-# Power your client via environment
-export GOOGLE_API_KEY="sk-..."         # macOS/Linux
-setx GOOGLE_API_KEY "sk-..."           # Windows
+embedding = Embeddings()
+vectors = embedding.create(
+    text=["Federal budget execution requires accurate obligations tracking."],
+    model="text-embedding-004",
+    task_type="RETRIEVAL_DOCUMENT"
+)
 
+print(vectors)
 ```
 
-3) **Hello Jeni**
+### Image Generation
 
 ```python
+from gemini import Images
 
-  from boo import Chat
-  
-  chat = Chat()
-  print(chat.generate_text("Say hello in one short sentence."))
+images = Images()
+result = images.generate(
+    prompt="A clean technical diagram of a retrieval augmented generation pipeline.",
+    model="gemini-2.5-flash-image-preview"
+)
 
+print(result)
 ```
 
-## 🔧 Configuration
-
-- **Environment**
-  - `GOOGLE_API_KEY` (required)
-- **Models**
-  - Text/Responses: e.g., `gpt-4o-mini`, `gpt-4o`, `gpt-4.1-mini`
-  - Images: `dall-e-3`
-  - Embeddings: `text-embedding-3-small`, `text-embedding-3-large`
-  - TTS: `gpt-4o-mini-tts`, `tts-1`, `tts-1-hd`
-  - ASR/Translate: `whisper-1`
-- **File Stores (optional)**
-  - Configure your store IDs once; Jeni converts to lists when calling tools.
-
-## 🧩 Design & Architecture
-
-- **Single client**: `Client(api_key=...)` is created in `gemini.__init__()` and reused everywhere.
-- **Schema helpers**: tiny, battle-tested builders ensure payloads are valid for the Responses API:
-  - input text only
-  - text + file
-  - text + image
-- **No duplicate methods**: each capability has one canonical implementation per class.
-- **Type-safe Pydantic**: BaseModel subclasses do **not** override `__init__` except with
-  pass-through `def __init__(self, **data): super().__init__(**data)`.
-- **Consistent naming**: `vector_stores` (with underscore), `response_format`, `output_text`.
-
-## 🔤 Text Generation
-
-- Generate high-quality responses using OpenAI's GPT models.
-- Supports parameter tuning (temperature, top_p, frequency penalties).
-- Ideal for summarization, explanations, and knowledge retrieval.
+### Audio Transcription
 
 ```python
+from gemini import Transcription
 
-  from jeni import Chat
-  
-  bro = Chat( )
-  response = bro.generate_text( "Explain how random forests handle overfitting." )
-  print( response )
+transcriber = Transcription()
+text = transcriber.transcribe(
+    "audio/meeting.m4a",
+    model="gemini-2.0-flash"
+)
 
+print(text)
 ```
 
-## 🎨 Image Generation (IMAGEN)
-
-- Convert natural language prompts into images using IMAGEN 3.
-- Specify resolution and rendering quality options.
-- Useful for creating visual illustrations and conceptual diagrams.
+### Text-to-Speech
 
 ```python
+from gemini import TTS
 
-image_url = jeni.generate_image("A conceptual illustration of quantum computing in federal AI")
-print(f"Image URL: {image_url}")
+tts = TTS()
+audio_bytes = tts.create_speech(
+    "Hello from Jeni.",
+    model="gemini-2.5-flash-preview-tts",
+    voice="Kore"
+)
 
+print(type(audio_bytes))
 ```
 
-### 🖼️ Image Analysis
-
-- Analyze visual content by combining image and text prompts.
-
-- Extract meaning, context, or structure from images.
-
-- Leverages Imagen3/4's vision capabilities for advanced perception.
-
-``` python
-  
-  url = "https://example.com/sample-image.png"
-  response = jeni.analyze_image("Describe the primary elements in this image", url)
-  print(response)
-
-```
-
-### 📄 Document Summarization
-
-- Upload and process document files directly into the assistant.
-
-- Use prompts to extract insights or summarize content.
-
-- Supports PDFs, DOCX, and other file formats via Gemini's File Store API.
-
-``` python
-  
-  file_path = "data/federal_strategy.pdf"
-  summary = bro.summarize_document( prompt = "Summarize key national cybersecurity strategies.",
-    path = file_path  )
-    
-  print( summary )
-
-```
-
-### 🔍 File Search with Vector Stores
-
-- Embed and store documents in vector stores for semantic search.
-
-- Retrieve contextually relevant content using natural language queries.
-
-- Ideal for knowledge base querying and document Q&A systems.
-
-``` python
-  
-  result = bro.search_files( 'Legislation related to environmental impact funding' )
-  print(result)
-
-```
-
-### 🔎 File & Web Search
-
-- Performs semantic search over domain-specific document embeddings to retrieve relevant content.
-
-- **File Search**: Query vector-embedded files using `vector_store_ids`.
-
-- **Web Search**: Real-time information retrieval using GPT web search integration.
-
-```python
-  
-  result = bro.search_files( 'Legislation related to environmental impact funding' )
-  print(result)
-
-```
-
-### 🌐 Web Search (Real-Time Querying)
-
-- Perform web lookups in real time via OpenAI’s web-enabled models.
-
-- Extract current events, news, and regulatory updates.
-
-- No scraping required—returns model-interpreted summaries.
-
-```python
-  
-  insights = bro.search_web( 'Current status of the Federal AI Bill 2025' )
-  print(insights)
-
-```
-
-### 🧾 Prompt & Message Structuring
-
-- Build structured prompt schemas using Pydantic models.
-
-- Define instructions, context, output goals, and data sources.
-
-- Promotes reusable, interpretable prompt engineering.
-
-```python
-  
-  from boo import Prompt
-  p = Prompt(
-      instruction="Create a budget summary",
-      context="Federal Defense Budget FY25",
-      output_indicator="summary",
-      input_data="defense_budget_raw.csv"
-  )
-  
-  print(p.model_dump())
-
-```
-
-### ⚙️ API Endpoint Access
-
-- Centralized access to Google's Gemini API endpoints
-
-- Includes endpoints for completions, images, speech, and files.
-
-- Facilitates debugging and manual request construction.
-
-```python
-  
-  from gemini import EndPoint
-  api = EndPoint( )
-  print( api.get_data( ) )
-
-```
-
-### 🤖 Assistant Management
-
-- Fetches and lists OpenAI assistants created or used within the system, enabling assistant
-  lifecycle management.
-
-- Chat: General multimodal chat
-
-- Assistant: Generic AI assistant
-
-- Bubba: Budget Execution Analyst
-
-- Bro: Programming & Data Science Analyst
-
-```python
-  
-  from boo import Assistant
-  assistant = Assistant()
-  assistants = assistant.get_list()
-  print("Available Assistants:", assistants)
-
-```
-
-## 🧪 Usage Examples
-
-> The snippets below show idiomatic Jeni usage. They assume `chat = Chat()`, `img = Image()`,
-> etc., and an `OPENAI_API_KEY` is present in your environment.
-
-## 📝 Text generation
-
-```python
-    
-    from boo import Chat
-
-    chat = Chat()
-    out = chat.generate_text("Give me three bullet points on strict typing in Python.")
-    print(out)
-    
-```
-
-## 🌐 Web search (Responses)
-
-```python
-
-    from boo import Chat
-
-    chat = Chat()
-    prompt = "Latest trends in Retrieval Augmented Generation. 3 bullets, 1 reference each."
-    out = chat.search_web(prompt)  # internally uses web_search_options
-    print(out)
-
-```
-
-## 📄 Summarize a document (file-grounded)
-
-```python
-
-    from boo import Chat
-
-    chat = Chat()
-    out = chat.summarize_document(
-        prompt="Summarize the document with a 5-bullet executive brief.",
-        path="docs/paper.pdf"
-    )
-    print(out)
-    
-```
-
-## 🗂️ File search (vector stores)
-
-```python
-
-    from boo import Chat
-
-    chat = Chat()
-    # Assumes chat.vector_stores is configured with { "Appropriations": "...", "Guidance": "..." }
-    out = chat.search_files("What are the major themes around FY2024 OCO funding?")
-    print(out)
-
-```
-
-## 👀 Vision: analyze an image
-
-```python
-
-    from boo import Image
-
-    img = Image()
-    out = img.analyze(
-        text="Describe the chart and call out any anomalies in one paragraph.",
-        path="https://example.com/plot.png"
-    )
-    print(out)
-    
-```
-
-## 🖼️ Images: generate / edit
-
-```python
-
-    from boo import Image
-
-    img = Image()
-    url = img.generate("A minimalist logo for 'Jeni' in monochrome, vector style")
-    print(url)
-
-    # If your SDK supports edits, ensure the correct API path (images.edit vs images.edits)
-    # url = img.edit("Add subtle grid background", "logo.png", size="1024x1024")
-
-```
-
-## 🧬 Embeddings
-
-```python
-
-    from boo import Embedding
-
-    emb = Embedding()
-    vec = emb.create_small_embedding("Vectorize this sentence.")
-    print(len(vec), "dims")
-
-```
-
-## 🔊 Text-to-Speech (TTS)
-
-```python
-
-    from boo import TTS
-
-    tts = TTS()
-    outfile = tts.save_audio("Hello from Jeni in a calm voice.", "out/hello.mp3")
-    print("Saved:", outfile)
-
-```
-
-## 🎙️ Transcription / Translation (Whisper)
-
-```python
-
-    from boo import Transcription, Translation
-
-    asr = Transcription()
-    text = asr.transcribe("audio/meeting.m4a")
-    print(text)
-
-    xlat = Translation()
-    english = xlat.create("Translate this speech to English.", "audio/spanish.m4a")
-    print(english)
-
-```
-
-
+## 📝 Notes
+
+* Some modes depend on model availability and the options exposed by `gemini.py` and `config.py`.
+* Some Google Cloud features require valid project and location settings.
+* PDF extraction depends on PyMuPDF availability.
+* Vector storage uses `sqlite-vec` when available and falls back to cosine similarity when needed.
+* The Streamlit sidebar can override configured API keys for the current session.
+* The application stores local prompts and data in SQLite.
 
 ## 📝 License
 
-Jeni is published under the [MIT General Public License v3](https://github.com/is-leeroy-jenkins/Boo/blob/main/LICENSE).
-
+Jeni is published under the [MIT License](https://github.com/is-leeroy-jenkins/Jeni/blob/main/LICENSE).
 
