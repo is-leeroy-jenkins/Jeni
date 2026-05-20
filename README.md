@@ -7,6 +7,16 @@ Google's Gemini API with multimodal support for text, image, audio, and file ana
 and is designed with extensibility and federal applications in mind, it enables secure, scalable, and intelligent
 automation of analytical tasks.
 
+## 🎥 Demo
+
+![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
+  
+
+## 🧱 Databricks
+[![Jeni](https://img.shields.io/badge/Databricks-Jeni-FF3621?logo=databricks&logoColor=white)](https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351)
+- A data engineering, analytics, and artificial intelligence collaborative workspace
+- Codebase
+
 ## 🛠️ Features
 
 - Unified AI Framework: Integrates OpenAI APIs for text, image, audio, file analysis, transcription,
@@ -15,11 +25,6 @@ automation of analytical tasks.
   summarization.
 - Vector Store Integration: Embedded vector store lookups for domain-specific knowledge retrieval.
 - Web & File Search: Built-in support for semantic document and web search.
-
-## 🎥 Demo
-
-![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
-  
 
 ## 🔑 API KEY SETUP
 
