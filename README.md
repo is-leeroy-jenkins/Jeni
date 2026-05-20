@@ -15,7 +15,6 @@
   <a href="#-capabilities">Capabilities</a> |
   <a href="#-data-management">Data</a> |
   <a href="#-file-organization">File</a> |
-  <a href="#-license">License</a>
 </p>
 
 Jeni is a Python and Streamlit application for building, running, and managing
