@@ -38,14 +38,6 @@ knowledge retrieval, prompt management, and multimodal artificial intelligence e
 * Databricks workspace repository for the Jeni codebase.
 * Supports collaborative development, analytics, notebook execution, and application deployment.
 
-## 🚀 Application Badges
-
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python\&logoColor=white)](#-requirements)
-[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit\&logoColor=white)](#-running-the-streamlit-application)
-[![Gemini](https://img.shields.io/badge/Google-Gemini-4285F4?logo=google\&logoColor=white)](#-api-key-setup)
-[![SQLite](https://img.shields.io/badge/SQLite-Data%20Store-003B57?logo=sqlite\&logoColor=white)](#-data-management)
-[![Google Cloud](https://img.shields.io/badge/Google%20Cloud-Buckets-4285F4?logo=googlecloud\&logoColor=white)](#-google-cloud-buckets)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](#-license)
 
 
 
@@ -563,6 +555,14 @@ audio_bytes = tts.create_speech(
 
 print(type(audio_bytes))
 ```
+## 🚀 Application Badges
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python\&logoColor=white)](#-requirements)
+[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit\&logoColor=white)](#-running-the-streamlit-application)
+[![Gemini](https://img.shields.io/badge/Google-Gemini-4285F4?logo=google\&logoColor=white)](#-api-key-setup)
+[![SQLite](https://img.shields.io/badge/SQLite-Data%20Store-003B57?logo=sqlite\&logoColor=white)](#-data-management)
+[![Google Cloud](https://img.shields.io/badge/Google%20Cloud-Buckets-4285F4?logo=googlecloud\&logoColor=white)](#-google-cloud-buckets)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](#-license)
 
 ## 📝 Notes
 
