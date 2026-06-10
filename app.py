@@ -3791,9 +3791,7 @@ with st.sidebar:
 			st.session_state.googlemaps_api_key = googlemaps_key
 			os.environ[ 'GOOGLEMAPS_API_KEY' ] = googlemaps_key
 		
-		google_cse_id = st.text_input(
-			'Google Custom Search ID',
-			type='password',
+		google_cse_id = st.text_input( 'Google Custom Search ID', type='password',
 			value=st.session_state.google_cse_id or '',
 			help='Overrides GOOGLE_CSE_ID from config.py for this session only.' )
 		
@@ -3801,9 +3799,7 @@ with st.sidebar:
 			st.session_state.google_cse_id = google_cse_id
 			os.environ[ 'GOOGLE_CSE_ID' ] = google_cse_id
 		
-		google_cloud_project_id = st.text_input(
-			'Google Cloud Project ID',
-			type='password',
+		google_cloud_project_id = st.text_input( 'Google Cloud Project ID', type='password',
 			value=st.session_state.google_cloud_project_id or '',
 			help='Overrides GOOGLE_CLOUD_PROJECT_ID from config.py for this session only.' )
 		
@@ -3811,10 +3807,8 @@ with st.sidebar:
 			st.session_state.google_cloud_project_id = google_cloud_project_id
 			os.environ[ 'GOOGLE_CLOUD_PROJECT_ID' ] = google_cloud_project_id
 		
-		google_cloud_location = st.text_input(
-			'Google Cloud Location',
-			type='password',
-			value=st.session_state.google_cloud_location or '',
+		google_cloud_location = st.text_input( 'Google Cloud Location',
+			type='password', value=st.session_state.google_cloud_location or '',
 			help='Overrides GOOGLE_CLOUD_LOCATION from config.py for this session only.' )
 		
 		if google_cloud_location:
@@ -4080,11 +4074,8 @@ if mode == 'Text':
 				
 				# ---------- Safety ------------
 				with resp_c5:
-					safety_options = [ 'OFF',
-					                   'BLOCK_NONE',
-					                   'BLOCK_ONLY_HIGH',
-					                   'BLOCK_MEDIUM_AND_ABOVE',
-					                   'BLOCK_LOW_AND_ABOVE' ]
+					safety_options = [ 'OFF', 'BLOCK_NONE',  'BLOCK_ONLY_HIGH',
+					                   'BLOCK_MEDIUM_AND_ABOVE', 'BLOCK_LOW_AND_ABOVE' ]
 					
 					text_safety_profile = st.selectbox( label='Safety', options=safety_options,
 						key='text_safety_profile',
@@ -4186,12 +4177,10 @@ if mode == 'Text':
 			prompt = str( prompt ).strip( )
 			apply_gemini_runtime_config( )
 			
-			st.session_state.text_messages.append(
-				{
+			st.session_state.text_messages.append( {
 						'role': 'user',
 						'content': prompt,
 				} )
-			
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
@@ -4228,7 +4217,6 @@ if mode == 'Text':
 							st.session_state.get( 'text_google_grounding', False ) )
 						
 						derived_text_tools = [ 'google_search' ] if grounding_enabled else [ ]
-						
 						raw_text_urls = str( st.session_state.get( 'text_urls_input', '' ) or '' )
 						derived_text_urls = [ url.strip( )
 						                      for url in raw_text_urls.split( ';' )
@@ -4294,10 +4282,9 @@ if mode == 'Text':
 									if url:
 										st.markdown( f'- [{title}]({url})' )
 						
-						st.session_state.text_messages.append(
-							{
-									'role': 'assistant',
-									'content': str( response ).strip( ),
+						st.session_state.text_messages.append( {
+								'role': 'assistant',
+								'content': str( response ).strip( ),
 							} )
 						
 						if st.session_state.get( 'text_stream', False ):
@@ -4565,12 +4552,9 @@ elif mode == "Images":
 					image_size = st.session_state.get( 'image_size', '' )
 				
 				with img_c3:
-					st.checkbox(
-						label='Ground with Google Search',
-						key='image_grounded',
+					st.checkbox( label='Ground with Google Search', key='image_grounded',
 						help='Enables Gemini Search grounding when supported by the selected model.',
-						disabled=not supports_grounding
-					)
+						disabled=not supports_grounding )
 					
 					if not supports_grounding:
 						st.caption( 'Not supported by selected model.' )
@@ -4606,13 +4590,8 @@ elif mode == "Images":
 				prompt_names = [ '' ]
 			
 			with in_left:
-				st.text_area(
-					label='Enter Text',
-					height=50,
-					width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS,
-					key='image_system_instructions'
-				)
+				st.text_area( label='Enter Text', height=50, width='stretch',
+					help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
 			
 			def _on_image_template_change( ) -> None:
 				"""On image template change.
@@ -4629,13 +4608,8 @@ elif mode == "Images":
 						st.session_state[ 'image_system_instructions' ] = text
 			
 			with in_right:
-				st.selectbox(
-					label='Use Template',
-					options=prompt_names,
-					index=None,
-					key='image_instructions_template',
-					on_change=_on_image_template_change
-				)
+				st.selectbox( label='Use Template', options=prompt_names, index=None,
+					key='image_instructions_template', on_change=_on_image_template_change )
 			
 			def _on_clear_image_instructions( ) -> None:
 				"""On clear image instructions.
@@ -4661,7 +4635,6 @@ elif mode == "Images":
 					return
 				
 				src = text.strip( )
-				
 				if cfg.XML_BLOCK_PATTERN.search( src ):
 					converted = convert_xml( src )
 				else:
@@ -4671,18 +4644,12 @@ elif mode == "Images":
 			
 			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
 			with btn_c1:
-				st.button(
-					label='Clear Instructions',
-					width='stretch',
-					on_click=_on_clear_image_instructions
-				)
+				st.button( label='Clear Instructions', width='stretch',
+					on_click=_on_clear_image_instructions )
 			
 			with btn_c2:
-				st.button(
-					label='XML <-> Markdown',
-					width='stretch',
-					on_click=_on_convert_image_system_instructions
-				)
+				st.button( label='XML <-> Markdown', width='stretch',
+					on_click=_on_convert_image_system_instructions )
 		
 		def _append_image_message( role: str, content: str ) -> None:
 			"""Append image message.
@@ -4719,6 +4686,7 @@ elif mode == "Images":
 		with tab_gen:
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
+					
 					with st.chat_message( msg[ 'role' ], avatar='' ):
 						st.markdown( msg[ 'content' ] )
 			
