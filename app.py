@@ -1675,19 +1675,6 @@ def convert_markdown( text: Any ) -> str:
 	# ------------------------------------------------------------------
 	if contains_htags:
 		def _htag_to_md( match: re.Match ) -> str:
-			"""Htag to md.
-            
-            Purpose:
-                Supports the Jeni Streamlit application by executing the htag to md workflow. The
-                function coordinates local state, input validation, and downstream helper calls needed
-                by the surrounding application mode.
-            
-            Args:
-                match (re.Match): Match value used by this workflow.
-            
-            Returns:
-                Result produced by the operation.
-            """
 			level = int( match.group( 1 ) )
 			content = match.group( 2 ).strip( )
 			
@@ -1705,19 +1692,6 @@ def convert_markdown( text: Any ) -> str:
 	# Markdown headings -> XML-like heading tags
 	# ------------------------------------------------------------------
 	def _md_to_htag( match: re.Match ) -> str:
-		"""Md to htag.
-        
-        Purpose:
-            Supports the Jeni Streamlit application by executing the md to htag workflow. The
-            function coordinates local state, input validation, and downstream helper calls needed
-            by the surrounding application mode.
-        
-        Args:
-            match (re.Match): Match value used by this workflow.
-        
-        Returns:
-            Result produced by the operation.
-        """
 		hashes = match.group( 1 )
 		content = match.group( 2 ).strip( )
 		level = len( hashes )
@@ -2449,19 +2423,6 @@ def read_table( table: str, limit: int = None, offset: int = 0 ) -> pd.DataFrame
 			columns.append( f'{name}_{seen[ name ]}' )
 	
 	def _scalarize( value: Any ) -> Any:
-		"""Scalarize.
-        
-        Purpose:
-            Supports the Jeni Streamlit application by executing the scalarize workflow. The
-            function coordinates local state, input validation, and downstream helper calls needed
-            by the surrounding application mode.
-        
-        Args:
-            value (Any): Value value used by this workflow.
-        
-        Returns:
-            Result produced by the operation.
-        """
 		if value is None or isinstance( value, (str, int, float, bool) ):
 			return value
 		
@@ -3863,13 +3824,6 @@ if mode == 'Text':
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			def reset_text_model_settings( ) -> None:
-				"""Reset text model settings.
-                
-                Purpose:
-                    Resets application state for the reset text model settings operation. The function
-                    clears selected Streamlit session-state values so the related workflow can start from a
-                    clean baseline.
-                """
 				for key in [ 'text_model',
 				             'text_reasoning',
 				             'text_modalities',
@@ -3880,13 +3834,6 @@ if mode == 'Text':
 						del st.session_state[ key ]
 			
 			def reset_text_inference_settings( ) -> None:
-				"""Reset text inference settings.
-                
-                Purpose:
-                    Resets application state for the reset text inference settings operation. The function
-                    clears selected Streamlit session-state values so the related workflow can start from a
-                    clean baseline.
-                """
 				for key in [ 'text_temperature',
 				             'text_top_percent',
 				             'text_top_k',
@@ -3896,13 +3843,6 @@ if mode == 'Text':
 						del st.session_state[ key ]
 			
 			def reset_text_grounding_settings( ) -> None:
-				"""Reset text grounding settings.
-                
-                Purpose:
-                    Resets application state for the reset text grounding settings operation. The function
-                    clears selected Streamlit session-state values so the related workflow can start from a
-                    clean baseline.
-                """
 				for key in [ 'text_google_grounding',
 				             'text_urls_input',
 				             'text_max_urls',
@@ -3916,13 +3856,6 @@ if mode == 'Text':
 						del st.session_state[ key ]
 			
 			def reset_text_response_settings( ) -> None:
-				"""Reset text response settings.
-                
-                Purpose:
-                    Resets application state for the reset text response settings operation. The function
-                    clears selected Streamlit session-state values so the related workflow can start from a
-                    clean baseline.
-                """
 				for key in [ 'text_max_tokens',
 				             'text_response_format',
 				             'text_response_schema',
@@ -4074,7 +4007,7 @@ if mode == 'Text':
 				
 				# ---------- Safety ------------
 				with resp_c5:
-					safety_options = [ 'OFF', 'BLOCK_NONE',  'BLOCK_ONLY_HIGH',
+					safety_options = [ 'OFF', 'BLOCK_NONE', 'BLOCK_ONLY_HIGH',
 					                   'BLOCK_MEDIUM_AND_ABOVE', 'BLOCK_LOW_AND_ABOVE' ]
 					
 					text_safety_profile = st.selectbox( label='Safety', options=safety_options,
@@ -4105,13 +4038,6 @@ if mode == 'Text':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='text_system_instructions' )
 			
 			def _on_template_change( ) -> None:
-				"""On template change.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on template change workflow.
-                    The function coordinates local state, input validation, and downstream helper calls
-                    needed by the surrounding application mode.
-                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -4123,24 +4049,10 @@ if mode == 'Text':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
-				"""On clear.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
-                    coordinates local state, input validation, and downstream helper calls needed by the
-                    surrounding application mode.
-                """
 				st.session_state[ 'text_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
-				"""On convert system instructions.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on convert system instructions
-                    workflow. The function coordinates local state, input validation, and downstream helper
-                    calls needed by the surrounding application mode.
-                """
 				text = st.session_state.get( 'text_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -4178,9 +4090,9 @@ if mode == 'Text':
 			apply_gemini_runtime_config( )
 			
 			st.session_state.text_messages.append( {
-						'role': 'user',
-						'content': prompt,
-				} )
+					'role': 'user',
+					'content': prompt,
+			} )
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
@@ -4188,16 +4100,6 @@ if mode == 'Text':
 					stream_placeholder = st.empty( )
 					
 					def _on_stream_chunk( chunk: str ) -> None:
-						"""On stream chunk.
-                        
-                        Purpose:
-                            Supports the Jeni Streamlit application by executing the on stream chunk workflow. The
-                            function coordinates local state, input validation, and downstream helper calls needed
-                            by the surrounding application mode.
-                        
-                        Args:
-                            chunk (str): Chunk value used by this workflow.
-                        """
 						if chunk is None:
 							return
 						
@@ -4285,7 +4187,7 @@ if mode == 'Text':
 						st.session_state.text_messages.append( {
 								'role': 'assistant',
 								'content': str( response ).strip( ),
-							} )
+						} )
 						
 						if st.session_state.get( 'text_stream', False ):
 							st.session_state[ 'text_gemini_history' ] = [ ]
@@ -4333,13 +4235,6 @@ elif mode == "Images":
 	image = Images( )
 	
 	def _clear_image_messages( ) -> None:
-		"""Clear image messages.
-        
-        Purpose:
-            Supports the Jeni Streamlit application by executing the clear image messages workflow.
-            The function coordinates local state, input validation, and downstream helper calls
-            needed by the surrounding application mode.
-        """
 		try:
 			st.session_state[ 'image_input' ] = [ ]
 		except Exception as _logged_exception:
@@ -4354,13 +4249,6 @@ elif mode == "Images":
 			pass
 	
 	def _sync_image_tools( ) -> None:
-		"""Sync image tools.
-        
-        Purpose:
-            Supports the Jeni Streamlit application by executing the sync image tools workflow. The
-            function coordinates local state, input validation, and downstream helper calls needed
-            by the surrounding application mode.
-        """
 		try:
 			tools = [ ]
 			if st.session_state.get( 'image_grounded', False ):
@@ -4594,13 +4482,6 @@ elif mode == "Images":
 					help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
 			
 			def _on_image_template_change( ) -> None:
-				"""On image template change.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on image template change
-                    workflow. The function coordinates local state, input validation, and downstream helper
-                    calls needed by the surrounding application mode.
-                """
 				name = st.session_state.get( 'image_instructions_template' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -4612,24 +4493,10 @@ elif mode == "Images":
 					key='image_instructions_template', on_change=_on_image_template_change )
 			
 			def _on_clear_image_instructions( ) -> None:
-				"""On clear image instructions.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on clear image instructions
-                    workflow. The function coordinates local state, input validation, and downstream helper
-                    calls needed by the surrounding application mode.
-                """
 				st.session_state[ 'image_system_instructions' ] = ''
 				st.session_state[ 'image_instructions_template' ] = ''
 			
 			def _on_convert_image_system_instructions( ) -> None:
-				"""On convert image system instructions.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on convert image system
-                    instructions workflow. The function coordinates local state, input validation, and
-                    downstream helper calls needed by the surrounding application mode.
-                """
 				text = st.session_state.get( 'image_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -4652,17 +4519,6 @@ elif mode == "Images":
 					on_click=_on_convert_image_system_instructions )
 		
 		def _append_image_message( role: str, content: str ) -> None:
-			"""Append image message.
-            
-            Purpose:
-                Supports the Jeni Streamlit application by executing the append image message workflow.
-                The function coordinates local state, input validation, and downstream helper calls
-                needed by the surrounding application mode.
-            
-            Args:
-                role (str): Role value used by this workflow.
-                content (str): Content value used by this workflow.
-            """
 			try:
 				if 'image_input' not in st.session_state or not isinstance(
 						st.session_state[ 'image_input' ], list ):
@@ -4686,7 +4542,6 @@ elif mode == "Images":
 		with tab_gen:
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
-					
 					with st.chat_message( msg[ 'role' ], avatar='' ):
 						st.markdown( msg[ 'content' ] )
 			
@@ -4918,19 +4773,6 @@ elif mode == 'Audio':
 	model_options = [ ]
 	
 	def _run_audio_task( source_path: str ) -> Optional[ str ]:
-		"""Run audio task.
-        
-        Purpose:
-            Supports the Jeni Streamlit application by executing the run audio task workflow. The
-            function coordinates local state, input validation, and downstream helper calls needed
-            by the surrounding application mode.
-        
-        Args:
-            source_path (str): Source path value used by this workflow.
-        
-        Returns:
-            Result produced by the operation.
-        """
 		try:
 			throw_if( 'source_path', source_path )
 			st.session_state[ 'audio_file' ] = source_path
@@ -5163,13 +5005,6 @@ elif mode == 'Audio':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
 			
 			def _on_template_change( ) -> None:
-				"""On template change.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on template change workflow.
-                    The function coordinates local state, input validation, and downstream helper calls
-                    needed by the surrounding application mode.
-                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -5181,24 +5016,10 @@ elif mode == 'Audio':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
-				"""On clear.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
-                    coordinates local state, input validation, and downstream helper calls needed by the
-                    surrounding application mode.
-                """
 				st.session_state[ 'audio_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
-				"""On convert system instructions.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on convert system instructions
-                    workflow. The function coordinates local state, input validation, and downstream helper
-                    calls needed by the surrounding application mode.
-                """
 				text = st.session_state.get( 'audio_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -5846,13 +5667,6 @@ elif mode == 'Document Q&A':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='docqna_system_instructions' )
 			
 			def _on_template_change( ) -> None:
-				"""On template change.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on template change workflow.
-                    The function coordinates local state, input validation, and downstream helper calls
-                    needed by the surrounding application mode.
-                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -5864,24 +5678,10 @@ elif mode == 'Document Q&A':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
-				"""On clear.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
-                    coordinates local state, input validation, and downstream helper calls needed by the
-                    surrounding application mode.
-                """
 				st.session_state[ 'docqna_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
-				"""On convert system instructions.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on convert system instructions
-                    workflow. The function coordinates local state, input validation, and downstream helper
-                    calls needed by the surrounding application mode.
-                """
 				text = st.session_state.get( 'docqna_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -6183,13 +5983,6 @@ elif mode == 'Files':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='files_system_instructions' )
 			
 			def _on_template_change( ) -> None:
-				"""On template change.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on template change workflow.
-                    The function coordinates local state, input validation, and downstream helper calls
-                    needed by the surrounding application mode.
-                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -6201,24 +5994,10 @@ elif mode == 'Files':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
-				"""On clear.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
-                    coordinates local state, input validation, and downstream helper calls needed by the
-                    surrounding application mode.
-                """
 				st.session_state[ 'files_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
-				"""On convert system instructions.
-                
-                Purpose:
-                    Supports the Jeni Streamlit application by executing the on convert system instructions
-                    workflow. The function coordinates local state, input validation, and downstream helper
-                    calls needed by the surrounding application mode.
-                """
 				text = st.session_state.get( 'files_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -6253,8 +6032,8 @@ elif mode == 'Files':
 						files_resp = list_method( )
 						rows = [ ]
 						files_list = (
-							files_resp.data if hasattr( files_resp, 'data' ) else files_resp
-							if isinstance( files_resp, list ) else [ ])
+								files_resp.data if hasattr( files_resp, 'data' ) else files_resp
+								if isinstance( files_resp, list ) else [ ])
 						
 						for f in files_list:
 							if isinstance( f, str ):
@@ -6657,25 +6436,9 @@ elif mode == 'Prompt Engineering':
 		# DB helpers
 		# ------------------------------------------------------------------
 		def get_conn( ):
-			"""Get conn.
-            
-            Purpose:
-                Retrieves get conn data for the current workflow. The function isolates lookup logic and
-                returns normalized values that can be displayed, processed, or passed into other
-                helpers.
-            
-            Returns:
-                Value produced by the operation for display or downstream processing.
-            """
 			return sqlite3.connect( cfg.DB_PATH )
 		
 		def reset_selection( ):
-			"""Reset selection.
-            
-            Purpose:
-                Resets application state for the reset selection operation. The function clears selected
-                Streamlit session-state values so the related workflow can start from a clean baseline.
-            """
 			st.session_state.pe_selected_id = None
 			st.session_state.pe_caption = ''
 			st.session_state.pe_name = ''
@@ -6684,16 +6447,6 @@ elif mode == 'Prompt Engineering':
 			st.session_state.pe_id = 0
 		
 		def load_prompt( pid: int ) -> None:
-			"""Load prompt.
-            
-            Purpose:
-                Retrieves load prompt data for the current workflow. The function isolates lookup logic
-                and returns normalized values that can be displayed, processed, or passed into other
-                helpers.
-            
-            Args:
-                pid (int): Pid value used by this workflow.
-            """
 			with get_conn( ) as conn:
 				_select = f"SELECT Caption, Name, Text, Version, ID FROM {TABLE} WHERE PromptsId=?"
 				cur = conn.execute( _select, (pid,), )

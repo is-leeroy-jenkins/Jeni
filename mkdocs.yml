@@ -1,0 +1,92 @@
+site_name: Jeni Documentation
+site_description: Official documentation for Jeni, a Gemini-powered multimodal AI assistant for analysis, document review, retrieval, prompt management, and data workflows.
+site_author: Terry D. Eppler
+site_url: https://is-leeroy-jenkins.github.io/Jeni/
+repo_url: https://github.com/is-leeroy-jenkins/Jeni
+repo_name: is-leeroy-jenkins/Jeni
+
+theme:
+  name: material
+  language: en
+  icon:
+    logo: material/brain
+    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - navigation.indexes
+    - toc.follow
+    - content.code.copy
+    - content.code.select
+    - search.highlight
+    - search.share
+    - search.suggest
+  palette:
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+  font:
+    text: Roboto
+    code: Roboto Mono
+
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - .
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            show_signature: false
+            separate_signature: false
+            show_signature_annotations: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            filters:
+              - "!^_"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Configuration: configuration.md
+  - User Guide: user-guide.md
+  - Architecture: architecture.md
+  - API Reference:
+      - Gemini: api/gemini.md
+      - Configuration: api/config.md
