@@ -63,7 +63,7 @@ import sqlite_vec
 
 import streamlit as st
 from typing import List, Dict, Any, Optional, Tuple
-from boogr import Error
+from boogr import Error, Logger
 from reportlab.lib.pagesizes import LETTER
 from reportlab.pdfgen import canvas
 from sentence_transformers import SentenceTransformer
@@ -72,7 +72,7 @@ try:
 	import fitz
 except Exception:
 	fitz = None
-	
+
 from gemini import (
 	Chat,
 	Images,
@@ -82,7 +82,7 @@ from gemini import (
 	TTS,
 	Files,
 	FileSearch,
-	CloudBuckets )
+	CloudBuckets)
 
 # ======================================================================================
 # SESSION STATE INITIALIZATION
@@ -96,7 +96,7 @@ if 'google_api_key' not in st.session_state:
 
 if 'google_cse_id' not in st.session_state:
 	st.session_state[ 'google_cse_id' ] = ''
-	
+
 if 'google_cloud_project_id' not in st.session_state:
 	st.session_state[ 'google_cloud_project_id' ] = ''
 
@@ -212,7 +212,7 @@ if 'stores_model' not in st.session_state:
 
 if 'bucket_model' not in st.session_state:
 	st.session_state[ 'bucket_model' ] = ''
-	
+
 # -------- INSTRUCTION VARIABLES ----------------------
 
 if 'instructions' not in st.session_state:
@@ -278,7 +278,7 @@ if 'selected_filestore_id' not in st.session_state:
 
 if 'selected_filestore_label' not in st.session_state:
 	st.session_state[ 'selected_filestore_label' ] = ''
-	
+
 if 'text_number' not in st.session_state:
 	st.session_state[ 'text_number' ] = 0
 
@@ -287,10 +287,10 @@ if 'text_top_k' not in st.session_state:
 
 if 'text_max_urls' not in st.session_state:
 	st.session_state[ 'text_max_urls' ] = 0
-	
+
 if 'text_google_grounding' not in st.session_state:
 	st.session_state[ 'text_google_grounding' ] = False
-	
+
 if 'text_max_tokens' not in st.session_state:
 	st.session_state[ 'text_max_tokens' ] = 0
 
@@ -353,10 +353,10 @@ if 'text_tools' not in st.session_state:
 
 if 'text_context' not in st.session_state:
 	st.session_state[ 'text_context' ] = [ ]
-	
+
 if 'text_gemini_history' not in st.session_state:
 	st.session_state[ 'text_gemini_history' ] = [ ]
-	
+
 # --------IMAGE-GENERATION PARAMETERS--------------------
 
 if 'image_max_tokens' not in st.session_state:
@@ -637,7 +637,7 @@ if 'files_table' not in st.session_state:
 
 if 'files_messages' not in st.session_state:
 	st.session_state.files_messages: List[ Dict[ str, Any ] ] = [ ]
-	
+
 # ------- EMBEDDING-SPECIFIC PARAMETERS ----------------------
 
 if 'embedding_model' not in st.session_state:
@@ -870,15 +870,37 @@ if 'bucket_id' not in st.session_state:
 # ======================================================================================
 
 def throw_if( name: str, value: object ):
+	"""Throw if.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the throw if workflow. The function
+        coordinates local state, input validation, and downstream helper calls needed by the
+        surrounding application mode.
+    
+    Args:
+        name (str): Name value used by this workflow.
+        value (object): Value value used by this workflow.
+    
+    Raises:
+        ValueError: Raised when validation fails or a required value is missing.
+    """
 	if value is None:
 		raise ValueError( f'Argument "{name}" cannot be empty!' )
 
 def extract_usage( resp: Any ) -> Dict[ str, int ]:
-	"""
-		Extract token usage from a response object/dict.
-		Returns dict with prompt_tokens, completion_tokens, total_tokens.
-		Defensive: returns zeros if not present.
-	"""
+	"""Extract usage.
+    
+    Purpose:
+        Extracts usage for downstream application use. The function normalizes provider or
+        file-system data into a stable shape that the Streamlit interface and helper workflows
+        can consume safely.
+    
+    Args:
+        resp (Any): Resp value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	usage = { 'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0 }
 	if not resp:
 		return usage
@@ -886,7 +908,15 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 	raw = None
 	try:
 		raw = getattr( resp, 'usage', None )
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'extract_usage'
+			error.method = 'extract_usage( resp: Any )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		raw = None
 	
 	if not raw and isinstance( resp, dict ):
@@ -899,7 +929,15 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 	if not raw:
 		try:
 			raw = getattr( resp, 'usage_metadata', None )
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = 'extract_usage'
+				error.method = 'extract_usage( resp: Any )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			raw = None
 	
 	if not raw:
@@ -907,7 +945,8 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 	
 	try:
 		if isinstance( raw, dict ):
-			usage[ 'prompt_tokens' ] = int( raw.get( 'prompt_tokens', raw.get( 'input_tokens', 0 ) ) )
+			usage[ 'prompt_tokens' ] = int(
+				raw.get( 'prompt_tokens', raw.get( 'input_tokens', 0 ) ) )
 			usage[ 'completion_tokens' ] = int(
 				raw.get( 'completion_tokens', raw.get( 'output_tokens', 0 ) )
 			)
@@ -915,22 +954,39 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 				raw.get( 'total_tokens', usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] )
 			)
 		else:
-			usage[ 'prompt_tokens' ] = int( getattr( raw, 'prompt_tokens', getattr( raw, 'input_tokens', 0 ) ) )
+			usage[ 'prompt_tokens' ] = int(
+				getattr( raw, 'prompt_tokens', getattr( raw, 'input_tokens', 0 ) ) )
 			usage[ 'completion_tokens' ] = int(
 				getattr( raw, 'completion_tokens', getattr( raw, 'output_tokens', 0 ) )
 			)
 			usage[ 'total_tokens' ] = int(
-				getattr( raw, 'total_tokens', usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] )
+				getattr( raw, 'total_tokens',
+					usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] )
 			)
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'extract_usage'
+			error.method = 'extract_usage( resp: Any )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		usage[ 'total_tokens' ] = usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ]
 	
 	return usage
 
 def update_counters( resp: Any ) -> None:
-	"""
-		Update session_state.last_call_usage and accumulate into session_state.token_usage.
-	"""
+	"""Update counters.
+    
+    Purpose:
+        Updates application state or persistent storage for the update counters operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        resp (Any): Resp value used by this workflow.
+    """
 	usage = extract_usage( resp )
 	st.session_state.last_call_usage = usage
 	st.session_state.token_usage[ 'prompt_tokens' ] += usage.get( 'prompt_tokens', 0 )
@@ -938,24 +994,45 @@ def update_counters( resp: Any ) -> None:
 	st.session_state.token_usage[ 'total_tokens' ] += usage.get( 'total_tokens', 0 )
 
 def display_value( val: Any ) -> str:
-	"""
-		Render a friendly display string for header values.
-		None -> em dash; otherwise str(value).
-	"""
+	"""Display value.
+    
+    Purpose:
+        Renders or applies display value behavior in the Streamlit user interface. The function
+        centralizes presentation logic so visual output remains consistent across the
+        application.
+    
+    Args:
+        val (Any): Val value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	if val is None:
 		return "—"
 	try:
 		return str( val )
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'display_value'
+			error.method = 'display_value( val: Any )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return "—"
 
 def resolve_gemini_api_key( ) -> Optional[ str ]:
-	"""
-		Resolve Gemini API key using the following precedence:
-		1) Session override (user-entered)
-		2) config.py default
-		3) Environment variable (optional fallback)
-	"""
+	"""Resolve gemini api key.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the resolve gemini api key
+        workflow. The function coordinates local state, input validation, and downstream helper
+        calls needed by the surrounding application mode.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	session_key = st.session_state.get( "gemini_api_key" )
 	if session_key:
 		return session_key
@@ -967,20 +1044,13 @@ def resolve_gemini_api_key( ) -> Optional[ str ]:
 	return os.environ.get( "GOOGLE_API_KEY" )
 
 def apply_gemini_runtime_config( ) -> None:
-	"""
-	Ensure Gemini client initializes in API-key mode.
-
-	This removes Vertex AI routing variables from the process environment and clears
-	the matching config attributes before the Gemini wrapper creates a genai.Client.
-
-	Parameters:
-	-----------
-	None
-
-	Returns:
-	--------
-	None
-	"""
+	"""Apply gemini runtime config.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the apply gemini runtime config
+        workflow. The function coordinates local state, input validation, and downstream helper
+        calls needed by the surrounding application mode.
+    """
 	key = resolve_gemini_api_key( )
 	if key:
 		os.environ[ "GEMINI_API_KEY" ] = key
@@ -1000,27 +1070,33 @@ def apply_gemini_runtime_config( ) -> None:
 				"GOOGLE_CLOUD_LOCATION"):
 		try:
 			setattr( cfg, attr_name, None )
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = 'apply_gemini_runtime_config'
+				error.method = 'apply_gemini_runtime_config(  )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			pass
 
 # ----------- RESPONSE/CHAT UTILITIES ------------
 
 def extract_response_text( response: object ) -> str:
-	"""
-		
-		Purpose:
-		--------
-		Safely extract assistant text from a Responses API object.
-	
-		Parameters:
-		-----------
-		response (object): The response returned from the OpenAI client.
-	
-		Returns:
-		--------
-		str: Concatenated assistant text output. Empty string if none found.
-		
-	"""
+	"""Extract response text.
+    
+    Purpose:
+        Extracts response text for downstream application use. The function normalizes provider
+        or file-system data into a stable shape that the Streamlit interface and helper
+        workflows can consume safely.
+    
+    Args:
+        response (object): Response value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	if response is None:
 		return ""
 	
@@ -1048,43 +1124,36 @@ def extract_response_text( response: object ) -> str:
 	return "".join( text_chunks ).strip( )
 
 def encode_image_base64( path: str ) -> str:
-	"""
-	
-		Purpose:
-		_________
-		
-		Parametes:
-		----------
-		
-		
-		Returns:
-		--------
-		
-		
-	"""
+	"""Encode image base64.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the encode image base64 workflow.
+        The function coordinates local state, input validation, and downstream helper calls
+        needed by the surrounding application mode.
+    
+    Args:
+        path (str): Path value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	data = Path( path ).read_bytes( )
 	return base64.b64encode( data ).decode( "utf-8" )
 
 def normalize_text( text: str ) -> str:
-	"""
-		
-		Purpose
-		-------
-		Normalize text by:
-			• Converting to lowercase
-			• Removing punctuation except sentence delimiters (. ! ?)
-			• Ensuring clean sentence boundary spacing
-			• Collapsing whitespace
-	
-		Parameters
-		----------
-		text: str
-	
-		Returns
-		-------
-		str
-		
-	"""
+	"""Normalize text.
+    
+    Purpose:
+        Normalizes text into a predictable application value. The function standardizes
+        optional, user-entered, or provider-derived input before it is used by later processing
+        steps.
+    
+    Args:
+        text (str): Text value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	if not text:
 		return ""
 	
@@ -1102,25 +1171,21 @@ def normalize_text( text: str ) -> str:
 	
 	return text
 
-def chunk_text( text: str, max_tokens: int=400 ) -> list[ str ]:
-	"""
-		
-		Purpose
-		-------
-		Segment normalized text into chunks by:
-			1. Sentence boundaries
-			2. Fallback to token windowing if needed
-	
-		Parameters
-		----------
-		text: str
-		max_tokens: int
-	
-		Returns
-		-------
-		list[str]
-		
-	"""
+def chunk_text( text: str, max_tokens: int = 400 ) -> list[ str ]:
+	"""Chunk text.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the chunk text workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        text (str): Text value used by this workflow.
+        max_tokens (int): Max tokens value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	if not text:
 		return [ ]
 	
@@ -1152,17 +1217,37 @@ def chunk_text( text: str, max_tokens: int=400 ) -> list[ str ]:
 	return chunks
 
 def cosine_sim( a: np.ndarray, b: np.ndarray ) -> float:
+	"""Cosine sim.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the cosine sim workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        a (np.ndarray): A value used by this workflow.
+        b (np.ndarray): B value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	denom = np.linalg.norm( a ) * np.linalg.norm( b )
 	return float( np.dot( a, b ) / denom ) if denom else 0.0
 
 def sanitize_markdown( text: str ) -> str:
-	"""
-	
-		Purpose:
-		_________
-		
-		
-	"""
+	"""Sanitize markdown.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the sanitize markdown workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        text (str): Text value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	# Remove bold markers
 	text = re.sub( r"\*\*(.*?)\*\*", r"\1", text )
 	# Optional: remove italics
@@ -1170,14 +1255,13 @@ def sanitize_markdown( text: str ) -> str:
 	return text
 
 def init_state( ) -> None:
-	"""
-	
-		Purpose:
-		_________
-		Initializes all session state variables.
-		
-		
-	"""
+	"""Init state.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the init state workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    """
 	if 'chat_history' not in st.session_state:
 		st.session_state.chat_history = [ ]
 	
@@ -1194,13 +1278,12 @@ def init_state( ) -> None:
 		st.session_state.setdefault( k, "" )
 
 def reset_state( ) -> None:
-	"""
-	
-		Purpose:
-		_________
-		Resets the session state to default values
-		
-	"""
+	"""Reset state.
+    
+    Purpose:
+        Resets application state for the reset state operation. The function clears selected
+        Streamlit session-state values so the related workflow can start from a clean baseline.
+    """
 	st.session_state.chat_history = [ ]
 	st.session_state.last_answer = ''
 	st.session_state.last_sources = [ ]
@@ -1211,6 +1294,19 @@ def reset_state( ) -> None:
 	}
 
 def normalize( obj ):
+	"""Normalize.
+    
+    Purpose:
+        Normalizes normalize into a predictable application value. The function standardizes
+        optional, user-entered, or provider-derived input before it is used by later processing
+        steps.
+    
+    Args:
+        obj (Any): Obj value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	if obj is None or isinstance( obj, (str, int, float, bool) ):
 		return obj
 	
@@ -1222,28 +1318,32 @@ def normalize( obj ):
 	if hasattr( obj, 'model_dump' ):
 		try:
 			return obj.model_dump( )
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = 'normalize'
+				error.method = 'normalize( obj: Any )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			return str( obj )
 	return str( obj )
 
 def extract_sources( response: Any ) -> List[ Dict[ str, Any ] ]:
-	"""
-	
-		Purpose:
-		_________
-		Parses-out sources from structured response object.
-		
-		Parameters:
-		------------
-		response: Any
-			Structured API response.
-		
-		Returns:
-		---------
-		List[ Dict[ str, Any ] ]
-			List of normalized source dictionaries.
-	
-	"""
+	"""Extract sources.
+    
+    Purpose:
+        Extracts sources for downstream application use. The function normalizes provider or
+        file-system data into a stable shape that the Streamlit interface and helper workflows
+        can consume safely.
+    
+    Args:
+        response (Any): Response value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	sources: List[ Dict[ str, Any ] ] = [ ]
 	
 	if response is None:
@@ -1298,22 +1398,19 @@ def extract_sources( response: Any ) -> List[ Dict[ str, Any ] ]:
 	return sources
 
 def save_temp( upload ) -> str | None:
-	"""
-		Purpose:
-		--------
-		Save a Streamlit UploadedFile object to a temporary file on disk
-		and return the filesystem path.
-	
-		Parameters:
-		-----------
-		upload : streamlit.runtime.uploaded_file_manager.UploadedFile
-			Uploaded file object from st.file_uploader.
-	
-		Returns:
-		--------
-		str | None
-			Path to the temporary file, or None if invalid input.
-	"""
+	"""Save temp.
+    
+    Purpose:
+        Updates application state or persistent storage for the save temp operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        upload (Any): Upload value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	if upload is None:
 		return None
 	
@@ -1325,19 +1422,31 @@ def save_temp( upload ) -> str | None:
 			tmp_path = tmp.name
 		
 		return tmp_path
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'save_temp'
+			error.method = 'save_temp( upload: Any )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return None
 
 def extract_usage( resp: Any ) -> Dict[ str, int ]:
-	"""
-	
-		Purpose:
-		_________
-		Extract token usage from a response object/dict.
-		Returns dict with prompt_tokens, completion_tokens, total_tokens.
-		Defensive: returns zeros if not present.
-		
-	"""
+	"""Extract usage.
+    
+    Purpose:
+        Extracts usage for downstream application use. The function normalizes provider or
+        file-system data into a stable shape that the Streamlit interface and helper workflows
+        can consume safely.
+    
+    Args:
+        resp (Any): Resp value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	usage = { 'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, }
 	if not resp:
 		return usage
@@ -1345,7 +1454,15 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 	raw = None
 	try:
 		raw = getattr( resp, "usage", None )
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'extract_usage'
+			error.method = 'extract_usage( resp: Any )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		raw = None
 	
 	if not raw and isinstance( resp, dict ):
@@ -1364,7 +1481,7 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 				raw.get(
 					'total_tokens',
 					usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ],
-					)
+				)
 			)
 		else:
 			usage[ "prompt_tokens" ] = int( getattr( raw, "prompt_tokens", 0 ) )
@@ -1373,19 +1490,30 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 			usage[ "total_tokens" ] = int(
 				getattr( raw, "total_tokens",
 					usage[ "prompt_tokens" ] + usage[ "completion_tokens" ], ) )
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'extract_usage'
+			error.method = 'extract_usage( resp: Any )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		usage[ "total_tokens" ] = (usage[ "prompt_tokens" ] + usage[ "completion_tokens" ])
 	
 	return usage
 
 def update_counters( resp: Any ) -> None:
-	"""
-	
-		Purpose:
-		_________
-		Update session_state.last_call_usage and accumulate into session_state.token_usage.
-		
-	"""
+	"""Update counters.
+    
+    Purpose:
+        Updates application state or persistent storage for the update counters operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        resp (Any): Resp value used by this workflow.
+    """
 	usage = extract_usage( resp )
 	st.session_state.last_call_usage = usage
 	st.session_state.token_usage[ 'prompt_tokens' ] += usage.get( 'prompt_tokens', 0 )
@@ -1393,18 +1521,48 @@ def update_counters( resp: Any ) -> None:
 	st.session_state.token_usage[ 'total_tokens' ] += usage.get( 'total_tokens', 0 )
 
 def display_value( val: Any ) -> str:
-	"""
-		Render a friendly display string for header values.
-		None -> em dash; otherwise str(value).
-	"""
+	"""Display value.
+    
+    Purpose:
+        Renders or applies display value behavior in the Streamlit user interface. The function
+        centralizes presentation logic so visual output remains consistent across the
+        application.
+    
+    Args:
+        val (Any): Val value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	if val is None:
 		return "—"
 	try:
 		return str( val )
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'display_value'
+			error.method = 'display_value( val: Any )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return "—"
 
 def build_intent_prefix( mode: str ) -> str:
+	"""Build intent prefix.
+    
+    Purpose:
+        Builds intent prefix for the active workflow. The function assembles validated inputs,
+        session-state values, and derived context into the structure expected by the next
+        processing stage.
+    
+    Args:
+        mode (str): Mode value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	if mode == 'Guidance Only':
 		return (
 				'[ANALYST INTENT]\n'
@@ -1420,6 +1578,19 @@ def build_intent_prefix( mode: str ) -> str:
 	return ''
 
 def format_results( results ):
+	"""Format results.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the format results workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        results (Any): Results value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	formatted_results = ''
 	for result in results.data:
 		formatted_result = f"<li> '{result.name}'"
@@ -1427,22 +1598,18 @@ def format_results( results ):
 	return f"<p>{formatted_results}</p>"
 
 def count_tokens( text: str ) -> int:
-	"""
-		
-		Purpose
-		----------
-		Returns the number of tokens in a text string.
-		
-		Parmeters
-		-----------
-		string : str
-		encoding_name : str
-		
-		Return
-		------------
-		int
-		
-	"""
+	"""Count tokens.
+    
+    Purpose:
+        Computes tokens for use by the active workflow. The function performs deterministic
+        calculation and returns a stable value for display or downstream logic.
+    
+    Args:
+        text (str): Text value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	encoding = tiktoken.get_encoding( 'cl100k_base' )
 	num_tokens = len( encoding.encode( text ) )
 	return num_tokens
@@ -1450,21 +1617,19 @@ def count_tokens( text: str ) -> int:
 # ------------ TEXT UTILITIES -----------------
 
 def convert_xml( text: str ) -> str:
-	"""
-		
-			Purpose:
-			_________
-			Convert XML-delimited prompt text into Markdown by treating XML-like
-			tags as section delimiters, not as strict XML.
-	
-			Parameters:
-			-----------
-			text (str) - Prompt text containing XML-like opening and closing tags.
-	
-			Returns:
-			---------
-			Markdown-formatted text using level-2 headings (##).
-	"""
+	"""Convert xml.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the convert xml workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        text (str): Text value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	markdown_blocks: List[ str ] = [ ]
 	for match in cfg.XML_BLOCK_PATTERN.finditer( text ):
 		raw_tag: str = match.group( 'tag' )
@@ -1478,27 +1643,19 @@ def convert_xml( text: str ) -> str:
 	return "\n\n".join( markdown_blocks )
 
 def convert_markdown( text: Any ) -> str:
-	"""
-		Purpose:
-		--------
-		Convert between Markdown headings and simple XML-like heading tags.
-	
-		Behavior:
-		---------
-		Auto-detects direction:
-		  - If <h1>...</h1> / <h2>...</h2> ... exist, converts to Markdown (# / ## / ###).
-		  - Otherwise converts Markdown headings (# / ## / ###) to <hN>...</hN> tags.
-	
-		Parameters:
-		-----------
-		text : Any
-			Source text. Non-string values return "".
-	
-		Returns:
-		--------
-		str
-			Converted text.
-	"""
+	"""Convert markdown.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the convert markdown workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        text (Any): Text value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	if not isinstance( text, str ) or not text.strip( ):
 		return ""
 	
@@ -1518,6 +1675,19 @@ def convert_markdown( text: Any ) -> str:
 	# ------------------------------------------------------------------
 	if contains_htags:
 		def _htag_to_md( match: re.Match ) -> str:
+			"""Htag to md.
+            
+            Purpose:
+                Supports the Jeni Streamlit application by executing the htag to md workflow. The
+                function coordinates local state, input validation, and downstream helper calls needed
+                by the surrounding application mode.
+            
+            Args:
+                match (re.Match): Match value used by this workflow.
+            
+            Returns:
+                Result produced by the operation.
+            """
 			level = int( match.group( 1 ) )
 			content = match.group( 2 ).strip( )
 			
@@ -1535,6 +1705,19 @@ def convert_markdown( text: Any ) -> str:
 	# Markdown headings -> XML-like heading tags
 	# ------------------------------------------------------------------
 	def _md_to_htag( match: re.Match ) -> str:
+		"""Md to htag.
+        
+        Purpose:
+            Supports the Jeni Streamlit application by executing the md to htag workflow. The
+            function coordinates local state, input validation, and downstream helper calls needed
+            by the surrounding application mode.
+        
+        Args:
+            match (re.Match): Match value used by this workflow.
+        
+        Returns:
+            Result produced by the operation.
+        """
 		hashes = match.group( 1 )
 		content = match.group( 2 ).strip( )
 		level = len( hashes )
@@ -1544,90 +1727,127 @@ def convert_markdown( text: Any ) -> str:
 	return out.strip( )
 
 def inject_response_css( ) -> None:
-	"""
-	
-		Purpose:
-		_________
-		Set the the format via css.
-		
-	"""
+	"""Inject response css.
+    
+    Purpose:
+        Renders or applies inject response css behavior in the Streamlit user interface. The
+        function centralizes presentation logic so visual output remains consistent across the
+        application.
+    """
 	st.markdown(
 		"""
-		<style>
-		/* Chat message text */
-		.stChatMessage p {
-			color: rgb(220, 220, 220);
-			font-size: 1rem;
-			line-height: 1.6;
-		}
+        <style>
+        /* Chat message text */
+        .stChatMessage p {
+            color: rgb(220, 220, 220);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
 
-		/* Headings inside chat responses */
-		.stChatMessage h1 {
-			color: rgb(0, 120, 252); /* DoD Blue */
-			font-size: 1.6rem;
-		}
+        /* Headings inside chat responses */
+        .stChatMessage h1 {
+            color: rgb(0, 120, 252); /* DoD Blue */
+            font-size: 1.6rem;
+        }
 
-		.stChatMessage h2 {
-			color: rgb(0, 120, 252);
-			font-size: 1.35rem;
-		}
+        .stChatMessage h2 {
+            color: rgb(0, 120, 252);
+            font-size: 1.35rem;
+        }
 
-		.stChatMessage h3 {
-			color: rgb(0, 120, 252);
-			font-size: 1.15rem;
-		}
-		
-		.stChatMessage a {
-			color: rgb(0, 120, 252); /* DoD Blue */
-			text-decoration: underline;
-		}
-		
-		.stChatMessage a:hover {
-			color: rgb(80, 160, 255);
-		}
+        .stChatMessage h3 {
+            color: rgb(0, 120, 252);
+            font-size: 1.15rem;
+        }
+        
+        .stChatMessage a {
+            color: rgb(0, 120, 252); /* DoD Blue */
+            text-decoration: underline;
+        }
+        
+        .stChatMessage a:hover {
+            color: rgb(80, 160, 255);
+        }
 
-		</style>
-		""", unsafe_allow_html=True )
+        </style>
+        """, unsafe_allow_html=True )
 
 def style_subheaders( ) -> None:
-	"""
-	
-		Purpose:
-		_________
-		Sets the style of subheaders in the main UI
-		
-	"""
+	"""Style subheaders.
+    
+    Purpose:
+        Renders or applies style subheaders behavior in the Streamlit user interface. The
+        function centralizes presentation logic so visual output remains consistent across the
+        application.
+    """
 	st.markdown(
 		"""
-		<style>
-		div[data-testid="stMarkdownContainer"] h2,
-		div[data-testid="stMarkdownContainer"] h3,
-		div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h2,
-		div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h3 {
-			color: rgb(0, 120, 252) !important;
-		}
-		</style>
-		""",
+        <style>
+        div[data-testid="stMarkdownContainer"] h2,
+        div[data-testid="stMarkdownContainer"] h3,
+        div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h2,
+        div[data-testid="stChatMessage"] div[data-testid="stMarkdownContainer"] h3 {
+            color: rgb(0, 120, 252) !important;
+        }
+        </style>
+        """,
 		unsafe_allow_html=True, )
 
 def save_message( role: str, content: str ) -> None:
+	"""Save message.
+    
+    Purpose:
+        Updates application state or persistent storage for the save message operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        role (str): Role value used by this workflow.
+        content (str): Content value used by this workflow.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute( 'INSERT INTO chat_history (role, content) VALUES (?, ?)', (role, content) )
 
 def load_history( ) -> List[ Tuple[ str, str ] ]:
+	"""Load history.
+    
+    Purpose:
+        Retrieves load history data for the current workflow. The function isolates lookup logic
+        and returns normalized values that can be displayed, processed, or passed into other
+        helpers.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		return conn.execute( 'SELECT role, content FROM chat_history ORDER BY id' ).fetchall( )
 
 def clear_history( ) -> None:
+	"""Clear history.
+    
+    Purpose:
+        Resets application state for the clear history operation. The function clears selected
+        Streamlit session-state values so the related workflow can start from a clean baseline.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute( "DELETE FROM chat_history" )
 
 # ----------  DOCQNA UTILITIES ----------
 
 def extract_text_from_bytes( file_bytes: bytes ) -> str:
-	"""
-		Extracts text from PDF or text-based documents.
-	"""
+	"""Extract text from bytes.
+    
+    Purpose:
+        Extracts text from bytes for downstream application use. The function normalizes
+        provider or file-system data into a stable shape that the Streamlit interface and helper
+        workflows can consume safely.
+    
+    Args:
+        file_bytes (bytes): File bytes value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	try:
 		import fitz  # PyMuPDF
 		
@@ -1637,28 +1857,42 @@ def extract_text_from_bytes( file_bytes: bytes ) -> str:
 			text += page.get_text( )
 		return text.strip( )
 	
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'extract_text_from_bytes'
+			error.method = 'extract_text_from_bytes( file_bytes: bytes )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		try:
 			return file_bytes.decode( errors="ignore" )
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = 'extract_text_from_bytes'
+				error.method = 'extract_text_from_bytes( file_bytes: bytes )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			return ""
 
 def route_document_query( prompt: str ) -> str:
-	"""
-		Purpose:
-		--------
-		Route a document question through the unified chat pipeline and return a model-generated answer.
-
-		Parameters:
-		-----------
-		prompt : str
-			The user question to answer about active documents.
-
-		Returns:
-		--------
-		str
-			The assistant answer text.
-	"""
+	"""Route document query.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the route document query workflow.
+        The function coordinates local state, input validation, and downstream helper calls
+        needed by the surrounding application mode.
+    
+    Args:
+        prompt (str): Prompt value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	user_input = build_document_user_input( prompt )
 	if not user_input:
 		user_input = (prompt or '').strip( )
@@ -1674,46 +1908,47 @@ def route_document_query( prompt: str ) -> str:
 	)
 
 def summarize_active_document( ) -> str:
-	"""
-		Uses the routing layer to summarize the currently active document.
-	"""
+	"""Summarize active document.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the summarize active document
+        workflow. The function coordinates local state, input validation, and downstream helper
+        calls needed by the surrounding application mode.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	system_instructions = st.session_state.get( "system_instructions", "" )
 	summary_prompt = """
-		Provide a clear, structured summary of this document.
-		Include:
-		- Purpose
-		- Key themes
-		- Major conclusions
-		- Important data points (if any)
-		- Policy implications (if applicable)
-		
-		Be precise and concise.
-		"""
+        Provide a clear, structured summary of this document.
+        Include:
+        - Purpose
+        - Key themes
+        - Major conclusions
+        - Important data points (if any)
+        - Policy implications (if applicable)
+        
+        Be precise and concise.
+        """
 	if system_instructions:
 		summary_prompt = f"{system_instructions}\n\n{summary_prompt}"
 	
 	return route_document_query( summary_prompt.strip( ) )
 
 def compute_fingerprint( active_docs: List[ str ], doc_bytes: Dict[ str, bytes ] ) -> str:
-	'''
-		
-		Purpose:
-		--------
-		Computes a stable fingerprint for the currently selected active
-		documents and their byte contents.
-	
-		Parameters:
-		-----------
-		active_docs:
-			A List[ str ] of active document names.
-		doc_bytes:
-			A Dict[ str, bytes ] mapping document name to file bytes.
-	
-		Returns:
-		--------
-		A str fingerprint suitable for cache invalidation.
-	
-	'''
+	"""Compute fingerprint.
+    
+    Purpose:
+        Computes fingerprint for use by the active workflow. The function performs deterministic
+        calculation and returns a stable value for display or downstream logic.
+    
+    Args:
+        active_docs (List[str]): Active docs value used by this workflow.
+        doc_bytes (Dict[str, bytes]): Doc bytes value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	h = hashlib.sha256( )
 	for name in sorted( active_docs ):
 		b = doc_bytes.get( name, b'' )
@@ -1723,22 +1958,19 @@ def compute_fingerprint( active_docs: List[ str ], doc_bytes: Dict[ str, bytes ]
 	return h.hexdigest( )
 
 def extract_text( file_bytes: bytes ) -> str:
-	'''
-	
-		Purpose:
-		--------
-		Extracts text from a PDF byte stream using PyMuPDF.
-	
-		Parameters:
-		-----------
-		file_bytes:
-			The PDF bytes.
-	
-		Returns:
-		--------
-		A str containing extracted text.
-	
-	'''
+	"""Extract text.
+    
+    Purpose:
+        Extracts text for downstream application use. The function normalizes provider or
+        file-system data into a stable shape that the Streamlit interface and helper workflows
+        can consume safely.
+    
+    Args:
+        file_bytes (bytes): File bytes value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	if not file_bytes:
 		return ''
 	
@@ -1748,51 +1980,61 @@ def extract_text( file_bytes: bytes ) -> str:
 		for page in doc:
 			parts.append( page.get_text( 'text' ) or '' )
 		return '\n'.join( parts ).strip( )
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'extract_text'
+			error.method = 'extract_text( file_bytes: bytes )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return ''
 
 def load_sqlite_vec( conn: sqlite3.Connection ) -> bool:
-	'''
-		
-		Purpose:
-		--------
-		Attempts to load sqlite-vec into the provided SQLite connection.
-	
-		Parameters:
-		-----------
-		conn:
-			The sqlite3.Connection.
-	
-		Returns:
-		--------
-		True if sqlite-vec loaded successfully; otherwise False.
-		
-	'''
+	"""Load sqlite vec.
+    
+    Purpose:
+        Retrieves load sqlite vec data for the current workflow. The function isolates lookup
+        logic and returns normalized values that can be displayed, processed, or passed into
+        other helpers.
+    
+    Args:
+        conn (sqlite3.Connection): Conn value used by this workflow.
+    
+    Returns:
+        Boolean result indicating whether the requested condition or setup step succeeded.
+    """
 	try:
 		import sqlite_vec
 		
 		sqlite_vec.load( conn )
 		return True
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'load_sqlite_vec'
+			error.method = 'load_sqlite_vec( conn: sqlite3.Connection )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return False
 
 def ensure_schema( dim: int ) -> bool:
-	'''
-	
-		Purpose:
-		--------
-		Creates the sqlite-vec virtual table used for Document Q&A embeddings if possible.
-	
-		Parameters:
-		-----------
-		dim:
-			The embedding dimension (e.g., 384 for all-MiniLM-L6-v2).
-	
-		Returns:
-		--------
-		True if the schema exists and is usable; otherwise False.
-	
-	'''
+	"""Ensure schema.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the ensure schema workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        dim (int): Dim value used by this workflow.
+    
+    Returns:
+        Boolean result indicating whether the requested condition or setup step succeeded.
+    """
 	conn = create_connection( )
 	try:
 		ok = load_sqlite_vec( conn )
@@ -1802,38 +2044,40 @@ def ensure_schema( dim: int ) -> bool:
 		cur = conn.cursor( )
 		cur.execute(
 			f'''
-			CREATE VIRTUAL TABLE IF NOT EXISTS docqna_vec
-			USING vec0(
-				embedding float[{int( dim )}],
-				doc_name TEXT,
-				chunk TEXT
-			);
-			'''
+            CREATE VIRTUAL TABLE IF NOT EXISTS docqna_vec
+            USING vec0(
+                embedding float[{int( dim )}],
+                doc_name TEXT,
+                chunk TEXT
+            );
+            '''
 		)
 		conn.commit( )
 		return True
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'ensure_schema'
+			error.method = 'ensure_schema( dim: int )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return False
 	finally:
 		conn.close( )
 
 def rebuild_index( embedder: SentenceTransformer ) -> None:
-	'''
-		
-		Purpose:
-		--------
-		Builds or refreshes the Document Q&A vector index when active documents change.
-	
-		Parameters:
-		-----------
-		embedder:
-			The SentenceTransformer used to generate embeddings.
-	
-		Returns:
-		--------
-		None
-		
-	'''
+	"""Rebuild index.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the rebuild index workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        embedder (SentenceTransformer): Embedder value used by this workflow.
+    """
 	active_docs: List[ str ] = st.session_state.get( 'active_docs', [ ] )
 	doc_bytes: Dict[ str, bytes ] = st.session_state.get( 'doc_bytes', { } )
 	
@@ -1859,7 +2103,15 @@ def rebuild_index( embedder: SentenceTransformer ) -> None:
 			try:
 				cur.execute( 'DELETE FROM docqna_vec;' )
 				conn.commit( )
-			except Exception:
+			except Exception as _logged_exception:
+				try:
+					error = Error( _logged_exception )
+					error.module = 'app'
+					error.cause = 'rebuild_index'
+					error.method = 'rebuild_index( embedder: SentenceTransformer )'
+					Logger( ).write( error )
+				except Exception:
+					pass
 				st.session_state[ 'docqna_vec_ready' ] = False
 				vec_ready = False
 		
@@ -1900,7 +2152,15 @@ def rebuild_index( embedder: SentenceTransformer ) -> None:
 		if not vec_ready:
 			st.session_state[ 'docqna_fallback_rows' ] = fallback_rows
 	
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'rebuild_index'
+			error.method = 'rebuild_index( embedder: SentenceTransformer )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		st.session_state[ 'docqna_vec_ready' ] = False
 		st.session_state[ 'docqna_fallback_rows' ] = [ ]
 		st.session_state[ 'docqna_chunk_count' ] = 0
@@ -1908,25 +2168,20 @@ def rebuild_index( embedder: SentenceTransformer ) -> None:
 		conn.close( )
 
 def retrieve_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] ]:
-	'''
-	
-		Purpose:
-		--------
-		Retrieves top-k document chunks relevant to the query, using sqlite-vec when available, and falling
-		back to in-memory cosine similarity when not.
-	
-		Parameters:
-		-----------
-		query:
-			The user query string.
-		k:
-			The number of chunks to return.
-	
-		Returns:
-		--------
-		A List[ Tuple[ str, str, float ] ] of (doc_name, chunk, score_or_distance).
-	
-	'''
+	"""Retrieve chunks.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the retrieve chunks workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        query (str): Query value used by this workflow.
+        k (int): K value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	if not query or not query.strip( ):
 		return [ ]
 	
@@ -1952,7 +2207,15 @@ def retrieve_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] 
 			)
 			rows = cur.fetchall( )
 			return [ (r[ 0 ], r[ 1 ], float( r[ 2 ] )) for r in rows ]
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = 'retrieve_chunks'
+				error.method = 'retrieve_chunks( query: str, k: int )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			st.session_state[ 'docqna_vec_ready' ] = False
 		finally:
 			conn.close( )
@@ -1976,24 +2239,20 @@ def retrieve_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] 
 	return results[ : int( k ) ]
 
 def build_document_user_input( user_query: str, k: int = 6 ) -> str:
-	'''
-	
-		Purpose:
-		--------
-		Builds a Document Q&A prompt that injects retrieved chunks (RAG) instead of stuffing full documents.
-	
-		Parameters:
-		-----------
-		user_query:
-			The user question.
-		k:
-			The number of retrieved chunks to include.
-	
-		Returns:
-		--------
-		A str prompt suitable for llama.cpp completion.
-	
-	'''
+	"""Build document user input.
+    
+    Purpose:
+        Builds document user input for the active workflow. The function assembles validated
+        inputs, session-state values, and derived context into the structure expected by the
+        next processing stage.
+    
+    Args:
+        user_query (str): User query value used by this workflow.
+        k (int): K value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	system = str( st.session_state.get( 'system_instructions', '' ) or '' ).strip( )
 	hits = retrieve_chunks( user_query, k=int( k ) )
 	
@@ -2022,20 +2281,12 @@ def build_document_user_input( user_query: str, k: int = 6 ) -> str:
 # ----------  DATABASE UTILITIES ----------
 
 def initialize_database( ) -> None:
-	"""
-		Purpose:
-		--------
-		Ensure required SQLite tables exist and that the Prompts table contains the
-		columns required by the prompt utilities and Prompt Engineering mode.
-
-		Parameters:
-		-----------
-		None
-
-		Returns:
-		--------
-		None
-	"""
+	"""Initialize database.
+    
+    Purpose:
+        Creates or initializes database used by the application. The function prepares
+        persistent state, database structures, or UI resources required by later workflows.
+    """
 	Path( 'stores/sqlite' ).mkdir( parents=True, exist_ok=True )
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute(
@@ -2112,40 +2363,65 @@ def initialize_database( ) -> None:
 		conn.commit( )
 
 def create_connection( ) -> sqlite3.Connection:
+	"""Create connection.
+    
+    Purpose:
+        Creates or initializes connection used by the application. The function prepares
+        persistent state, database structures, or UI resources required by later workflows.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	return sqlite3.connect( cfg.DB_PATH )
 
 def list_tables( ) -> List[ str ]:
+	"""List tables.
+    
+    Purpose:
+        Retrieves list tables data for the current workflow. The function isolates lookup logic
+        and returns normalized values that can be displayed, processed, or passed into other
+        helpers.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	with create_connection( ) as conn:
 		_query = "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;"
 		rows = conn.execute( _query ).fetchall( )
 		return [ r[ 0 ] for r in rows ]
 
 def create_schema( table: str ) -> List[ Tuple ]:
+	"""Create schema.
+    
+    Purpose:
+        Creates or initializes schema used by the application. The function prepares persistent
+        state, database structures, or UI resources required by later workflows.
+    
+    Args:
+        table (str): Table value used by this workflow.
+    
+    Returns:
+        Result produced by the operation.
+    """
 	with create_connection( ) as conn:
 		return conn.execute( f'PRAGMA table_info("{table}");' ).fetchall( )
 
-def read_table( table: str, limit: int=None, offset: int=0 ) -> pd.DataFrame:
-	"""
-	
-		Purpose:
-		--------
-		Read a SQLite table into a pandas DataFrame using a normalized scalar-only path.
-	
-		Parameters:
-		-----------
-		table : str
-			Table name.
-		limit : int = None
-			Optional row limit.
-		offset : int = 0
-			Optional row offset.
-	
-		Returns:
-		--------
-		pd.DataFrame
-			DataFrame of plain Python scalar values.
-	
-	"""
+def read_table( table: str, limit: int = None, offset: int = 0 ) -> pd.DataFrame:
+	"""Read table.
+    
+    Purpose:
+        Retrieves read table data for the current workflow. The function isolates lookup logic
+        and returns normalized values that can be displayed, processed, or passed into other
+        helpers.
+    
+    Args:
+        table (str): Table value used by this workflow.
+        limit (int): Limit value used by this workflow.
+        offset (int): Offset value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	if not table:
 		return pd.DataFrame( )
 	
@@ -2173,25 +2449,62 @@ def read_table( table: str, limit: int=None, offset: int=0 ) -> pd.DataFrame:
 			columns.append( f'{name}_{seen[ name ]}' )
 	
 	def _scalarize( value: Any ) -> Any:
+		"""Scalarize.
+        
+        Purpose:
+            Supports the Jeni Streamlit application by executing the scalarize workflow. The
+            function coordinates local state, input validation, and downstream helper calls needed
+            by the surrounding application mode.
+        
+        Args:
+            value (Any): Value value used by this workflow.
+        
+        Returns:
+            Result produced by the operation.
+        """
 		if value is None or isinstance( value, (str, int, float, bool) ):
 			return value
 		
 		if isinstance( value, bytes ):
 			try:
 				return value.decode( 'utf-8' )
-			except Exception:
+			except Exception as _logged_exception:
+				try:
+					error = Error( _logged_exception )
+					error.module = 'app'
+					error.cause = '_scalarize'
+					error.method = '_scalarize( value: Any )'
+					Logger( ).write( error )
+				except Exception:
+					pass
 				return value.hex( )
 		
 		if isinstance( value, (list, tuple, set, dict) ):
 			try:
 				return str( normalize( value ) )
-			except Exception:
+			except Exception as _logged_exception:
+				try:
+					error = Error( _logged_exception )
+					error.module = 'app'
+					error.cause = '_scalarize'
+					error.method = '_scalarize( value: Any )'
+					Logger( ).write( error )
+				except Exception:
+					pass
 				return str( value )
 		
 		if hasattr( value, 'model_dump' ):
 			try:
 				return str( value.model_dump( ) )
-			except Exception:
+			except Exception as _logged_exception:
+				try:
+					error = Error( _logged_exception )
+					error.module = 'app'
+					error.cause = '_scalarize'
+					error.method = '_scalarize( value: Any )'
+					Logger( ).write( error )
+				except Exception:
+					pass
 				return str( value )
 		
 		return str( value )
@@ -2206,23 +2519,16 @@ def read_table( table: str, limit: int=None, offset: int=0 ) -> pd.DataFrame:
 	return pd.DataFrame( normalized_rows, columns=columns )
 
 def render_table( df: pd.DataFrame ) -> None:
-	"""
-	
-		Purpose:
-		--------
-		Render a DataFrame safely in Streamlit. Use the normal interactive dataframe
-		first, and fall back to HTML rendering if Streamlit/PyArrow serialization fails.
-	
-		Parameters:
-		-----------
-		df : pd.DataFrame
-			The DataFrame to render.
-	
-		Returns:
-		--------
-		None
-	
-	"""
+	"""Render table.
+    
+    Purpose:
+        Renders or applies render table behavior in the Streamlit user interface. The function
+        centralizes presentation logic so visual output remains consistent across the
+        application.
+    
+    Args:
+        df (pd.DataFrame): Df value used by this workflow.
+    """
 	if df is None:
 		st.info( 'No data available.' )
 		return
@@ -2230,7 +2536,15 @@ def render_table( df: pd.DataFrame ) -> None:
 	try:
 		st.data_editor( df, use_container_width=True )
 		return
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'render_table'
+			error.method = 'render_table( df: pd.DataFrame )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		pass
 	
 	fallback_df = df.copy( )
@@ -2243,6 +2557,19 @@ def render_table( df: pd.DataFrame ) -> None:
 	st.markdown( fallback_df.to_html( index=False, escape=True ), unsafe_allow_html=True )
 
 def make_display_safe( df: pd.DataFrame ) -> pd.DataFrame:
+	"""Make display safe.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the make display safe workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        df (pd.DataFrame): Df value used by this workflow.
+    
+    Returns:
+        DataFrame or transformed object produced by the operation.
+    """
 	display_df = df.copy( )
 	
 	for col in display_df.columns:
@@ -2253,16 +2580,16 @@ def make_display_safe( df: pd.DataFrame ) -> pd.DataFrame:
 	return display_df
 
 def drop_table( table: str ) -> None:
-	"""
-		Purpose:
-		--------
-		Safely drop a table if it exists.
-	
-		Parameters:
-		-----------
-		table : str
-			Table name.
-	"""
+	"""Drop table.
+    
+    Purpose:
+        Updates application state or persistent storage for the drop table operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        table (str): Table value used by this workflow.
+    """
 	if not table:
 		return
 	
@@ -2271,25 +2598,19 @@ def drop_table( table: str ) -> None:
 		conn.commit( )
 
 def create_index( table: str, column: str ) -> None:
-	"""
-		Purpose:
-		--------
-		Create a safe SQLite index on a specified table column.
-	
-		Handles:
-			- Spaces in column names
-			- Special characters
-			- Reserved words
-			- Duplicate index names
-			- Validation against actual table schema
-	
-		Parameters:
-		-----------
-		table : str
-			Table name.
-		column : str
-			Column name to index.
-	"""
+	"""Create index.
+    
+    Purpose:
+        Creates or initializes index used by the application. The function prepares persistent
+        state, database structures, or UI resources required by later workflows.
+    
+    Args:
+        table (str): Table value used by this workflow.
+        column (str): Column value used by this workflow.
+    
+    Raises:
+        ValueError: Raised when validation fails or a required value is missing.
+    """
 	if not table or not column:
 		return
 	
@@ -2324,6 +2645,19 @@ def create_index( table: str, column: str ) -> None:
 		conn.commit( )
 
 def apply_filters( df: pd.DataFrame ) -> pd.DataFrame:
+	"""Apply filters.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the apply filters workflow. The
+        function coordinates local state, input validation, and downstream helper calls needed
+        by the surrounding application mode.
+    
+    Args:
+        df (pd.DataFrame): Df value used by this workflow.
+    
+    Returns:
+        DataFrame or transformed object produced by the operation.
+    """
 	st.subheader( 'Advanced Filters' )
 	conditions = [ ]
 	col1, col2, col3 = st.columns( 3 )
@@ -2349,6 +2683,15 @@ def apply_filters( df: pd.DataFrame ) -> pd.DataFrame:
 	return df
 
 def create_aggregation( df: pd.DataFrame ):
+	"""Create aggregation.
+    
+    Purpose:
+        Creates or initializes aggregation used by the application. The function prepares
+        persistent state, database structures, or UI resources required by later workflows.
+    
+    Args:
+        df (pd.DataFrame): Df value used by this workflow.
+    """
 	st.subheader( 'Aggregation Engine' )
 	
 	numeric_cols = df.select_dtypes( include=[ 'number' ] ).columns.tolist( )
@@ -2376,23 +2719,15 @@ def create_aggregation( df: pd.DataFrame ):
 	st.metric( 'Result', result )
 
 def create_visualization( df: pd.DataFrame ) -> None:
-	"""
-	
-		Purpose:
-		--------
-		Render data visualizations without passing pandas objects directly into
-		Plotly/Narwhals.
-		
-		Parameters:
-		-----------
-		df : pd.DataFrame
-			The input DataFrame.
-		
-		Returns:
-		--------
-		None
-		
-	"""
+	"""Create visualization.
+    
+    Purpose:
+        Creates or initializes visualization used by the application. The function prepares
+        persistent state, database structures, or UI resources required by later workflows.
+    
+    Args:
+        df (pd.DataFrame): Df value used by this workflow.
+    """
 	st.subheader( 'Visualization Engine' )
 	
 	if df is None or df.empty:
@@ -2523,6 +2858,17 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		st.plotly_chart( fig, use_container_width=True )
 
 def dm_create_table_from_df( table_name: str, df: pd.DataFrame ):
+	"""Dm create table from df.
+    
+    Purpose:
+        Supports the Jeni Streamlit application by executing the dm create table from df
+        workflow. The function coordinates local state, input validation, and downstream helper
+        calls needed by the surrounding application mode.
+    
+    Args:
+        table_name (str): Table name value used by this workflow.
+        df (pd.DataFrame): Df value used by this workflow.
+    """
 	columns = [ ]
 	for col in df.columns:
 		sql_type = get_sqlite_type( df[ col ].dtype )
@@ -2536,6 +2882,17 @@ def dm_create_table_from_df( table_name: str, df: pd.DataFrame ):
 		conn.commit( )
 
 def insert_data( table_name: str, df: pd.DataFrame ):
+	"""Insert data.
+    
+    Purpose:
+        Updates application state or persistent storage for the insert data operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        table_name (str): Table name value used by this workflow.
+        df (pd.DataFrame): Df value used by this workflow.
+    """
 	df = df.copy( )
 	df.columns = [ c.replace( ' ', '_' ) for c in df.columns ]
 	
@@ -2547,21 +2904,19 @@ def insert_data( table_name: str, df: pd.DataFrame ):
 		conn.commit( )
 
 def get_sqlite_type( dtype ) -> str:
-	"""
-		Purpose:
-		--------
-		Map a pandas dtype to an appropriate SQLite column type.
-	
-		Parameters:
-		-----------
-		dtype : pandas dtype
-			The dtype of a pandas Series.
-	
-		Returns:
-		--------
-		str
-			SQLite column type.
-	"""
+	"""Get sqlite type.
+    
+    Purpose:
+        Retrieves get sqlite type data for the current workflow. The function isolates lookup
+        logic and returns normalized values that can be displayed, processed, or passed into
+        other helpers.
+    
+    Args:
+        dtype (Any): Dtype value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	dtype_str = str( dtype ).lower( )
 	
 	# ------------------------------------------------------------------
@@ -2600,27 +2955,19 @@ def get_sqlite_type( dtype ) -> str:
 	return 'TEXT'
 
 def create_custom_table( table_name: str, columns: list ) -> None:
-	"""
-		Purpose:
-		--------
-		Create a custom SQLite table from column definitions.
-	
-		Parameters:
-		-----------
-		table_name : str
-			Name of table.
-	
-		columns : list of dict
-			[
-				{
-					"name": str,
-					"type": str,
-					"not_null": bool,
-					"primary_key": bool,
-					"auto_increment": bool
-				}
-			]
-	"""
+	"""Create custom table.
+    
+    Purpose:
+        Creates or initializes custom table used by the application. The function prepares
+        persistent state, database structures, or UI resources required by later workflows.
+    
+    Args:
+        table_name (str): Table name value used by this workflow.
+        columns (list): Columns value used by this workflow.
+    
+    Raises:
+        ValueError: Raised when validation fails or a required value is missing.
+    """
 	if not table_name:
 		raise ValueError( 'Table name required.' )
 	
@@ -2656,23 +3003,18 @@ def create_custom_table( table_name: str, columns: list ) -> None:
 		conn.commit( )
 
 def is_safe_query( query: str ) -> bool:
-	"""
-	
-		Purpose:
-		--------
-		Determine whether a SQL query is read-only and safe to execute.
-	
-		Allows:
-			SELECT
-			WITH (CTE returning SELECT)
-			EXPLAIN SELECT
-			PRAGMA (read-only)
-	
-		Blocks:
-			INSERT, UPDATE, DELETE, DROP, ALTER, CREATE, ATTACH,
-			DETACH, VACUUM, REPLACE, TRIGGER, and multiple statements.
-			
-	"""
+	"""Is safe query.
+    
+    Purpose:
+        Evaluates whether safe query meets the application safety or validation criteria. The
+        function returns a boolean decision used to guard downstream execution.
+    
+    Args:
+        query (str): Query value used by this workflow.
+    
+    Returns:
+        Boolean result indicating whether the requested condition or setup step succeeded.
+    """
 	if not query or not isinstance( query, str ):
 		return False
 	
@@ -2711,17 +3053,21 @@ def is_safe_query( query: str ) -> bool:
 	return True
 
 def create_identifier( name: str ) -> str:
-	"""
-	
-		Purpose:
-		--------
-		Sanitize a string into a safe SQLite identifier.
-	
-		- Replaces invalid characters with underscores
-		- Ensures it starts with a letter or underscore
-		- Prevents empty names
-		
-	"""
+	"""Create identifier.
+    
+    Purpose:
+        Creates or initializes identifier used by the application. The function prepares
+        persistent state, database structures, or UI resources required by later workflows.
+    
+    Args:
+        name (str): Name value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    
+    Raises:
+        ValueError: Raised when validation fails or a required value is missing.
+    """
 	if not name or not isinstance( name, str ):
 		raise ValueError( 'Invalid Identifier.' )
 	
@@ -2735,11 +3081,36 @@ def create_identifier( name: str ) -> str:
 	return safe
 
 def get_indexes( table: str ):
+	"""Get indexes.
+    
+    Purpose:
+        Retrieves get indexes data for the current workflow. The function isolates lookup logic
+        and returns normalized values that can be displayed, processed, or passed into other
+        helpers.
+    
+    Args:
+        table (str): Table value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	with create_connection( ) as conn:
 		rows = conn.execute( f'PRAGMA index_list("{table}");' ).fetchall( )
 		return rows
 
 def add_column( table: str, column: str, col_type: str ):
+	"""Add column.
+    
+    Purpose:
+        Updates application state or persistent storage for the add column operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        table (str): Table value used by this workflow.
+        column (str): Column value used by this workflow.
+        col_type (str): Col type value used by this workflow.
+    """
 	column = create_identifier( column )
 	col_type = col_type.upper( )
 	
@@ -2749,30 +3120,21 @@ def add_column( table: str, column: str, col_type: str ):
 		conn.commit( )
 
 def rename_column( table_name: str, old_name: str, new_name: str ) -> None:
-	"""
-	
-		Purpose:
-		--------
-		Rename a column within an existing SQLite table. Attempts native ALTER TABLE rename
-		first; if it fails, falls back to a schema-safe rebuild preserving column order, data,
-		and indexes.
-
-		Parameters:
-		-----------
-		table_name : str
-			Table containing the column.
-
-		old_name : str
-			Existing column name.
-
-		new_name : str
-			New column name.
-
-		Returns:
-		--------
-		None
-		
-	"""
+	"""Rename column.
+    
+    Purpose:
+        Updates application state or persistent storage for the rename column operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        table_name (str): Table name value used by this workflow.
+        old_name (str): Old name value used by this workflow.
+        new_name (str): New name value used by this workflow.
+    
+    Raises:
+        ValueError: Raised when validation fails or a required value is missing.
+    """
 	if not table_name or not old_name or not new_name:
 		return
 	
@@ -2783,7 +3145,15 @@ def rename_column( table_name: str, old_name: str, new_name: str ) -> None:
 			)
 			conn.commit( )
 			return
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = 'rename_column'
+				error.method = 'rename_column( table_name: str, old_name: str, new_name: str )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			pass
 		
 		row = conn.execute(
@@ -2866,6 +3236,18 @@ def rename_column( table_name: str, old_name: str, new_name: str ) -> None:
 		conn.commit( )
 
 def create_profile_table( table: str ):
+	"""Create profile table.
+    
+    Purpose:
+        Creates or initializes profile table used by the application. The function prepares
+        persistent state, database structures, or UI resources required by later workflows.
+    
+    Args:
+        table (str): Table value used by this workflow.
+    
+    Returns:
+        DataFrame or transformed object produced by the operation.
+    """
 	df = read_table( table )
 	profile_rows = [ ]
 	total_rows = len( df )
@@ -2878,7 +3260,8 @@ def create_profile_table( table: str ):
 					'column': col, 'dtype': str( series.dtype ),
 					'null_%': round( (null_count / total_rows) * 100, 2 ) if total_rows else 0,
 					'distinct_%': round( (
-							                     distinct_count / total_rows) * 100, 2 ) if total_rows else 0,
+							                     distinct_count / total_rows) * 100,
+						2 ) if total_rows else 0,
 			}
 		
 		if pd.api.types.is_numeric_dtype( series ):
@@ -2895,6 +3278,20 @@ def create_profile_table( table: str ):
 	return pd.DataFrame( profile_rows )
 
 def drop_column( table: str, column: str ):
+	"""Drop column.
+    
+    Purpose:
+        Updates application state or persistent storage for the drop column operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        table (str): Table value used by this workflow.
+        column (str): Column value used by this workflow.
+    
+    Raises:
+        ValueError: Raised when validation fails or a required value is missing.
+    """
 	if not table or not column:
 		raise ValueError( 'Table and column required.' )
 	
@@ -2993,27 +3390,20 @@ def drop_column( table: str, column: str ):
 		conn.commit( )
 
 def rename_table( old_name: str, new_name: str ) -> None:
-	"""
-	
-		Purpose:
-		--------
-		Rename an existing SQLite table. Attempts native ALTER TABLE rename first; if it fails,
-		falls back to a schema-safe rebuild using the original CREATE TABLE statement and
-		preserves indexes.
-
-		Parameters:
-		-----------
-		old_name : str
-			Existing table name.
-
-		new_name : str
-			New table name.
-
-		Returns:
-		--------
-		None
-		
-	"""
+	"""Rename table.
+    
+    Purpose:
+        Updates application state or persistent storage for the rename table operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        old_name (str): Old name value used by this workflow.
+        new_name (str): New name value used by this workflow.
+    
+    Raises:
+        ValueError: Raised when validation fails or a required value is missing.
+    """
 	if not old_name or not new_name:
 		return
 	
@@ -3022,7 +3412,15 @@ def rename_table( old_name: str, new_name: str ) -> None:
 			conn.execute( f'ALTER TABLE "{old_name}" RENAME TO "{new_name}";' )
 			conn.commit( )
 			return
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = 'rename_table'
+				error.method = 'rename_table( old_name: str, new_name: str )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			pass
 		
 		row = conn.execute(
@@ -3078,21 +3476,19 @@ def rename_table( old_name: str, new_name: str ) -> None:
 # ---------- PROMPT ENGINEERING UTILITIES ---------------
 
 def fetch_prompt_names( db_path: str ) -> list[ str ]:
-	"""
-		Purpose:
-		--------
-		Retrieve template names from Prompts table.
-	
-		Parameters:
-		-----------
-		db_path : str
-			SQLite database path.
-	
-		Returns:
-		--------
-		list[str]
-			Sorted prompt names.
-	"""
+	"""Fetch prompt names.
+    
+    Purpose:
+        Retrieves fetch prompt names data for the current workflow. The function isolates lookup
+        logic and returns normalized values that can be displayed, processed, or passed into
+        other helpers.
+    
+    Args:
+        db_path (str): Db path value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	try:
 		conn = sqlite3.connect( db_path )
 		cur = conn.cursor( )
@@ -3100,27 +3496,32 @@ def fetch_prompt_names( db_path: str ) -> list[ str ]:
 		rows = cur.fetchall( )
 		conn.close( )
 		return [ r[ 0 ] for r in rows if r and r[ 0 ] is not None ]
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'fetch_prompt_names'
+			error.method = 'fetch_prompt_names( db_path: str )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return [ ]
 
 def fetch_prompt_text( db_path: str, name: str ) -> str | None:
-	"""
-		Purpose:
-		--------
-		Retrieve template text by name.
-	
-		Parameters:
-		-----------
-		db_path : str
-			SQLite database path.
-		name : str
-			Template name.
-	
-		Returns:
-		--------
-		str | None
-			Prompt text if found.
-	"""
+	"""Fetch prompt text.
+    
+    Purpose:
+        Retrieves fetch prompt text data for the current workflow. The function isolates lookup
+        logic and returns normalized values that can be displayed, processed, or passed into
+        other helpers.
+    
+    Args:
+        db_path (str): Db path value used by this workflow.
+        name (str): Name value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	try:
 		conn = sqlite3.connect( db_path )
 		cur = conn.cursor( )
@@ -3128,10 +3529,28 @@ def fetch_prompt_text( db_path: str, name: str ) -> str | None:
 		row = cur.fetchone( )
 		conn.close( )
 		return str( row[ 0 ] ) if row and row[ 0 ] is not None else None
-	except Exception:
+	except Exception as _logged_exception:
+		try:
+			error = Error( _logged_exception )
+			error.module = 'app'
+			error.cause = 'fetch_prompt_text'
+			error.method = 'fetch_prompt_text( db_path: str, name: str )'
+			Logger( ).write( error )
+		except Exception:
+			pass
 		return None
 
 def fetch_prompts_df( ) -> pd.DataFrame:
+	"""Fetch prompts df.
+    
+    Purpose:
+        Retrieves fetch prompts df data for the current workflow. The function isolates lookup
+        logic and returns normalized values that can be displayed, processed, or passed into
+        other helpers.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		df = pd.read_sql_query(
 			"SELECT PromptsId, Caption,  Name, Version, ID FROM Prompts ORDER BY PromptsId DESC",
@@ -3140,6 +3559,19 @@ def fetch_prompts_df( ) -> pd.DataFrame:
 	return df
 
 def fetch_prompt_by_id( pid: int ) -> Dict[ str, Any ] | None:
+	"""Fetch prompt by id.
+    
+    Purpose:
+        Retrieves fetch prompt by id data for the current workflow. The function isolates lookup
+        logic and returns normalized values that can be displayed, processed, or passed into
+        other helpers.
+    
+    Args:
+        pid (int): Pid value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		cur = conn.execute(
 			"SELECT PromptsId, Caption, Name, Text, Version, ID FROM Prompts WHERE PromptsId=?",
@@ -3149,6 +3581,19 @@ def fetch_prompt_by_id( pid: int ) -> Dict[ str, Any ] | None:
 		return dict( zip( [ c[ 0 ] for c in cur.description ], row ) ) if row else None
 
 def fetch_prompt_by_name( name: str ) -> Dict[ str, Any ] | None:
+	"""Fetch prompt by name.
+    
+    Purpose:
+        Retrieves fetch prompt by name data for the current workflow. The function isolates
+        lookup logic and returns normalized values that can be displayed, processed, or passed
+        into other helpers.
+    
+    Args:
+        name (str): Name value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		cur = conn.execute(
 			"SELECT PromptsId, Caption, Name, Text, Version, ID FROM Prompts WHERE Caption=?",
@@ -3158,11 +3603,32 @@ def fetch_prompt_by_name( name: str ) -> Dict[ str, Any ] | None:
 		return dict( zip( [ c[ 0 ] for c in cur.description ], row ) ) if row else None
 
 def insert_prompt( data: Dict[ str, Any ] ) -> None:
+	"""Insert prompt.
+    
+    Purpose:
+        Updates application state or persistent storage for the insert prompt operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        data (Dict[str, Any]): Data value used by this workflow.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute( 'INSERT INTO Prompts (Caption, Name, Text, Version, ID) VALUES (?, ?, ?, ?)',
 			(data[ 'Caption' ], data[ 'Name' ], data[ 'Text' ], data[ 'Version' ], data[ 'ID' ]) )
 
 def update_prompt( pid: int, data: Dict[ str, Any ] ) -> None:
+	"""Update prompt.
+    
+    Purpose:
+        Updates application state or persistent storage for the update prompt operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        pid (int): Pid value used by this workflow.
+        data (Dict[str, Any]): Data value used by this workflow.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute(
 			"UPDATE Prompts SET Caption=?, Name=?, Text=?, Version=?, ID=? WHERE PromptsId=?",
@@ -3171,26 +3637,33 @@ def update_prompt( pid: int, data: Dict[ str, Any ] ) -> None:
 		)
 
 def delete_prompt( pid: int ) -> None:
+	"""Delete prompt.
+    
+    Purpose:
+        Updates application state or persistent storage for the delete prompt operation. The
+        function performs the requested mutation while keeping database and session-state
+        handling centralized.
+    
+    Args:
+        pid (int): Pid value used by this workflow.
+    """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute( "DELETE FROM Prompts WHERE PromptsId=?", (pid,) )
 
 def build_prompt( user_input: str ) -> str:
-	"""
-		Purpose:
-		--------
-		Build a llama.cpp-compatible prompt using the application's system instructions, optional
-		retrieval context (semantic + basic RAG), and the current in-memory chat history.
-
-		Parameters:
-		-----------
-		user_input : str
-			The current user turn to append to the prompt.
-
-		Returns:
-		--------
-		str
-			A fully constructed prompt in chat template format.
-	"""
+	"""Build prompt.
+    
+    Purpose:
+        Builds prompt for the active workflow. The function assembles validated inputs,
+        session-state values, and derived context into the structure expected by the next
+        processing stage.
+    
+    Args:
+        user_input (str): User input value used by this workflow.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	system_instructions = st.session_state.get( 'system_instructions', '' )
 	use_semantic = bool( st.session_state.get( 'use_semantic', False ) )
 	basic_docs = st.session_state.get( 'basic_docs', [ ] )
@@ -3234,27 +3707,20 @@ def build_prompt( user_input: str ) -> str:
 	prompt += f"<|user|>\n{user_input}\n</s>\n<|assistant|>\n"
 	return prompt
 
-
 # -------------- LLM  UTILITIES -------------------
 
 @st.cache_resource
 def load_embedder( ) -> SentenceTransformer:
-	"""
-	
-		Purpose:
-		--------
-		Load the sentence-transformers model used for embedding and retrieval workflows.
-	
-		Parameters:
-		-----------
-		None
-	
-		Returns:
-		--------
-		SentenceTransformer
-			Loaded embedder instance.
-			
-	"""
+	"""Load embedder.
+    
+    Purpose:
+        Retrieves load embedder data for the current workflow. The function isolates lookup
+        logic and returns normalized values that can be displayed, processed, or passed into
+        other helpers.
+    
+    Returns:
+        Value produced by the operation for display or downstream processing.
+    """
 	return SentenceTransformer( 'all-MiniLM-L6-v2' )
 
 # ==============================================================================
@@ -3292,7 +3758,8 @@ with st.sidebar:
 	st.logo( cfg.LOGO_PATH, size='large' )
 	st.divider( )
 	st.text( 'AI Mode' )
-	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0, label_visibility='collapsed' )
+	mode = st.sidebar.radio( 'Select Mode', cfg.GEMINI_MODES, index=0,
+		label_visibility='collapsed' )
 	
 	st.divider( )
 	
@@ -3303,7 +3770,7 @@ with st.sidebar:
 		google_key = st.text_input( 'Google API Key', type='password',
 			value=st.session_state.google_api_key or '',
 			help='Overrides GOOGLE_API_KEY from config.py for this session only.' )
-	
+		
 		if google_key:
 			st.session_state.google_api_key = google_key
 			os.environ[ 'GOOGLE_API_KEY' ] = google_key
@@ -3401,8 +3868,14 @@ if mode == 'Text':
 		# Expander — Text Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-		
 			def reset_text_model_settings( ) -> None:
+				"""Reset text model settings.
+                
+                Purpose:
+                    Resets application state for the reset text model settings operation. The function
+                    clears selected Streamlit session-state values so the related workflow can start from a
+                    clean baseline.
+                """
 				for key in [ 'text_model',
 				             'text_reasoning',
 				             'text_modalities',
@@ -3413,6 +3886,13 @@ if mode == 'Text':
 						del st.session_state[ key ]
 			
 			def reset_text_inference_settings( ) -> None:
+				"""Reset text inference settings.
+                
+                Purpose:
+                    Resets application state for the reset text inference settings operation. The function
+                    clears selected Streamlit session-state values so the related workflow can start from a
+                    clean baseline.
+                """
 				for key in [ 'text_temperature',
 				             'text_top_percent',
 				             'text_top_k',
@@ -3422,6 +3902,13 @@ if mode == 'Text':
 						del st.session_state[ key ]
 			
 			def reset_text_grounding_settings( ) -> None:
+				"""Reset text grounding settings.
+                
+                Purpose:
+                    Resets application state for the reset text grounding settings operation. The function
+                    clears selected Streamlit session-state values so the related workflow can start from a
+                    clean baseline.
+                """
 				for key in [ 'text_google_grounding',
 				             'text_urls_input',
 				             'text_max_urls',
@@ -3435,6 +3922,13 @@ if mode == 'Text':
 						del st.session_state[ key ]
 			
 			def reset_text_response_settings( ) -> None:
+				"""Reset text response settings.
+                
+                Purpose:
+                    Resets application state for the reset text response settings operation. The function
+                    clears selected Streamlit session-state values so the related workflow can start from a
+                    clean baseline.
+                """
 				for key in [ 'text_max_tokens',
 				             'text_response_format',
 				             'text_response_schema',
@@ -3484,7 +3978,8 @@ if mode == 'Text':
 				st.button( label='Reset', key='text_model_reset', width='stretch',
 					on_click=reset_text_model_settings )
 			
-			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
+					width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -3578,7 +4073,8 @@ if mode == 'Text':
 				
 				# ---------- Stops ------------
 				with resp_c4:
-					text_stops_input = st.text_input( label='Stop Sequences', key='text_stops_input',
+					text_stops_input = st.text_input( label='Stop Sequences',
+						key='text_stops_input',
 						help=cfg.STOP_SEQUENCE, width='stretch',
 						placeholder='Enter Stop Strings separated by commas' )
 				
@@ -3602,7 +4098,7 @@ if mode == 'Text':
 				
 				st.button( label='Reset', key='reset_text_response',
 					width='stretch', on_click=reset_text_response_settings )
-				
+		
 		# ------------------------------------------------------------------
 		# Expander — Text System Instructions
 		# ------------------------------------------------------------------
@@ -3618,6 +4114,13 @@ if mode == 'Text':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='text_system_instructions' )
 			
 			def _on_template_change( ) -> None:
+				"""On template change.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on template change workflow.
+                    The function coordinates local state, input validation, and downstream helper calls
+                    needed by the surrounding application mode.
+                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -3629,10 +4132,24 @@ if mode == 'Text':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
+				"""On clear.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
+                    coordinates local state, input validation, and downstream helper calls needed by the
+                    surrounding application mode.
+                """
 				st.session_state[ 'text_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
+				"""On convert system instructions.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on convert system instructions
+                    workflow. The function coordinates local state, input validation, and downstream helper
+                    calls needed by the surrounding application mode.
+                """
 				text = st.session_state.get( 'text_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -3670,10 +4187,10 @@ if mode == 'Text':
 			apply_gemini_runtime_config( )
 			
 			st.session_state.text_messages.append(
-			{
-				'role': 'user',
-				'content': prompt,
-			} )
+				{
+						'role': 'user',
+						'content': prompt,
+				} )
 			
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
@@ -3682,6 +4199,16 @@ if mode == 'Text':
 					stream_placeholder = st.empty( )
 					
 					def _on_stream_chunk( chunk: str ) -> None:
+						"""On stream chunk.
+                        
+                        Purpose:
+                            Supports the Jeni Streamlit application by executing the on stream chunk workflow. The
+                            function coordinates local state, input validation, and downstream helper calls needed
+                            by the surrounding application mode.
+                        
+                        Args:
+                            chunk (str): Chunk value used by this workflow.
+                        """
 						if chunk is None:
 							return
 						
@@ -3693,28 +4220,29 @@ if mode == 'Text':
 						if structured_context is None or len( structured_context ) == 0:
 							structured_context = st.session_state.get( 'text_messages', [ ] )[ :-1 ]
 							selected_text_model = st.session_state.get( 'text_model' )
-							
+						
 						if not selected_text_model:
 							selected_text_model = text.model
-							
+						
 						grounding_enabled = bool(
 							st.session_state.get( 'text_google_grounding', False ) )
-					
+						
 						derived_text_tools = [ 'google_search' ] if grounding_enabled else [ ]
 						
 						raw_text_urls = str( st.session_state.get( 'text_urls_input', '' ) or '' )
 						derived_text_urls = [ url.strip( )
-								for url in raw_text_urls.split( ';' )
-								if url.strip( ) ]
+						                      for url in raw_text_urls.split( ';' )
+						                      if url.strip( ) ]
 						
 						raw_text_stops = str( st.session_state.get( 'text_stops_input', '' ) or '' )
 						derived_text_stops = [ stop.strip( )
-								for stop in raw_text_stops.split( ',' )
-								if stop.strip( ) ]
+						                       for stop in raw_text_stops.split( ',' )
+						                       if stop.strip( ) ]
 						
 						derived_text_modalities = [ str( modality ).strip( )
-								for modality in st.session_state.get( 'text_modalities', [ ] )
-								if str( modality ).strip( ) ]
+						                            for modality in
+						                            st.session_state.get( 'text_modalities', [ ] )
+						                            if str( modality ).strip( ) ]
 						
 						response = text.generate_text( prompt=prompt,
 							model=selected_text_model,
@@ -3754,7 +4282,7 @@ if mode == 'Text':
 						else:
 							st.markdown( response )
 							grounding_sources = text.get_grounding_sources( )
-					
+						
 						if grounding_sources:
 							st.session_state.last_sources = grounding_sources
 							with st.expander( label='Grounding Sources', icon='🔎',
@@ -3765,12 +4293,12 @@ if mode == 'Text':
 									
 									if url:
 										st.markdown( f'- [{title}]({url})' )
-									
+						
 						st.session_state.text_messages.append(
-						{
-							'role': 'assistant',
-							'content': str( response ).strip( ),
-						} )
+							{
+									'role': 'assistant',
+									'content': str( response ).strip( ),
+							} )
 						
 						if st.session_state.get( 'text_stream', False ):
 							st.session_state[ 'text_gemini_history' ] = [ ]
@@ -3790,7 +4318,7 @@ if mode == 'Text':
 			st.session_state.last_answer = ''
 			st.session_state.last_sources = [ ]
 			st.rerun( )
-			
+
 # ======================================================================================
 # IMAGES MODE
 # ======================================================================================
@@ -3818,34 +4346,34 @@ elif mode == "Images":
 	image = Images( )
 	
 	def _clear_image_messages( ) -> None:
-		"""
-		
-			Purpose:
-			-----------
-			Clears only Image-mode conversation state.
-			
-			Returns:
-			--------
-			None
-			
-		"""
+		"""Clear image messages.
+        
+        Purpose:
+            Supports the Jeni Streamlit application by executing the clear image messages workflow.
+            The function coordinates local state, input validation, and downstream helper calls
+            needed by the surrounding application mode.
+        """
 		try:
 			st.session_state[ 'image_input' ] = [ ]
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = '_clear_image_messages'
+				error.method = '_clear_image_messages(  )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			pass
 	
 	def _sync_image_tools( ) -> None:
-		"""
-		
-			Purpose:
-			-----------
-			Synchronizes derived Image-mode tools into session state.
-			
-			Returns:
-			--------
-			None
-			
-		"""
+		"""Sync image tools.
+        
+        Purpose:
+            Supports the Jeni Streamlit application by executing the sync image tools workflow. The
+            function coordinates local state, input validation, and downstream helper calls needed
+            by the surrounding application mode.
+        """
 		try:
 			tools = [ ]
 			if st.session_state.get( 'image_grounded', False ):
@@ -3855,7 +4383,15 @@ elif mode == "Images":
 				tools.append( 'image_search' )
 			
 			st.session_state[ 'image_tools' ] = tools
-		except Exception:
+		except Exception as _logged_exception:
+			try:
+				error = Error( _logged_exception )
+				error.module = 'app'
+				error.cause = '_sync_image_tools'
+				error.method = '_sync_image_tools(  )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			pass
 	
 	if st.session_state.get( 'clear_instructions' ):
@@ -3869,7 +4405,6 @@ elif mode == "Images":
 		st.divider( )
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4 = st.columns(
 					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
@@ -3877,7 +4412,8 @@ elif mode == "Images":
 				with llm_c1:
 					_modes = [ 'Generation', 'Analysis', 'Editing' ]
 					st.selectbox( label='Image Mode', options=_modes, key='image_mode',
-						help='Available Gemini image workflows.', index=None, placeholder='Options' )
+						help='Available Gemini image workflows.', index=None,
+						placeholder='Options' )
 					image_mode = st.session_state.get( 'image_mode', '' )
 				
 				with llm_c2:
@@ -3914,7 +4450,8 @@ elif mode == "Images":
 							del st.session_state[ key ]
 					st.rerun( )
 			
-			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False,
+					width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4 = st.columns(
 					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
 				
@@ -4078,6 +4615,13 @@ elif mode == "Images":
 				)
 			
 			def _on_image_template_change( ) -> None:
+				"""On image template change.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on image template change
+                    workflow. The function coordinates local state, input validation, and downstream helper
+                    calls needed by the surrounding application mode.
+                """
 				name = st.session_state.get( 'image_instructions_template' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -4094,10 +4638,24 @@ elif mode == "Images":
 				)
 			
 			def _on_clear_image_instructions( ) -> None:
+				"""On clear image instructions.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on clear image instructions
+                    workflow. The function coordinates local state, input validation, and downstream helper
+                    calls needed by the surrounding application mode.
+                """
 				st.session_state[ 'image_system_instructions' ] = ''
 				st.session_state[ 'image_instructions_template' ] = ''
 			
 			def _on_convert_image_system_instructions( ) -> None:
+				"""On convert image system instructions.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on convert image system
+                    instructions workflow. The function coordinates local state, input validation, and
+                    downstream helper calls needed by the surrounding application mode.
+                """
 				text = st.session_state.get( 'image_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -4127,18 +4685,17 @@ elif mode == "Images":
 				)
 		
 		def _append_image_message( role: str, content: str ) -> None:
-			"""
-			
-				Purpose:
-				-----------
-				Appends an image-mode message to session state.
-				
-				Parameters:
-				-----------
-				role: str - Message role.
-				content: str - Message content.
-				
-			"""
+			"""Append image message.
+            
+            Purpose:
+                Supports the Jeni Streamlit application by executing the append image message workflow.
+                The function coordinates local state, input validation, and downstream helper calls
+                needed by the surrounding application mode.
+            
+            Args:
+                role (str): Role value used by this workflow.
+                content (str): Content value used by this workflow.
+            """
 			try:
 				if 'image_input' not in st.session_state or not isinstance(
 						st.session_state[ 'image_input' ], list ):
@@ -4146,7 +4703,15 @@ elif mode == "Images":
 				
 				st.session_state[ 'image_input' ].append(
 					{ 'role': role, 'content': content } )
-			except Exception:
+			except Exception as _logged_exception:
+				try:
+					error = Error( _logged_exception )
+					error.module = 'app'
+					error.cause = '_append_image_message'
+					error.method = '_append_image_message( role: str, content: str )'
+					Logger( ).write( error )
+				except Exception:
+					pass
 				pass
 		
 		tab_gen, tab_analyze, tab_edit = st.tabs( [ 'Generate', 'Analyze', 'Edit' ] )
@@ -4180,7 +4745,8 @@ elif mode == "Images":
 									top_p=image_top_percent,
 									max_tokens=image_max_tokens,
 									resolution=image_size,
-									instruct=st.session_state.get( 'image_system_instructions', '' ),
+									instruct=st.session_state.get( 'image_system_instructions',
+										'' ),
 									output_mime_type=image_mime_type,
 									response_modalities=image_modality,
 									grounded=image_grounded,
@@ -4217,12 +4783,12 @@ elif mode == "Images":
 			if uploaded_img:
 				tmp_path = save_temp( uploaded_img )
 				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
-		
+			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
 					with st.chat_message( msg[ 'role' ], avatar='' ):
 						st.markdown( msg[ 'content' ] )
-						
+			
 			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 			
 			prompt = st.chat_input( 'Enter image analysis prompt …' )
@@ -4249,7 +4815,8 @@ elif mode == "Images":
 									temperature=image_temperature,
 									top_p=image_top_percent,
 									max_tokens=image_max_tokens,
-									instruct=st.session_state.get( 'image_system_instructions', '' ),
+									instruct=st.session_state.get( 'image_system_instructions',
+										'' ),
 									response_modalities=image_modality,
 									grounded=image_grounded,
 									image_search=image_image_search
@@ -4317,7 +4884,8 @@ elif mode == "Images":
 									top_p=image_top_percent,
 									max_tokens=image_max_tokens,
 									resolution=image_size,
-									instruct=st.session_state.get( 'image_system_instructions', '' ),
+									instruct=st.session_state.get( 'image_system_instructions',
+										'' ),
 									output_mime_type=image_mime_type,
 									response_modalities=image_modality,
 									grounded=image_grounded,
@@ -4344,7 +4912,7 @@ elif mode == "Images":
 				if st.button( 'Clear Messages', key='clear_image_editing' ):
 					_clear_image_messages( )
 					st.rerun( )
-	
+
 # ======================================================================================
 # AUDIO MODE
 # ======================================================================================
@@ -4382,21 +4950,19 @@ elif mode == 'Audio':
 	model_options = [ ]
 	
 	def _run_audio_task( source_path: str ) -> Optional[ str ]:
-		"""
-
-			Purpose:
-			--------
-			Executes the selected audio task against a saved local audio file.
-
-			Parameters:
-			-----------
-			source_path: str - Local path to a saved audio file.
-
-			Returns:
-			--------
-			Optional[ str ] - Transcript or translation text.
-
-		"""
+		"""Run audio task.
+        
+        Purpose:
+            Supports the Jeni Streamlit application by executing the run audio task workflow. The
+            function coordinates local state, input validation, and downstream helper calls needed
+            by the surrounding application mode.
+        
+        Args:
+            source_path (str): Source path value used by this workflow.
+        
+        Returns:
+            Result produced by the operation.
+        """
 		try:
 			throw_if( 'source_path', source_path )
 			st.session_state[ 'audio_file' ] = source_path
@@ -4433,6 +4999,14 @@ elif mode == 'Audio':
 			
 			return None
 		except Exception as exc:
+			try:
+				error = Error( exc )
+				error.module = 'app'
+				error.cause = '_run_audio_task'
+				error.method = '_run_audio_task( source_path: str )'
+				Logger( ).write( error )
+			except Exception:
+				pass
 			st.error( f'Audio task failed: {exc}' )
 			return None
 	
@@ -4447,7 +5021,6 @@ elif mode == 'Audio':
 		st.divider( )
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			with st.expander( 'LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				aud_c1, aud_c2, aud_c3, aud_c4, aud_c5 = st.columns(
 					[ 0.2, 0.2, 0.2, 0.2, 0.2 ], gap='xxsmall', border=True )
@@ -4484,7 +5057,8 @@ elif mode == 'Audio':
 					if audio_task in ('Transcribe', 'Translate'):
 						obj = transcriber if audio_task == 'Transcribe' else translator
 						if obj and hasattr( obj, 'language_options' ):
-							audio_language = st.selectbox( label='Language', options=obj.language_options,
+							audio_language = st.selectbox( label='Language',
+								options=obj.language_options,
 								key='audio_language', placeholder='Options', index=None )
 							
 							audio_language = st.session_state[ 'audio_language' ]
@@ -4621,6 +5195,13 @@ elif mode == 'Audio':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
 			
 			def _on_template_change( ) -> None:
+				"""On template change.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on template change workflow.
+                    The function coordinates local state, input validation, and downstream helper calls
+                    needed by the surrounding application mode.
+                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -4632,10 +5213,24 @@ elif mode == 'Audio':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
+				"""On clear.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
+                    coordinates local state, input validation, and downstream helper calls needed by the
+                    surrounding application mode.
+                """
 				st.session_state[ 'audio_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
+				"""On convert system instructions.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on convert system instructions
+                    workflow. The function coordinates local state, input validation, and downstream helper
+                    calls needed by the surrounding application mode.
+                """
 				text = st.session_state.get( 'audio_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -4679,7 +5274,8 @@ elif mode == 'Audio':
 								st.text_area( audio_task, value=result, height=300 )
 								try:
 									update_counters(
-										getattr( transcriber, 'response', None ) if audio_task == 'Transcribe'
+										getattr( transcriber, 'response',
+											None ) if audio_task == 'Transcribe'
 										else getattr( translator, 'response', None ) )
 								except Exception:
 									pass
@@ -4739,7 +5335,8 @@ elif mode == 'Audio':
 								st.text_area( f'Recorded {audio_task}', value=result, height=220 )
 								try:
 									update_counters(
-										getattr( transcriber, 'response', None ) if audio_task == 'Transcribe'
+										getattr( transcriber, 'response',
+											None ) if audio_task == 'Transcribe'
 										else getattr( translator, 'response', None ) )
 								except Exception:
 									pass
@@ -4802,7 +5399,8 @@ elif mode == 'Embedding':
 			# ---------  Model --------
 			with emb_c1:
 				embedding_models = list( embedding.model_options )
-				set_embedding_model = st.selectbox( label='Embedding Model:', options=embedding_models,
+				set_embedding_model = st.selectbox( label='Embedding Model:',
+					options=embedding_models,
 					help='REQUIRED. Embedding model used by the AI', key='embedding_model',
 					index=None, placeholder='Options' )
 				
@@ -4820,7 +5418,8 @@ elif mode == 'Embedding':
 			
 			# ---------  Dimensions --------
 			with emb_c3:
-				set_embedding_dimensions = st.slider( label='Dimensions', min_value=0, max_value=2048,
+				set_embedding_dimensions = st.slider( label='Dimensions', min_value=0,
+					max_value=2048,
 					value=int( st.session_state.get( 'embeddings_dimensions' ) ),
 					step=1, key='embeddings_dimensions',
 					help='Optional (large llm only): An integer between 1 and 2048',
@@ -5025,7 +5624,6 @@ elif mode == 'Document Q&A':
 		st.subheader( '📓 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
 		st.divider( )
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
@@ -5052,7 +5650,8 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Allowed Domains ------------
 				with llm_c3:
-					set_docqna_domains = st.text_input( label='Allowed Domains', key='docqna_domains_input',
+					set_docqna_domains = st.text_input( label='Allowed Domains',
+						key='docqna_domains_input',
 						value=','.join( st.session_state.get( 'docqna_domains', [ ] ) ),
 						help=cfg.ALLOWED_DOMAINS, width='stretch', placeholder='Enter Domains' )
 					
@@ -5088,7 +5687,8 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
-			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
+					width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -5102,7 +5702,8 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Frequency ------------
 				with prm_c2:
-					set_docqna_freq = st.slider( label='Frequency Penalty', min_value=-2.0, max_value=2.0,
+					set_docqna_freq = st.slider( label='Frequency Penalty', min_value=-2.0,
+						max_value=2.0,
 						value=float( st.session_state.get( 'docqna_frequency_penalty', 0.0 ) ),
 						step=0.01, help=cfg.FREQUENCY_PENALTY, key='docqna_frequency_penalty' )
 					
@@ -5110,7 +5711,8 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Presence ------------
 				with prm_c3:
-					set_docqna_presence = st.slider( label='Presense Penalty', min_value=-2.0, max_value=2.0,
+					set_docqna_presence = st.slider( label='Presense Penalty', min_value=-2.0,
+						max_value=2.0,
 						value=float( st.session_state.get( 'docqna_presence_penalty', 0.0 ) ),
 						step=0.01, help=cfg.PRESENCE_PENALTY, key='docqna_presence_penalty' )
 					
@@ -5118,7 +5720,8 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Temperature ------------
 				with prm_c4:
-					set_docqna_temperature = st.slider( label='Temperature', min_value=0.0, max_value=1.0,
+					set_docqna_temperature = st.slider( label='Temperature', min_value=0.0,
+						max_value=1.0,
 						value=float( st.session_state.get( 'docqna_temperature', 0.0 ) ), step=0.01,
 						help=cfg.TEMPERATURE, key='docqna_temperature' )
 					
@@ -5168,14 +5771,16 @@ elif mode == 'Document Q&A':
 				with tool_c3:
 					choice_options = list( docqna.choice_options )
 					set_docqna_choice = st.selectbox( label='Calling Mode', options=choice_options,
-						key='docqna_tool_choice', help=cfg.CHOICE, index=None, placeholder='Options' )
+						key='docqna_tool_choice', help=cfg.CHOICE, index=None,
+						placeholder='Options' )
 					
 					docqna_tool_choice = st.session_state[ 'docqna_tool_choice' ]
 				
 				# ---------- Tools ------------
 				with tool_c4:
 					tool_options = list( docqna.tool_options )
-					set_docqna_tools = st.multiselect( label='Available Tools', options=tool_options,
+					set_docqna_tools = st.multiselect( label='Available Tools',
+						options=tool_options,
 						key='docqna_tools', help=cfg.TOOLS, placeholder='Options' )
 					
 					docqna_tools = [ d.strip( ) for d in set_docqna_tools
@@ -5186,7 +5791,8 @@ elif mode == 'Document Q&A':
 				# ---------- Modalities ------------
 				with tool_c5:
 					modality_options = list( docqna.modality_options )
-					set_docqna_modalities = st.multiselect( label='Response Modalities', options=modality_options,
+					set_docqna_modalities = st.multiselect( label='Response Modalities',
+						options=modality_options,
 						key='docqna_modalities', help='Optional. Modality of the response',
 						placeholder='Options' )
 					
@@ -5204,7 +5810,8 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
-			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False,
+					width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -5217,7 +5824,8 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Store ------------
 				with resp_c2:
-					set_docqna_store = st.toggle( label='Store', key='docqna_store', help=cfg.STORE )
+					set_docqna_store = st.toggle( label='Store', key='docqna_store',
+						help=cfg.STORE )
 					
 					docqna_store = st.session_state[ 'docqna_store' ]
 				
@@ -5238,7 +5846,8 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Max Tokens ------------
 				with resp_c5:
-					set_docqna_tokens = st.slider( label='Max Tokens', min_value=0, max_value=100000,
+					set_docqna_tokens = st.slider( label='Max Tokens', min_value=0,
+						max_value=100000,
 						value=int( st.session_state.get( 'docqna_max_tokens', 0 ) ), step=500,
 						help=cfg.MAX_OUTPUT_TOKENS, key='docqna_max_tokens' )
 					
@@ -5269,6 +5878,13 @@ elif mode == 'Document Q&A':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='docqna_system_instructions' )
 			
 			def _on_template_change( ) -> None:
+				"""On template change.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on template change workflow.
+                    The function coordinates local state, input validation, and downstream helper calls
+                    needed by the surrounding application mode.
+                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -5280,10 +5896,24 @@ elif mode == 'Document Q&A':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
+				"""On clear.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
+                    coordinates local state, input validation, and downstream helper calls needed by the
+                    surrounding application mode.
+                """
 				st.session_state[ 'docqna_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
+				"""On convert system instructions.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on convert system instructions
+                    workflow. The function coordinates local state, input validation, and downstream helper
+                    calls needed by the surrounding application mode.
+                """
 				text = st.session_state.get( 'docqna_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -5316,7 +5946,8 @@ elif mode == 'Document Q&A':
 				
 				if docqna_uploaded is not None:
 					st.session_state.docqna_active_docs = [ docqna_uploaded.name ]
-					st.session_state.doc_bytes = { docqna_uploaded.name: docqna_uploaded.getvalue( ) }
+					st.session_state.doc_bytes = {
+							docqna_uploaded.name: docqna_uploaded.getvalue( ) }
 					st.success( f'{docqna_uploaded.name} has been loaded!' )
 				else:
 					st.info( 'Load a document.' )
@@ -5369,7 +6000,6 @@ elif mode == 'Files':
 		st.subheader( '📚 Files API', help=cfg.FILES_API )
 		st.divider( )
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5, llm_c6 = st.columns(
 					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
@@ -5585,6 +6215,13 @@ elif mode == 'Files':
 					help=cfg.SYSTEM_INSTRUCTIONS, key='files_system_instructions' )
 			
 			def _on_template_change( ) -> None:
+				"""On template change.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on template change workflow.
+                    The function coordinates local state, input validation, and downstream helper calls
+                    needed by the surrounding application mode.
+                """
 				name = st.session_state.get( 'instructions' )
 				if name and name != 'No Templates Found':
 					text = fetch_prompt_text( cfg.DB_PATH, name )
@@ -5596,10 +6233,24 @@ elif mode == 'Files':
 					key='instructions', on_change=_on_template_change )
 			
 			def _on_clear( ) -> None:
+				"""On clear.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on clear workflow. The function
+                    coordinates local state, input validation, and downstream helper calls needed by the
+                    surrounding application mode.
+                """
 				st.session_state[ 'files_system_instructions' ] = ''
 				st.session_state[ 'instructions' ] = ''
 			
 			def _on_convert_system_instructions( ) -> None:
+				"""On convert system instructions.
+                
+                Purpose:
+                    Supports the Jeni Streamlit application by executing the on convert system instructions
+                    workflow. The function coordinates local state, input validation, and downstream helper
+                    calls needed by the surrounding application mode.
+                """
 				text = st.session_state.get( 'files_system_instructions', '' )
 				if not isinstance( text, str ) or not text.strip( ):
 					return
@@ -5624,7 +6275,7 @@ elif mode == 'Files':
 				st.button( label='XML <-> Markdown', width='stretch',
 					on_click=_on_convert_system_instructions )
 		
-		fls_c1, fls_c2 = st.columns([ 0.4, 0.6 ], border=True )
+		fls_c1, fls_c2 = st.columns( [ 0.4, 0.6 ], border=True )
 		with fls_c1:
 			if st.button( 'List Files' ):
 				try:
@@ -5633,8 +6284,9 @@ elif mode == 'Files':
 						list_method = getattr( files, 'list' )
 						files_resp = list_method( )
 						rows = [ ]
-						files_list = (files_resp.data if hasattr( files_resp, 'data' ) else files_resp
-						if isinstance( files_resp, list ) else [ ])
+						files_list = (
+							files_resp.data if hasattr( files_resp, 'data' ) else files_resp
+							if isinstance( files_resp, list ) else [ ])
 						
 						for f in files_list:
 							if isinstance( f, str ):
@@ -5863,11 +6515,11 @@ elif mode == 'File Search Stores':
 								except Exception as exc:
 									st.error( f'Delete failed: {exc}' )
 			
-			#--------- Uploader
+			# --------- Uploader
 			with stores_right:
 				uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
 					type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
-			
+				
 				if uploaded_file:
 					tmp_path = save_temp( uploaded_file )
 					upload_fn = None
@@ -6037,9 +6689,25 @@ elif mode == 'Prompt Engineering':
 		# DB helpers
 		# ------------------------------------------------------------------
 		def get_conn( ):
+			"""Get conn.
+            
+            Purpose:
+                Retrieves get conn data for the current workflow. The function isolates lookup logic and
+                returns normalized values that can be displayed, processed, or passed into other
+                helpers.
+            
+            Returns:
+                Value produced by the operation for display or downstream processing.
+            """
 			return sqlite3.connect( cfg.DB_PATH )
 		
 		def reset_selection( ):
+			"""Reset selection.
+            
+            Purpose:
+                Resets application state for the reset selection operation. The function clears selected
+                Streamlit session-state values so the related workflow can start from a clean baseline.
+            """
 			st.session_state.pe_selected_id = None
 			st.session_state.pe_caption = ''
 			st.session_state.pe_name = ''
@@ -6048,6 +6716,16 @@ elif mode == 'Prompt Engineering':
 			st.session_state.pe_id = 0
 		
 		def load_prompt( pid: int ) -> None:
+			"""Load prompt.
+            
+            Purpose:
+                Retrieves load prompt data for the current workflow. The function isolates lookup logic
+                and returns normalized values that can be displayed, processed, or passed into other
+                helpers.
+            
+            Args:
+                pid (int): Pid value used by this workflow.
+            """
 			with get_conn( ) as conn:
 				_select = f"SELECT Caption, Name, Text, Version, ID FROM {TABLE} WHERE PromptsId=?"
 				cur = conn.execute( _select, (pid,), )
@@ -6106,12 +6784,12 @@ elif mode == 'Prompt Engineering':
 		
 		offset = (st.session_state.pe_page - 1) * PAGE_SIZE
 		query = f"""
-	        SELECT PromptsId, Caption, Name, Text, Version, ID
-	        FROM {TABLE}
-	        {where}
-	        ORDER BY {st.session_state.pe_sort_col} {st.session_state.pe_sort_dir}
-	        LIMIT {PAGE_SIZE} OFFSET {offset}
-	    """
+            SELECT PromptsId, Caption, Name, Text, Version, ID
+            FROM {TABLE}
+            {where}
+            ORDER BY {st.session_state.pe_sort_col} {st.session_state.pe_sort_dir}
+            LIMIT {PAGE_SIZE} OFFSET {offset}
+        """
 		
 		count_query = f"SELECT COUNT(*) FROM {TABLE} {where}"
 		
@@ -6193,10 +6871,10 @@ elif mode == 'Prompt Engineering':
 						if st.session_state.pe_selected_id:
 							conn.execute(
 								f"""
-	                            UPDATE {TABLE}
-	                            SET Caption=?, Name=?, Text=?, Version=?, ID=?
-	                            WHERE PromptsId=?
-	                            """,
+                                UPDATE {TABLE}
+                                SET Caption=?, Name=?, Text=?, Version=?, ID=?
+                                WHERE PromptsId=?
+                                """,
 								(
 										st.session_state.pe_caption,
 										st.session_state.pe_name,
@@ -6208,9 +6886,9 @@ elif mode == 'Prompt Engineering':
 						else:
 							conn.execute(
 								f"""
-	                            INSERT INTO {TABLE} (Caption, Name, Text, Version, ID)
-	                            VALUES (?, ?, ?, ? , ?)
-	                            """,
+                                INSERT INTO {TABLE} (Caption, Name, Text, Version, ID)
+                                VALUES (?, ?, ?, ? , ?)
+                                """,
 								(
 										st.session_state.pe_caption,
 										st.session_state.pe_name,
@@ -6265,7 +6943,8 @@ elif mode == 'Data Export':
 			export_filename = 'Buddy_System_Instructions.xml'
 		
 		st.download_button( label='Download System Instructions', data=export_text,
-			file_name=export_filename, mime='text/plain', disabled=not bool( export_text.strip( ) ) )
+			file_name=export_filename, mime='text/plain',
+			disabled=not bool( export_text.strip( ) ) )
 		
 		# -----------------------------
 		# Existing chat history export
@@ -6303,7 +6982,7 @@ elif mode == 'Data Management':
 		st.subheader( '🏛️ Data Management', help=cfg.DATA_MANAGEMENT )
 		tabs = st.tabs( [ '📥 Import', '🗂 Browse', '💉 CRUD', '📊 Explore', '🔎 Filter',
 		                  '🧮 Aggregate', '📈 Visualize', '⚙ Admin', '🧠 SQL' ] )
-
+		
 		# ------------------------------------------------------------------------------
 		# UPLOAD TAB
 		# ------------------------------------------------------------------------------
@@ -6332,14 +7011,14 @@ elif mode == 'Data Management':
 								sql_type = get_sqlite_type( df[ col ].dtype )
 								columns.append( f'"{col}" {sql_type}' )
 							
-							create_stmt = ( f'CREATE TABLE "{table_name}" '
-									f'({", ".join( columns )});' )
+							create_stmt = (f'CREATE TABLE "{table_name}" '
+							               f'({", ".join( columns )});')
 							
 							conn.execute( create_stmt )
 							
 							# --- Insert Data ---
 							placeholders = ", ".join( [ "?" ] * len( df.columns ) )
-							insert_stmt = ( f'INSERT INTO "{table_name}" VALUES ({placeholders});' )
+							insert_stmt = (f'INSERT INTO "{table_name}" VALUES ({placeholders});')
 							
 							conn.executemany( insert_stmt,
 								df.where( pd.notnull( df ), None ).values.tolist( ) )
@@ -6348,14 +7027,14 @@ elif mode == 'Data Management':
 					
 					st.success( 'Import completed successfully (transaction committed).' )
 					st.rerun( )
-					
+				
 				except Exception as e:
 					try:
 						conn.rollback( )
 					except:
 						pass
 					st.error( f'Import failed — transaction rolled back.\n\n{e}' )
-	
+		
 		# ------------------------------------------------------------------------------
 		# BROWSE TAB
 		# ------------------------------------------------------------------------------
@@ -6542,12 +7221,12 @@ elif mode == 'Data Management':
 				
 				with exp_c2:
 					page_size = st.slider( 'Rows per page', 10, 500, 50 )
-					
+				
 				with exp_c3:
 					page = st.number_input( 'Page', min_value=1, step=1 )
 					offset = (page - 1) * page_size
 					df_page = read_table( table, page_size, offset )
-					
+				
 				st.divider( )
 				
 				st.data_editor( df_page, key='dm_explore_table' )
@@ -6565,7 +7244,7 @@ elif mode == 'Data Management':
 				with ftr_c2:
 					df = read_table( table )
 					column = st.selectbox( 'Column', df.columns )
-					
+				
 				with ftr_c3:
 					value = st.text_input( 'Contains' )
 					if value:
@@ -6666,7 +7345,8 @@ elif mode == 'Data Management':
 			
 			st.subheader( 'Create Custom Table' )
 			new_table_name = st.text_input( 'Table Name' )
-			column_count = st.number_input( 'Number of Columns', min_value=1, max_value=20, value=1 )
+			column_count = st.number_input( 'Number of Columns', min_value=1, max_value=20,
+				value=1 )
 			columns = [ ]
 			for i in range( column_count ):
 				st.markdown( f'### Column {i + 1}' )
@@ -6679,7 +7359,7 @@ elif mode == 'Data Management':
 				auto_inc = st.checkbox( 'AUTOINCREMENT (INTEGER only)', key=f'ai_{i}' )
 				
 				columns.append( { 'name': col_name, 'type': col_type, 'not_null': not_null,
-						'primary_key': primary_key, 'auto_increment': auto_inc } )
+				                  'primary_key': primary_key, 'auto_increment': auto_inc } )
 			
 			if st.button( 'Create Table' ):
 				try:
@@ -6834,39 +7514,39 @@ elif mode == 'Data Management':
 # ======================================================================================
 st.markdown(
 	"""
-	<style>
-	.block-container {
-		padding-bottom: 3rem;
-	}
-	</style>
-	""",
+    <style>
+    .block-container {
+        padding-bottom: 3rem;
+    }
+    </style>
+    """,
 	unsafe_allow_html=True,
 )
 
 # ---- Fixed Container
 st.markdown(
 	"""
-	<style>
-	.boo-status-bar {
-		position: fixed;
-		bottom: 0;
-		left: 0;
-		width: 100%;
-		background-color: rgba(17, 17, 17, 0.95);
-		border-top: 1px solid #2a2a2a;
-		padding: 10px 16px;
-		font-size: 0.80rem;
-		color: #35618c;
-		z-index: 1000;
-	}
-	.boo-status-inner {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		max-width: 100%;
-	}
-	</style>
-	""",
+    <style>
+    .boo-status-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        background-color: rgba(17, 17, 17, 0.95);
+        border-top: 1px solid #2a2a2a;
+        padding: 10px 16px;
+        font-size: 0.80rem;
+        color: #35618c;
+        z-index: 1000;
+    }
+    .boo-status-inner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        max-width: 100%;
+    }
+    </style>
+    """,
 	unsafe_allow_html=True,
 )
 

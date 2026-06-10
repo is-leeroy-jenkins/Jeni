@@ -44,7 +44,7 @@
 from google.genai.file_search_stores import FileSearchStores
 import config as cfg
 import base64
-from boogr import ErrorDialog, Error
+from boogr import Error, Logger
 import json
 import os
 import requests
@@ -55,7 +55,7 @@ from google import genai
 from google.cloud import storage
 from google.genai import types
 from google.genai.pagers import Pager
-from google.genai.types import ( Part, GenerateContentConfig, ImageConfig, FunctionCallingConfig,
+from google.genai.types import (Part, GenerateContentConfig, ImageConfig, FunctionCallingConfig,
                                 GenerateImagesConfig, GenerateVideosConfig, ThinkingConfig,
                                 GeneratedImage, EmbedContentConfig, Content, ContentEmbedding,
                                 Candidate, HttpOptions, GenerateImagesResponse, Field,
@@ -63,24 +63,23 @@ from google.genai.types import ( Part, GenerateContentConfig, ImageConfig, Funct
                                 GenerateContentResponse, GenerateVideosResponse, Image, File,
                                 SpeakerVoiceConfig, VoiceConfig, SpeechConfig, Tool, ToolConfig,
                                 GoogleSearch, UrlContext, SafetySetting, HarmCategory,
-                                HarmBlockThreshold )
+                                HarmBlockThreshold)
 
 def throw_if( name: str, value: object ) -> None:
-	"""
+	"""Throw if.
 	
-		Purpose:
-		--------
-		Raises a ValueError when a required argument is None or empty.
-		
-		Parameters:
-		-----------
-		name: str - Argument name used in the error message.
-		value: object - Argument value to validate.
-		
-		Returns:
-		--------
-		None
+	Purpose:
+		Validates a required argument before provider requests or filesystem operations
+		continue. The helper raises a clear ValueError when a value is missing, blank, or an
+		empty collection so callers fail fast with a stable diagnostic.
 	
+	Args:
+		name (str): name value used by this workflow.
+		value (object): value value used by this workflow.
+	
+	Raises:
+		Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+		ValueError: Raised when local validation detects an invalid required value.
 	"""
 	if value is None:
 		raise ValueError( f'Argument "{name}" cannot be empty!' )
@@ -92,51 +91,62 @@ def throw_if( name: str, value: object ) -> None:
 		raise ValueError( f'Argument "{name}" cannot be empty!' )
 
 def encode_image( image_path: str ) -> str:
-	"""
-		
-		Purpose:
-		---------
-		Encodes a local image to a base64 string for vision API requests.
-		
+	"""Encode image.
+	
+	Purpose:
+		Reads a local image file and converts its binary content into a base64 text payload. The
+		helper supports vision workflows that need an inline encoded representation instead of a
+		file handle or URI.
+	
+	Args:
+		image_path (str): image path value used by this workflow.
+	
+	Returns:
+		Base64-encoded image content.
 	"""
 	with open( image_path, "rb" ) as image_file:
 		return base64.b64encode( image_file.read( ) ).decode( 'utf-8' )
 
 class Gemini( ):
-	'''
-
-		Purpose:
-		-------
-		Base configuration and attribute store for Google Gemini AI functionality.
-
-		Attributes:
-		-----------
-		number            : int - Default candidate count
-		project_id        : str - Google Cloud Project ID
-		api_key           : str - Google API Key
-		cloud_location    : str - Google Cloud region
-		instructions      : str - System instructions
-		prompt            : str - User input prompt
-		model             : str - Model identifier
-		api_version       : str - API version
-		max_tokens        : int - Token limit
-		temperature       : float - Sampling temperature
-		top_p             : float - Nucleus sampling
-		top_k             : int - Top-k threshold
-		content_config    : GenerateContentConfig - Content generation settings
-		function_config   : FunctionCallingConfig - Tool use configuration
-		thought_config    : ThinkingConfig - Reasoning settings
-		genimg_config     : GenerateImagesConfig - Image generation settings
-		image_config      : ImageConfig - Multimodal settings
-		tool_config       : list - Collection of Tool objects for grounding
-		candidate_count   : int - Response count
-		response_modalities        : list - I/O types
-		stops             : list - Stop sequences
-		frequency_penalty : float - Repetition control
-		presence_penalty  : float - Topic control
-		response_format   : str - format string
-
-	'''
+	"""Gemini class.
+	
+	Purpose:
+		Provides shared configuration, runtime state, and compatibility fields for Gemini-
+		related wrapper classes. The base class centralizes API keys, model settings, sampling
+		options, modality settings, and response placeholders used by chat, image, embedding,
+		audio, file, file-search, and storage workflows.
+	
+	Attributes:
+		number (Optional[int]): Runtime field used by the Gemini workflow.
+		google_api_key (Optional[str]): Runtime field used by the Gemini workflow.
+		gemini_api_key (Optional[str]): Runtime field used by the Gemini workflow.
+		instructions (Optional[str]): Runtime field used by the Gemini workflow.
+		prompt (Optional[str]): Runtime field used by the Gemini workflow.
+		model (Optional[str]): Runtime field used by the Gemini workflow.
+		api_version (Optional[str]): Runtime field used by the Gemini workflow.
+		max_tokens (Optional[int]): Runtime field used by the Gemini workflow.
+		temperature (Optional[float]): Runtime field used by the Gemini workflow.
+		top_p (Optional[float]): Runtime field used by the Gemini workflow.
+		top_k (Optional[int]): Runtime field used by the Gemini workflow.
+		candidate_count (Optional[int]): Runtime field used by the Gemini workflow.
+		media_resolution (Optional[str]): Runtime field used by the Gemini workflow.
+		response_modalities (Optional[List[str]]): Runtime field used by the Gemini workflow.
+		stops (Optional[List[str]]): Runtime field used by the Gemini workflow.
+		domains (Optional[List[str]]): Runtime field used by the Gemini workflow.
+		frequency_penalty (Optional[float]): Runtime field used by the Gemini workflow.
+		presence_penalty (Optional[float]): Runtime field used by the Gemini workflow.
+		response_format (Optional[str]): Runtime field used by the Gemini workflow.
+		content_response (Optional[GenerateContentResponse]): Runtime field used by the Gemini workflow.
+		image_response (Optional[GenerateImagesResponse]): Runtime field used by the Gemini workflow.
+		content_config (Optional[GenerateContentConfig]): Runtime field used by the Gemini workflow.
+		function_config (Optional[FunctionCallingConfig]): Runtime field used by the Gemini workflow.
+		thought_config (Optional[ThinkingConfig]): Runtime field used by the Gemini workflow.
+		genimg_config (Optional[GenerateImagesConfig]): Runtime field used by the Gemini workflow.
+		image_config (Optional[ImageConfig]): Runtime field used by the Gemini workflow.
+		tool_config (Optional[List[types.Tool]]): Runtime field used by the Gemini workflow.
+		tool_choice (Optional[str]): Runtime field used by the Gemini workflow.
+		tools (Optional[List[str]]): Runtime field used by the Gemini workflow.
+	"""
 	number: Optional[ int ]
 	google_api_key: Optional[ str ]
 	gemini_api_key: Optional[ str ]
@@ -168,6 +178,13 @@ class Gemini( ):
 	tools: Optional[ List[ str ] ]
 	
 	def __init__( self ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the Gemini instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		"""
 		self.google_api_key = cfg.GOOGLE_API_KEY
 		self.gemini_api_key = cfg.GEMINI_API_KEY
 		self.model = None
@@ -188,34 +205,32 @@ class Gemini( ):
 		self.tools = [ ]
 
 class Chat( Gemini ):
-	'''
-
-	    Purpose:
-	    _______
-	    Class handling text, vision, and tool-augmented analysis with the Google Gemini SDK.
-
-	    Attributes:
-	    -----------
-	    use_vertex          : bool - Use Vertex AI (True) or API Key (False)
-	    http_options        : HttpOptions - Networking and version settings
-	    client              : Client - The initialized GenAI client
-	    contents            : Union - Input prompt or message parts
-	    content_response    : GenerateContentResponse - Result from text generation
-	    image_response      : GenerateImagesResponse - Result from image generation
-	    image_uri           : str - URI of processed image
-	    audio_uri           : str - URI of processed audio
-	    file_path           : str - Local path for document processing
-	    response_modalities : list - Allowed output formats
-
-	    Methods:
-	    --------
-	    generate_text( prompt, model )      : Generates text based on prompt
-	    analyze_image( prompt, path, mod )  : Processes image content with text
-	    summarize_document( prompt, path )  : Uploads and summarizes documents
-	    web_search( prompt, model )         : Performs a search-grounded text generation
-	    search_maps( prompt, model )        : Grounds responses using Google Search/Maps context
-
-    '''
+	"""Chat class.
+	
+	Purpose:
+		Handles Gemini text-generation workflows for the application. The class builds request
+		contents, configures model options, coordinates optional grounding and tool settings,
+		captures response metadata, and exposes generated text and structured history to the
+		caller.
+	
+	Attributes:
+		use_vertex (Optional[bool]): Runtime field used by the Chat workflow.
+		http_options (Optional[HttpOptions]): Runtime field used by the Chat workflow.
+		client (Optional[genai.Client]): Runtime field used by the Chat workflow.
+		storage_client (Optional[storage.Client]): Runtime field used by the Chat workflow.
+		contents (Optional[Union[str, List[str], List[Content]]]): Runtime field used by the Chat workflow.
+		image_uri (Optional[str]): Runtime field used by the Chat workflow.
+		audio_uri (Optional[str]): Runtime field used by the Chat workflow.
+		file_path (Optional[str]): Runtime field used by the Chat workflow.
+		files (Optional[List[str]]): Runtime field used by the Chat workflow.
+		content_block (Optional[str]): Runtime field used by the Chat workflow.
+		context (Optional[List[Dict[str, Any]]]): Runtime field used by the Chat workflow.
+		urls (Optional[List[str]]): Runtime field used by the Chat workflow.
+		max_urls (Optional[int]): Runtime field used by the Chat workflow.
+		response_schema (Optional[Any]): Runtime field used by the Chat workflow.
+		safety_profile (Optional[str]): Runtime field used by the Chat workflow.
+		safety_settings (Optional[List[SafetySetting]]): Runtime field used by the Chat workflow.
+	"""
 	use_vertex: Optional[ bool ]
 	http_options: Optional[ HttpOptions ]
 	client: Optional[ genai.Client ]
@@ -234,6 +249,16 @@ class Chat( Gemini ):
 	safety_settings: Optional[ List[ SafetySetting ] ]
 	
 	def __init__( self, model: str = 'gemini-2.5-flash-lite' ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the Chat instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		
+		Args:
+			model (str): model value used by this workflow.
+		"""
 		super( ).__init__( )
 		self.gemini_api_key = cfg.GEMINI_API_KEY
 		self.google_api_key = cfg.GOOGLE_API_KEY
@@ -285,12 +310,15 @@ class Chat( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""
-			
-			Purpose:
-			--------
-			Returns list of available chat llm.
-			
+		"""Model options.
+		
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-2.5-flash',
 		         'gemini-2.5-flash-lite',
@@ -303,13 +331,16 @@ class Chat( Gemini ):
 	
 	@property
 	def tool_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available tools options
-
-		'''
+		"""Tool options.
+		
+		Purpose:
+			Returns the tool options exposed by this provider wrapper. This property keeps UI option
+			rendering centralized and gives documentation a stable location for describing supported
+			choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'google_search',
 		         'google_maps',
 		         'url_context',
@@ -318,49 +349,61 @@ class Chat( Gemini ):
 	
 	@property
 	def reasoning_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of thinking effort options
-
-		'''
+		"""Reasoning options.
+		
+		Purpose:
+			Returns the reasoning options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL',
 		         'LOW', 'MEDIUM', 'HIGH' ]
 	
 	@property
 	def media_options( self ):
-		'''
+		"""Media options.
 		
 		Purpose:
-		--------
-		Returns a List[ str ] of media resolution options.
+			Returns the media options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
 		
-		'''
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'media_resolution_high',
 		         'media_resolution_medium',
 		         'media_resolution_low' ]
 	
 	@property
 	def choice_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available tools options
-
-		'''
+		"""Choice options.
+		
+		Purpose:
+			Returns the choice options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'auto', 'any', 'none', 'validated' ]
 	
 	@property
 	def include_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of the includeable options
-
-		'''
+		"""Include options.
+		
+		Purpose:
+			Returns the include options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'file_search_call.results',
 		         'message.input_image.image_url',
 		         'message.output_text.logprobs',
@@ -368,43 +411,51 @@ class Chat( Gemini ):
 	
 	@property
 	def modality_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available modality options
-
-		'''
+		"""Modality options.
+		
+		Purpose:
+			Returns the modality options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ '', 'text', 'image', 'audio' ]
 	
 	@property
 	def format_options( self ):
-		'''
-			
-			Returns:
-			--------
-			A List[ str ] of mime types
-			
-		'''
+		"""Format options.
+		
+		Purpose:
+			Returns the format options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'text/plain',
 		         'application/json',
 		         'text/x.enum' ]
 	
 	def get_supported_tools( self, model: str ) -> List[ str ]:
-		"""
+		"""Get supported tools.
 		
-			Purpose:
-			--------
-			Returns the subset of built-in Gemini tools supported by the selected model.
-			
-			Parameters:
-			-----------
-			model: str - Optional Gemini model identifier.
-			
-			Returns:
-			--------
-			List[ str ] - Supported tool names.
+		Purpose:
+			Retrieves a derived value from the current Chat runtime state. The method shields
+			callers from provider response-shape differences and returns a stable application-facing
+			value.
 		
+		Args:
+			model (str): model value used by this workflow.
+		
+		Returns:
+			Derived value extracted from the current runtime state.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'model', model )
@@ -420,23 +471,26 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'get_supported_tools( self, model: str=None )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def supports_google_maps( self, model: str ) -> bool:
-		"""
+		"""Supports google maps.
 		
-			Purpose:
-			--------
-			Determines whether the selected model should expose Google Maps grounding.
-			
-			Parameters:
-			-----------
-			model: str - Gemini model identifier.
-			
-			Returns:
-			--------
-			bool
-			
+		Purpose:
+			Determines whether the selected model supports a specific Chat feature. The method
+			centralizes feature gating so the UI and request builders expose only compatible
+			options.
+		
+		Args:
+			model (str): model value used by this workflow.
+		
+		Returns:
+			True when the selected model supports the requested feature; otherwise False.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'model', model )
@@ -456,24 +510,27 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'supports_google_maps( self, model: str=None ) -> bool'
+			Logger( ).write( exception )
 			raise exception
 	
 	def build_urls( self, urls: List[ str ], max_urls: int = 10 ) -> List[ str ]:
-		"""
+		"""Build urls.
 		
-			Purpose:
-			--------
-			Normalizes URL context values selected or entered in the UI.
-			
-			Parameters:
-			-----------
-			urls: List[ str ] - Candidate URL values.
-			max_urls: int - Optional maximum number of URLs to include.
-			
-			Returns:
-			--------
-			List[ str ] - Clean URL list.
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
 		
+		Args:
+			urls (List[str]): urls value used by this workflow.
+			max_urls (int): max urls value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'max_urls', max_urls )
@@ -498,24 +555,26 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'build_urls( self, urls: List[ str ]=None, max_urls: int=None )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def append_urls_to_content( self, content: str, urls: List[ str ] ) -> str | None:
-		"""
+		"""Append urls to content.
 		
-			Purpose:
-			--------
-			Appends URL context values to the optional content block used in generation.
-			
-			Parameters:
-			-----------
-			content: str - Optional content/context text.
-			urls: List[ str ] - URLs to include in the prompt context.
-			
-			Returns:
-			--------
-			str | None - Combined context block or None.
+		Purpose:
+			Performs the append urls to content operation for the Chat wrapper. The method preserves
+			provider-specific handling behind the application-facing class interface.
 		
+		Args:
+			content (str): content value used by this workflow.
+			urls (List[str]): urls value used by this workflow.
+		
+		Returns:
+			Result produced by the operation.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.content_blocks = [ ]
@@ -530,24 +589,26 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = ('append_urls_to_content( self, **kwargs ) -> str')
+			Logger( ).write( exception )
 			raise exception
 	
 	def build_tools( self, tools: List[ str ] ) -> List[ Tool ] | None:
-		"""
+		"""Build tools.
 		
-			Purpose:
-			--------
-			Builds the Google Search grounding tool for Text mode when explicitly enabled.
-			
-			Parameters:
-			-----------
-			tools: List[ str ] - Derived tool names for the request.
-			file_search_store_names: List[ str ] - Ignored for Google Search-only grounding.
-			
-			Returns:
-			--------
-			List[ Tool ] | None - Google Search tool list or None.
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
 		
+		Args:
+			tools (List[str]): tools value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.tools = [
@@ -565,25 +626,28 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'build_tools( self, tools: List[ str ], file_search_store_names: List[ str ] )'
+			Logger( ).write( exception )
 			raise exception
-		
+	
 	def build_tool_config( self, tool_choice: str = None,
 			tools: List[ Tool ] = None ) -> ToolConfig | None:
-		"""
+		"""Build tool config.
 		
-			Purpose:
-			--------
-			Builds Gemini tool configuration from the selected tool-choice mode.
-			
-			Parameters:
-			-----------
-			tool_choice: str - Tool choice mode selected in the UI.
-			tools: List[ Tool ] - Configured Gemini tool objects.
-			
-			Returns:
-			--------
-			ToolConfig | None - Tool configuration or None.
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
 		
+		Args:
+			tool_choice (str): tool choice value used by this workflow.
+			tools (List[Tool]): tools value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.tool_choice = str( tool_choice or '' ).strip( ).lower( )
@@ -608,24 +672,27 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = ('build_tool_config( self, **kwargs) -> ToolConfig | None')
+			Logger( ).write( exception )
 			raise exception
 	
 	def build_modalities( self, modalities: List[ str ] ) -> List[ str ] | None:
+		"""Build modalities.
+		
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
+		
+		Args:
+			modalities (List[str]): modalities value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
-			
-				Purpose:
-				--------
-				Normalizes optional response modality values selected in the UI.
-				
-				Parameters:
-				-----------
-				modalities: List[ str ] - Candidate response modalities.
-				
-				Returns:
-				--------
-				List[ str ] | None - Clean response modality list or None.
-			
-			"""
 		try:
 			self.modalities = [ ]
 			
@@ -643,23 +710,26 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'build_modalities( self, modalities: List[ str ] )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def build_reasoning( self, reasoning: str ) -> ThinkingConfig | None:
-		"""
+		"""Build reasoning.
 		
-			Purpose:
-			--------
-			Builds Gemini thinking configuration when a reasoning level is selected.
-			
-			Parameters:
-			-----------
-			reasoning: str - Reasoning level selected in the UI.
-			
-			Returns:
-			--------
-			ThinkingConfig | None - Thinking configuration or None.
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
 		
+		Args:
+			reasoning (str): reasoning value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.reasoning = str( reasoning or '' ).strip( ).upper( )
@@ -679,23 +749,26 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'build_reasoning( self, reasoning: str ) -> ThinkingConfig | None'
+			Logger( ).write( exception )
 			raise exception
 	
 	def build_safety_settings( self, safety_profile: str ) -> List[ SafetySetting ] | None:
-		"""
+		"""Build safety settings.
 		
-			Purpose:
-			--------
-			Builds Gemini safety settings from the optional UI safety profile.
-			
-			Parameters:
-			-----------
-			safety_profile: str - Safety threshold name selected in the UI.
-			
-			Returns:
-			--------
-			List[ SafetySetting ] | None - Safety settings or None.
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
 		
+		Args:
+			safety_profile (str): safety profile value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.safety_profile = str( safety_profile or '' ).strip( ).upper( )
@@ -730,19 +803,23 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'build_safety_settings( self, safety_profile: str )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def get_output_text( self ) -> Optional[ str ]:
-		"""
+		"""Get output text.
 		
-			Purpose:
-			--------
-			Extracts text output from a Gemini generate_content response.
-			
-			Returns:
-			--------
-			Optional[ str ] - Text output or None.
+		Purpose:
+			Retrieves a derived value from the current Chat runtime state. The method shields
+			callers from provider response-shape differences and returns a stable application-facing
+			value.
 		
+		Returns:
+			Derived value extracted from the current runtime state.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			if self.content_response is None:
@@ -785,23 +862,25 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'get_output_text( self ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			raise exception
 	
 	def parse_response_schema( self, response_schema: Any ) -> Any:
-		"""
+		"""Parse response schema.
 		
-			Purpose:
-			--------
-			Normalizes a structured-output schema passed as a dict, JSON string, or schema class.
-			
-			Parameters:
-			-----------
-			response_schema: Any - UI schema value.
-			
-			Returns:
-			--------
-			Any - Parsed schema object or None.
+		Purpose:
+			Parses caller-supplied structured-output configuration for the Chat workflow. The method
+			accepts flexible UI input and returns provider-compatible schema data when available.
 		
+		Args:
+			response_schema (Any): response schema value used by this workflow.
+		
+		Returns:
+			Result produced by the operation.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			if response_schema is None:
@@ -823,25 +902,30 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'parse_response_schema( self, response_schema: Any )'
+			Logger( ).write( exception )
 			raise exception
 	
-	def build_contents( self, prompt: str, content: str, context: List[ Any ] = None ) -> str | List[ Content ]:
-		"""
+	def build_contents( self, prompt: str, content: str, context: List[ Any ] = None ) -> str | \
+	                                                                                      List[
+		                                                                                      Content ]:
+		"""Build contents.
 		
-			Purpose:
-			--------
-			Builds Gemini contents from the current prompt and any prior conversational context.
-			
-			Parameters:
-			-----------
-			prompt: str - Current user prompt.
-			content: str - Optional prepended content block.
-			context: List[ Any ] - Prior chat messages or Gemini Content objects.
-			
-			Returns:
-			--------
-			Union[ str, List[ Content ] ] - Contents payload for Gemini.
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
 		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			content (str): content value used by this workflow.
+			context (List[Any]): context value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -890,23 +974,20 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'build_contents( self, prompt: str, content: str, context: List[ Any ]=None )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def capture_grounding_metadata( self ) -> None:
-		"""
+		"""Capture grounding metadata.
 		
-			Purpose:
-			--------
-			Captures grounding metadata from the most recent Gemini text response.
-			
-			Parameters:
-			-----------
-			None
-			
-			Returns:
-			--------
-			None
+		Purpose:
+			Captures response metadata from the most recent Chat provider response. The method
+			stores provider metadata on the instance for later display, citation, grounding, or
+			diagnostic use.
 		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.grounding_metadata = None
@@ -931,23 +1012,23 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'capture_grounding_metadata( self )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def get_grounding_sources( self ) -> List[ Dict[ str, str ] ]:
-		"""
+		"""Get grounding sources.
 		
-			Purpose:
-			--------
-			Extracts displayable source links from Gemini grounding metadata.
-			
-			Parameters:
-			-----------
-			None
-			
-			Returns:
-			--------
-			List[ Dict[ str, str ] ] - Grounding source dictionaries.
+		Purpose:
+			Retrieves a derived value from the current Chat runtime state. The method shields
+			callers from provider response-shape differences and returns a stable application-facing
+			value.
 		
+		Returns:
+			Derived value extracted from the current runtime state.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.sources = [ ]
@@ -994,19 +1075,23 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'get_grounding_sources( self ) -> List[ Dict[ str, str ] ]'
+			Logger( ).write( exception )
 			raise exception
 	
 	def get_structured_history( self ) -> List[ Content ] | None:
-		"""
+		"""Get structured history.
 		
-			Purpose:
-			--------
-			Builds the full structured conversation history for reuse in a subsequent Gemini request.
-			
-			Returns:
-			--------
-			Optional[ List[ Content ] ] - Conversation history with model output.
+		Purpose:
+			Retrieves a derived value from the current Chat runtime state. The method shields
+			callers from provider response-shape differences and returns a stable application-facing
+			value.
 		
+		Returns:
+			Derived value extracted from the current runtime state.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.history = [ ]
@@ -1031,6 +1116,7 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'get_structured_history( self ) -> List[ Content ] | None'
+			Logger( ).write( exception )
 			raise exception
 	
 	def build_config( self, model: str = 'gemini-2.5-flash-lite', number: int = None,
@@ -1041,38 +1127,40 @@ class Chat( Gemini ):
 			modalities: List[ str ] = None, media_resolution: str = None,
 			response_schema: Any = None, safety_profile: str = None,
 			file_search_store_names: List[ str ] = None ) -> GenerateContentConfig:
-		"""
+		"""Build config.
 		
-			Purpose:
-			--------
-			Builds the GenerateContentConfig object used for Gemini text generation.
-			
-			Parameters:
-			-----------
-			model: str - Gemini model identifier.
-			number: int - Candidate count.
-			temperature: float - Sampling temperature.
-			top_p: float - Nucleus sampling probability.
-			top_k: int - Top-k token selection count.
-			frequency: float - Frequency penalty.
-			presence: float - Presence penalty.
-			max_tokens: int - Maximum output tokens.
-			stops: List[ str ] - Stop sequences.
-			instruct: str - System instruction text.
-			response_format: str - Response MIME type.
-			tools: List[ str ] - Selected tool names.
-			tool_choice: str - Tool-choice mode.
-			reasoning: str - Thinking level.
-			modalities: List[ str ] - Response modalities.
-			media_resolution: str - Media resolution.
-			response_schema: Any - Structured-output schema.
-			safety_profile: str - Safety profile.
-			file_search_store_names: List[ str ] - Gemini File Search Store names.
-			
-			Returns:
-			--------
-			GenerateContentConfig - Configured content settings.
+		Purpose:
+			Builds the request component used by the Chat workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
 		
+		Args:
+			model (str): model value used by this workflow.
+			number (int): number value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			top_k (int): top k value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+			response_format (str): response format value used by this workflow.
+			tools (List[str]): tools value used by this workflow.
+			tool_choice (str): tool choice value used by this workflow.
+			reasoning (str): reasoning value used by this workflow.
+			modalities (List[str]): modalities value used by this workflow.
+			media_resolution (str): media resolution value used by this workflow.
+			response_schema (Any): response schema value used by this workflow.
+			safety_profile (str): safety profile value used by this workflow.
+			file_search_store_names (List[str]): file search store names value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.model = str( model or self.model or 'gemini-2.5-flash-lite' ).strip( )
@@ -1162,6 +1250,7 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'build_config( self, model ) -> GenerateContentConfig'
+			Logger( ).write( exception )
 			raise exception
 	
 	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
@@ -1175,45 +1264,47 @@ class Chat( Gemini ):
 			urls: List[ str ] = None, max_urls: int = None, response_schema: Any = None,
 			safety_profile: str = None, file_search_store_names: List[ str ] = None,
 			stream: bool = False, stream_handler: Any = None ) -> str | None:
-		"""
+		"""Generate text.
 		
-			Purpose:
-			--------
-			Generates a text completion based on the provided prompt and configuration.
-			
-			Parameters:
-			-----------
-			prompt: str - The text input for the model.
-			model: str - The Gemini model identifier.
-			number: int - Candidate count.
-			temperature: float - Sampling temperature.
-			top_p: float - Nucleus sampling probability.
-			top_k: int - Top-k token selection count.
-			frequency: float - Frequency penalty.
-			presence: float - Presence penalty.
-			max_tokens: int - Maximum output tokens.
-			stops: List[ str ] - Stop sequences.
-			instruct: str - System instruction text.
-			response_format: str - Response MIME type.
-			tools: List[ str ] - Selected Gemini tools.
-			tool_choice: str - Tool-choice mode.
-			reasoning: str - Thinking level.
-			modalities: List[ str ] - Response modalities.
-			media_resolution: str - Media resolution.
-			context: List[ Dict[ str, Any ] ] - Conversation context.
-			content: str - Additional context block.
-			urls: List[ str ] - URLs used with URL context.
-			max_urls: int - Maximum URLs to include.
-			response_schema: Any - Structured-output schema.
-			safety_profile: str - Safety profile.
-			file_search_store_names: List[ str ] - File Search Store resource names.
-			stream: bool - Whether to stream the response.
-			stream_handler: Any - Optional callback for streaming chunks.
-			
-			Returns:
-			--------
-			str | None - The generated text response or None.
+		Purpose:
+			Executes the generate text workflow for the Chat wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
 		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			model (str): model value used by this workflow.
+			number (int): number value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			top_k (int): top k value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+			response_format (str): response format value used by this workflow.
+			tools (List[str]): tools value used by this workflow.
+			tool_choice (str): tool choice value used by this workflow.
+			reasoning (str): reasoning value used by this workflow.
+			modalities (List[str]): modalities value used by this workflow.
+			media_resolution (str): media resolution value used by this workflow.
+			context (List[Dict[str, Any]]): context value used by this workflow.
+			content (str): content value used by this workflow.
+			urls (List[str]): urls value used by this workflow.
+			max_urls (int): max urls value used by this workflow.
+			response_schema (Any): response schema value used by this workflow.
+			safety_profile (str): safety profile value used by this workflow.
+			file_search_store_names (List[str]): file search store names value used by this workflow.
+			stream (bool): stream value used by this workflow.
+			stream_handler (Any): stream handler value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -1274,35 +1365,42 @@ class Chat( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'generate_text( self, prompt, model ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			raise exception
 
 class Images( Gemini ):
+	"""Images class.
+	
+	Purpose:
+		Supports Gemini image generation, image analysis, and image editing workflows. The class
+		stores image-specific configuration, constructs multimodal request payloads, manages
+		grounding options when supported, and extracts image or text output from provider
+		responses.
+	
+	Attributes:
+		client (Optional[genai.Client]): Runtime field used by the Images workflow.
+		aspect_ratio (Optional[str]): Runtime field used by the Images workflow.
+		use_vertex (Optional[bool]): Runtime field used by the Images workflow.
+		resolution (Optional[str]): Runtime field used by the Images workflow.
+		size (Optional[str]): Runtime field used by the Images workflow.
 	"""
-
-	    Purpose
-	    ___________
-	    Class for generating, analyzing, and editing images with the Google Gemini SDK.
-
-	    Attributes:
-	    -----------
-	    client       : Client - GenAI instance
-	    aspect_ratio : str - W:H ratio
-	    use_vertex   : bool - Integration flag
-
-	    Methods:
-	    --------
-	    generate( prompt, aspect )        : Generates an image from text
-	    analyze( prompt, path, model )    : Analyzes an image using text + image input
-	    edit( prompt, path, model )       : Edits an image using text + image input
-
-    """
 	client: Optional[ genai.Client ]
 	aspect_ratio: Optional[ str ]
 	use_vertex: Optional[ bool ]
 	resolution: Optional[ str ]
 	size: Optional[ str ]
 	
-	def __init__( self, model: str='gemini-2.5-flash-image' ):
+	def __init__( self, model: str = 'gemini-2.5-flash-image' ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the Images instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		
+		Args:
+			model (str): model value used by this workflow.
+		"""
 		super( ).__init__( )
 		self.number = None
 		self.model = model
@@ -1338,25 +1436,31 @@ class Images( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""
-			
-			Purpose:
-			--------
-			Returns list of image generation llm.
-			
+		"""Model options.
+		
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-2.5-flash-image',
 		         'gemini-3.1-flash-image-preview' ]
 	
 	@property
 	def include_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of the includeable options
-
-		'''
+		"""Include options.
+		
+		Purpose:
+			Returns the include options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'file_search_call.results',
 		         'message.input_image.image_url',
 		         'message.output_text.logprobs',
@@ -1364,195 +1468,230 @@ class Images( Gemini ):
 	
 	@property
 	def aspect_options( self ) -> List[ str ] | None:
-		"""
-			
-			Purpose:
-			--------
-			Returns list of allowed aspect ratios.
-			
+		"""Aspect options.
+		
+		Purpose:
+			Returns the aspect options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9' ]
 	
 	@property
 	def media_options( self ):
-		'''
+		"""Media options.
 		
 		Purpose:
-		--------
-		Returns a List[ str ] of media resolution options.
+			Returns the media options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
 		
-		'''
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'media_resolution_high',
 		         'media_resolution_medium',
 		         'media_resolution_low' ]
 	
 	@property
 	def modality_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available modality options
-
-		'''
+		"""Modality options.
+		
+		Purpose:
+			Returns the modality options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'text', 'image', 'text_and_image' ]
 	
 	@property
 	def reasoning_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of thinking effort options
-
-		'''
+		"""Reasoning options.
+		
+		Purpose:
+			Returns the reasoning options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'unspecified', 'minimal',
 		         'low', 'medium', 'high' ]
 	
 	@property
 	def size_options( self ):
-		'''
-			
-			Purpose:
-			---------
-			Returns list of image sizes
-			
-		'''
+		"""Size options.
+		
+		Purpose:
+			Returns the size options exposed by this provider wrapper. This property keeps UI option
+			rendering centralized and gives documentation a stable location for describing supported
+			choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ '1K', '2K', '4K' ]
 	
 	@property
 	def tool_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available tools options
-
-		'''
+		"""Tool options.
+		
+		Purpose:
+			Returns the tool options exposed by this provider wrapper. This property keeps UI option
+			rendering centralized and gives documentation a stable location for describing supported
+			choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'google_search', 'image_search' ]
 	
 	@property
 	def choice_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available tools options
-
-		'''
+		"""Choice options.
+		
+		Purpose:
+			Returns the choice options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'auto', 'any', 'none', 'validated' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
-		'''
-			
-			Returns:
-			--------
-			A List[ str ] of mime types
-			
-		'''
+		"""Format options.
+		
+		Purpose:
+			Returns the format options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'text/plain',
 		         'application/json',
 		         'text/x.enum' ]
 	
 	@property
 	def mime_options( self ) -> List[ str ] | None:
-		'''
-			
-			Returns:
-			--------
-			A List[ str ] of mime types
-			
-		'''
+		"""Mime options.
+		
+		Purpose:
+			Returns the mime options exposed by this provider wrapper. This property keeps UI option
+			rendering centralized and gives documentation a stable location for describing supported
+			choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'image/jpeg',
 		         'image/png',
 		         'image/webp' ]
 	
 	@property
 	def resolution_options( self ) -> List[ str ] | None:
-		'''
-			
-			Purpose:
-			-------
-			Returns a list of resolution options
-			
-		'''
-		return [ '1K', '2K', '4K' ]
+		"""Resolution options.
 		
-	def supports_image_size( self, model: str='gemini-2.5-flash-image' ) -> bool:
+		Purpose:
+			Returns the resolution options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
-			
-			Purpose:
-			-----------
-			Determines whether the selected Gemini image model supports explicit image-size
-			configuration through types.ImageConfig.image_size.
-			
-			Parameters:
-			-----------
-			model: str - Gemini image model identifier selected by the UI.
-			
-			Returns:
-			--------
-			bool - True when the model supports image_size; otherwise False.
-			
+		return [ '1K', '2K', '4K' ]
+	
+	def supports_image_size( self, model: str = 'gemini-2.5-flash-image' ) -> bool:
+		"""Supports image size.
+		
+		Purpose:
+			Determines whether the selected model supports a specific Images feature. The method
+			centralizes feature gating so the UI and request builders expose only compatible
+			options.
+		
+		Args:
+			model (str): model value used by this workflow.
+		
+		Returns:
+			True when the selected model supports the requested feature; otherwise False.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.model_name = str( model or '' ).strip( ).lower( )
 			self.image_size_models = [ 'gemini-3.1-flash-image-preview',
-					'gemini-3-pro-image-preview' ]
+			                           'gemini-3-pro-image-preview' ]
 			return self.model_name in self.image_size_models
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'supports_image_size( self, model: str ) -> bool'
+			Logger( ).write( exception )
 			raise exception
 	
-	def supports_search_grounding( self, model: str='gemini-2.5-flash-image' ) -> bool:
-		"""
-			
-			Purpose:
-			-----------
-			Determines whether the selected Gemini image model should expose standard Google
-			Search grounding in Image mode.
-			
-			Parameters:
-			-----------
-			model: str - Gemini image model identifier selected by the UI.
-			
-			Returns:
-			--------
-			bool - True when Google Search grounding is supported; otherwise False.
-			
+	def supports_search_grounding( self, model: str = 'gemini-2.5-flash-image' ) -> bool:
+		"""Supports search grounding.
+		
+		Purpose:
+			Determines whether the selected model supports a specific Images feature. The method
+			centralizes feature gating so the UI and request builders expose only compatible
+			options.
+		
+		Args:
+			model (str): model value used by this workflow.
+		
+		Returns:
+			True when the selected model supports the requested feature; otherwise False.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.model_name = str( model or '' ).strip( ).lower( )
 			self.search_grounding_models = [ 'gemini-3.1-flash-image-preview',
-					'gemini-3-pro-image-preview' ]
+			                                 'gemini-3-pro-image-preview' ]
 			return self.model_name in self.search_grounding_models
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'supports_search_grounding( self, model: str ) -> bool'
+			Logger( ).write( exception )
 			raise exception
 	
-	def supports_image_search( self, model: str='gemini-2.5-flash-image' ) -> bool:
-		"""
-			
-			Purpose:
-			-----------
-			Determines whether the selected Gemini image model supports Google Image Search
-			grounding through the google_search.search_types.image_search configuration.
-			
-			Parameters:
-			-----------
-			model: str - Gemini image model identifier selected by the UI.
-			
-			Returns:
-			--------
-			bool - True when Google Image Search grounding is supported; otherwise False.
-			
+	def supports_image_search( self, model: str = 'gemini-2.5-flash-image' ) -> bool:
+		"""Supports image search.
+		
+		Purpose:
+			Determines whether the selected model supports a specific Images feature. The method
+			centralizes feature gating so the UI and request builders expose only compatible
+			options.
+		
+		Args:
+			model (str): model value used by this workflow.
+		
+		Returns:
+			True when the selected model supports the requested feature; otherwise False.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.model_name = str( model or '' ).strip( ).lower( )
@@ -1562,26 +1701,28 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'supports_image_search( self, model: str ) -> bool'
+			Logger( ).write( exception )
 			raise exception
 	
 	def normalize_response_modalities( self, response_modalities: Optional[ str ],
-			image_only: bool=False ) -> List[ str ]:
-		"""
-			
-			Purpose:
-			-----------
-			Normalizes the UI response-mode selection into a Gemini-compatible response
-			modalities list.
-			
-			Parameters:
-			-----------
-			response_modalities: Optional[ str ] - UI-selected response mode.
-			image_only: bool - Indicates whether the workflow defaults to image output.
-			
-			Returns:
-			--------
-			List[ str ] - Normalized Gemini response modalities.
-			
+			image_only: bool = False ) -> List[ str ]:
+		"""Normalize response modalities.
+		
+		Purpose:
+			Normalizes input values for the Images workflow before they are passed to provider calls
+			or downstream processing. The method converts UI or caller-supplied values into a stable
+			shape expected by the wrapper.
+		
+		Args:
+			response_modalities (Optional[str]): response modalities value used by this workflow.
+			image_only (bool): image only value used by this workflow.
+		
+		Returns:
+			Normalized value suitable for provider calls or downstream processing.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.mode_name = str( response_modalities or '' ).strip( ).upper( )
@@ -1608,24 +1749,26 @@ class Images( Gemini ):
 			exception.method = (
 					'normalize_response_modalities( self, response_modalities: Optional[str], '
 					'image_only: bool=False ) -> List[str]')
+			Logger( ).write( exception )
 			raise exception
 	
-	def build_grounding_tool( self, image_search: bool=False ) -> Optional[ Tool ]:
-		"""
-			
-			Purpose:
-			-----------
-			Builds a Gemini Google Search grounding tool for image workflows.
-			
-			Parameters:
-			-----------
-			image_search: bool - Indicates whether Google Image Search should be requested
-			when supported by the selected model.
-			
-			Returns:
-			--------
-			Optional[ Tool ] - Configured Google Search tool, or None when unsupported.
-			
+	def build_grounding_tool( self, image_search: bool = False ) -> Optional[ Tool ]:
+		"""Build grounding tool.
+		
+		Purpose:
+			Builds the request component used by the Images workflow. The method translates caller
+			options and current object state into provider-compatible configuration or content
+			values.
+		
+		Args:
+			image_search (bool): image search value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			if not self.supports_search_grounding( self.model ):
@@ -1635,7 +1778,7 @@ class Images( Gemini ):
 			self.model_name = str( self.model or '' ).strip( ).lower( )
 			if self.use_image_search and self.supports_image_search( self.model_name ):
 				return Tool( google_search=types.GoogleSearch( search_types=types.SearchTypes(
-							web_search=types.WebSearch( ), image_search=types.ImageSearch( ) ) ) )
+					web_search=types.WebSearch( ), image_search=types.ImageSearch( ) ) ) )
 			
 			return Tool( google_search=types.GoogleSearch( ) )
 		except Exception as e:
@@ -1643,31 +1786,32 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'build_grounding_tool( self, image_search: bool=False ) -> Optional[Tool]'
+			Logger( ).write( exception )
 			raise exception
 	
-	def get_content_config( self, response_modalities: Optional[ str ], image_only: bool=False,
-			image_search: bool=False, grounded: bool=False,
-			output_mime_type: Optional[ str ]=None ) -> GenerateContentConfig:
-		"""
-			
-			Purpose:
-			-----------
-			Creates a Gemini GenerateContentConfig for image-generation, image-analysis, and
-			image-editing workflows using SDK-compatible request fields.
-			
-			Parameters:
-			-----------
-			response_modalities: Optional[str] - UI-selected response mode.
-			image_only: bool - Indicates whether the workflow defaults to image output.
-			image_search: bool - Indicates whether Google Image Search grounding should be used.
-			grounded: bool - Indicates whether Google Search grounding should be enabled.
-			output_mime_type: Optional[str] - Local output preference retained for UI use; not
-			passed into types.ImageConfig.
-			
-			Returns:
-			--------
-			GenerateContentConfig - Configured Gemini content-generation settings.
-			
+	def get_content_config( self, response_modalities: Optional[ str ], image_only: bool = False,
+			image_search: bool = False, grounded: bool = False,
+			output_mime_type: Optional[ str ] = None ) -> GenerateContentConfig:
+		"""Get content config.
+		
+		Purpose:
+			Retrieves a derived value from the current Images runtime state. The method shields
+			callers from provider response-shape differences and returns a stable application-facing
+			value.
+		
+		Args:
+			response_modalities (Optional[str]): response modalities value used by this workflow.
+			image_only (bool): image only value used by this workflow.
+			image_search (bool): image search value used by this workflow.
+			grounded (bool): grounded value used by this workflow.
+			output_mime_type (Optional[str]): output mime type value used by this workflow.
+		
+		Returns:
+			Derived value extracted from the current runtime state.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.image_only = image_only
@@ -1724,23 +1868,26 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'get_content_config( self, **kwargs ) -> GenerateContentConfig'
+			Logger( ).write( exception )
 			raise exception
 	
 	def open_image( self, path: str ) -> PIL.Image.Image:
-		"""
-			
-			Purpose:
-			-----------
-			Opens a local image file for Gemini multimodal requests.
-			
-			Parameters:
-			-----------
-			path: str - Path to the local image file.
-			
-			Returns:
-			--------
-			PIL.Image.Image - Opened local image.
-			
+		"""Open image.
+		
+		Purpose:
+			Opens a local image file and returns an independent image object for multimodal
+			requests. The method validates the path and copies the image so the file handle can
+			close safely.
+		
+		Args:
+			path (str): path value used by this workflow.
+		
+		Returns:
+			Result produced by the operation.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'path', path )
@@ -1751,19 +1898,20 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'open_image( self, path ) -> PIL.Image.Image'
+			Logger( ).write( exception )
 			raise exception
 	
 	def capture_metadata( self ) -> None:
-		"""
-			
-			Purpose:
-			-----------
-			Captures grounding metadata from the most recent Gemini content response.
-			
-			Returns:
-			--------
-			None
-			
+		"""Capture metadata.
+		
+		Purpose:
+			Captures response metadata from the most recent Images provider response. The method
+			stores provider metadata on the instance for later display, citation, grounding, or
+			diagnostic use.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.grounding_metadata = None
@@ -1785,19 +1933,23 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'capture_metadata( self )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def get_first_image( self ) -> Optional[ PIL.Image.Image ]:
-		"""
-			
-			Purpose:
-			-----------
-			Extracts the first returned image from a Gemini content response.
-			
-			Returns:
-			--------
-			Optional[ PIL.Image.Image ] - The first returned image, if any.
-			
+		"""Get first image.
+		
+		Purpose:
+			Retrieves a derived value from the current Images runtime state. The method shields
+			callers from provider response-shape differences and returns a stable application-facing
+			value.
+		
+		Returns:
+			Derived value extracted from the current runtime state.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			if self.content_response is None:
@@ -1809,7 +1961,12 @@ class Images( Gemini ):
 					try:
 						if getattr( part, 'inline_data', None ) is not None:
 							return part.as_image( )
-					except Exception:
+					except Exception as e:
+						exception = Error( e )
+						exception.module = 'gemini'
+						exception.cause = 'Images'
+						exception.method = 'get_first_image( self ) -> Optional[ PIL.Image.Image ]'
+						Logger( ).write( exception )
 						continue
 			
 			candidates = getattr( self.content_response, 'candidates', None )
@@ -1824,7 +1981,12 @@ class Images( Gemini ):
 						try:
 							if getattr( part, 'inline_data', None ) is not None:
 								return part.as_image( )
-						except Exception:
+						except Exception as e:
+							exception = Error( e )
+							exception.module = 'gemini'
+							exception.cause = 'Images'
+							exception.method = 'get_first_image( self ) -> Optional[ PIL.Image.Image ]'
+							Logger( ).write( exception )
 							continue
 			
 			return None
@@ -1833,19 +1995,23 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'get_first_image( self ) -> Optional[ PIL.Image.Image ]'
+			Logger( ).write( exception )
 			raise exception
 	
 	def get_output_text( self ) -> Optional[ str ]:
-		"""
-			
-			Purpose:
-			-----------
-			Extracts text output from a Gemini content response.
-			
-			Returns:
-			--------
-			Optional[ str ] - The returned text, if any.
-			
+		"""Get output text.
+		
+		Purpose:
+			Retrieves a derived value from the current Images runtime state. The method shields
+			callers from provider response-shape differences and returns a stable application-facing
+			value.
+		
+		Returns:
+			Derived value extracted from the current runtime state.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			if self.content_response is None:
@@ -1888,34 +2054,45 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'get_output_text( self ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			raise exception
 	
-	def generate( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
-			number: int=None, temperature: float=None, top_p: float=None,
-			frequency: float=None, presence: float=None, max_tokens: int=None,
-			resolution: str=None, instruct: str=None, output_mime_type: str=None,
-			response_modalities: str=None, grounded: bool=False,
-			image_search: bool=False ) -> Optional[ PIL.Image.Image ]:
-		"""
-			
-			Purpose:
-			-----------
-			Generates a new image based on a descriptive text prompt.
-			
-			Parameters:
-			-----------
-			prompt: str - Image description.
-			aspect: str - Aspect ratio.
-			resolution: str - Output image size when supported by the selected model.
-			output_mime_type: str - Requested output MIME type for returned image content.
-			response_modalities: str - UI-selected Gemini response mode.
-			grounded: bool - Enables Google Search grounding when supported by the selected model.
-			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
-			
-			Returns:
-			--------
-			Optional[ PIL.Image.Image ] - The generated image.
-			
+	def generate( self, prompt: str, model: str = 'gemini-2.5-flash-image', aspect: str = None,
+			number: int = None, temperature: float = None, top_p: float = None,
+			frequency: float = None, presence: float = None, max_tokens: int = None,
+			resolution: str = None, instruct: str = None, output_mime_type: str = None,
+			response_modalities: str = None, grounded: bool = False,
+			image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+		"""Generate.
+		
+		Purpose:
+			Executes the generate workflow for the Images wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			model (str): model value used by this workflow.
+			aspect (str): aspect value used by this workflow.
+			number (int): number value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			resolution (str): resolution value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+			output_mime_type (str): output mime type value used by this workflow.
+			response_modalities (str): response modalities value used by this workflow.
+			grounded (bool): grounded value used by this workflow.
+			image_search (bool): image search value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -1946,33 +2123,46 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'generate( self, prompt, aspect ) -> Optional[ PIL.Image.Image ]'
+			Logger( ).write( exception )
 			raise exception
 	
-	def analyze( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
-			aspect: str=None, number: int=None, temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None, resolution: str=None, instruct: str=None,
-			output_mime_type: str=None, response_modalities: str=None,
-			grounded: bool=False, image_search: bool=False ) -> Optional[ str ]:
-		"""
-			
-			Purpose:
-			-----------
-			Analyzes a local image using a text prompt and image input.
-			
-			Parameters:
-			-----------
-			prompt: str - Analysis instruction.
-			path: str - Path to the local image.
-			output_mime_type: str - Reserved for API consistency; not used for text analysis output.
-			response_modalities: str - UI-selected Gemini response mode.
-			grounded: bool - Enables Google Search grounding when supported by the selected model.
-			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
-			
-			Returns:
-			--------
-			Optional[ str ] - The analysis text.
-			
+	def analyze( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
+			aspect: str = None, number: int = None, temperature: float = None,
+			top_p: float = None, frequency: float = None, presence: float = None,
+			max_tokens: int = None, resolution: str = None, instruct: str = None,
+			output_mime_type: str = None, response_modalities: str = None,
+			grounded: bool = False, image_search: bool = False ) -> Optional[ str ]:
+		"""Analyze.
+		
+		Purpose:
+			Executes the analyze workflow for the Images wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			path (str): path value used by this workflow.
+			model (str): model value used by this workflow.
+			aspect (str): aspect value used by this workflow.
+			number (int): number value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			resolution (str): resolution value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+			output_mime_type (str): output mime type value used by this workflow.
+			response_modalities (str): response modalities value used by this workflow.
+			grounded (bool): grounded value used by this workflow.
+			image_search (bool): image search value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -1992,7 +2182,8 @@ class Images( Gemini ):
 			self.response_mode = response_modalities or 'text'
 			self.client = genai.Client( api_key=self.gemini_api_key )
 			self.content_config = self.get_content_config( image_only=False,
-				grounded=grounded, image_search=image_search, response_modalities=self.response_mode,
+				grounded=grounded, image_search=image_search,
+				response_modalities=self.response_mode,
 				output_mime_type=self.output_mime_type )
 			self.content_response = self.client.models.generate_content( model=self.model,
 				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
@@ -2004,35 +2195,46 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'analyze( self, prompt, path, model ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			raise exception
 	
-	def edit( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
-			aspect: str=None, number: int=None, temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None, resolution: str=None, instruct: str=None,
-			output_mime_type: str=None, response_modalities: str=None,
-			grounded: bool=False, image_search: bool=False ) -> Optional[ PIL.Image.Image ]:
-		"""
-			
-			Purpose:
-			-----------
-			Edits a local image using a text instruction and image input.
-			
-			Parameters:
-			-----------
-			prompt: str - Editing instruction.
-			path: str - Path to the local image.
-			aspect: str - Aspect ratio.
-			resolution: str - Output image size when supported by the selected model.
-			output_mime_type: str - Requested output MIME type for returned image content.
-			response_modalities: str - UI-selected Gemini response mode.
-			grounded: bool - Enables Google Search grounding when supported by the selected model.
-			image_search: bool - Enables Google Image Search grounding when supported by the selected model.
-			
-			Returns:
-			--------
-			Optional[ PIL.Image.Image ] - The edited image.
-			
+	def edit( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
+			aspect: str = None, number: int = None, temperature: float = None,
+			top_p: float = None, frequency: float = None, presence: float = None,
+			max_tokens: int = None, resolution: str = None, instruct: str = None,
+			output_mime_type: str = None, response_modalities: str = None,
+			grounded: bool = False, image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+		"""Edit.
+		
+		Purpose:
+			Executes the edit workflow for the Images wrapper. The method validates required inputs,
+			prepares provider configuration, performs the requested provider or storage operation,
+			captures response state, and returns the result expected by the application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			path (str): path value used by this workflow.
+			model (str): model value used by this workflow.
+			aspect (str): aspect value used by this workflow.
+			number (int): number value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			resolution (str): resolution value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+			output_mime_type (str): output mime type value used by this workflow.
+			response_modalities (str): response modalities value used by this workflow.
+			grounded (bool): grounded value used by this workflow.
+			image_search (bool): image search value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -2052,7 +2254,8 @@ class Images( Gemini ):
 			self.response_mode = response_modalities or 'image'
 			self.client = genai.Client( api_key=self.gemini_api_key )
 			self.content_config = self.get_content_config( image_only=True,
-				grounded=grounded, image_search=image_search, response_modalities=self.response_mode,
+				grounded=grounded, image_search=image_search,
+				response_modalities=self.response_mode,
 				output_mime_type=self.output_mime_type )
 			self.content_response = self.client.models.generate_content( model=self.model,
 				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
@@ -2064,34 +2267,31 @@ class Images( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Images'
 			exception.method = 'edit( self, prompt, path, model ) -> Optional[ PIL.Image.Image ]'
+			Logger( ).write( exception )
 			raise exception
 
 class Embeddings( Gemini ):
-	'''
-
-		Purpose:
-		--------
-		Class handling text embedding generation with the Google GenAI SDK.
-
-		Attributes:
-		-----------
-		client              : Client - Initialized GenAI client.
-		response            : Any - Raw API response.
-		embedding           : List[ float ] | List[ List[ float ] ] - Generated vectors.
-		encoding_format     : str - UI-selected embedding output format.
-		dimensions          : int - Optional embedding output dimensionality.
-		task_type           : str - Optional embedding task type.
-		title               : str - Optional retrieval-document title.
-		embedding_config    : EmbedContentConfig - Configuration for embeddings.
-		contents            : str | List[ str ] - Input text or text chunks.
-		input_text          : str | List[ str ] - Current text input.
-		file_path           : str - Path to source text.
-
-		Methods:
-		--------
-		create( text, model ) : Creates one or more embedding vectors.
-
-	'''
+	"""Embeddings class.
+	
+	Purpose:
+		Creates vector embeddings from text input using Gemini embedding models. The class
+		normalizes single-string and batch text input, builds embedding configuration, calls the
+		provider API, and extracts vector values in a stable application-facing shape.
+	
+	Attributes:
+		client (Optional[genai.Client]): Runtime field used by the Embeddings workflow.
+		response (Optional[Any]): Runtime field used by the Embeddings workflow.
+		embedding (Optional[List[float] | List[List[float]]]): Runtime field used by the Embeddings workflow.
+		encoding_format (Optional[str]): Runtime field used by the Embeddings workflow.
+		dimensions (Optional[int]): Runtime field used by the Embeddings workflow.
+		task_type (Optional[str]): Runtime field used by the Embeddings workflow.
+		title (Optional[str]): Runtime field used by the Embeddings workflow.
+		embedding_config (Optional[types.EmbedContentConfig]): Runtime field used by the Embeddings workflow.
+		contents (Optional[str | List[str]]): Runtime field used by the Embeddings workflow.
+		input_text (Optional[str | List[str]]): Runtime field used by the Embeddings workflow.
+		file_path (Optional[str]): Runtime field used by the Embeddings workflow.
+		response_modalities (Optional[str]): Runtime field used by the Embeddings workflow.
+	"""
 	client: Optional[ genai.Client ]
 	response: Optional[ Any ]
 	embedding: Optional[ List[ float ] | List[ List[ float ] ] ]
@@ -2105,7 +2305,17 @@ class Embeddings( Gemini ):
 	file_path: Optional[ str ]
 	response_modalities: Optional[ str ]
 	
-	def __init__( self, model: str='gemini-embedding-001' ):
+	def __init__( self, model: str = 'gemini-embedding-001' ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the Embeddings instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		
+		Args:
+			model (str): model value used by this workflow.
+		"""
 		super( ).__init__( )
 		self.model = model
 		self.client = None
@@ -2126,16 +2336,15 @@ class Embeddings( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""
+		"""Model options.
 		
-			Purpose:
-			--------
-			Returns supported Gemini embedding model options.
-			
-			Returns:
-			--------
-			List[ str ] | None - Available embedding model names.
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
 		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-embedding-001',
 		         'gemini-embedding-2',
@@ -2145,32 +2354,30 @@ class Embeddings( Gemini ):
 	
 	@property
 	def encoding_options( self ) -> List[ str ]:
-		'''
-			
-			Purpose:
-			--------
-			Returns available embedding output format options retained for UI compatibility.
-			
-			Returns:
-			--------
-			List[ str ] - Available format options.
-
-		'''
+		"""Encoding options.
+		
+		Purpose:
+			Returns the encoding options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'float', 'base64' ]
 	
 	@property
 	def task_options( self ) -> List[ str ]:
-		'''
-			
-			Purpose:
-			--------
-			Returns available embedding task options.
-			
-			Returns:
-			--------
-			List[ str ] - Available embedding task types.
-
-		'''
+		"""Task options.
+		
+		Purpose:
+			Returns the task options exposed by this provider wrapper. This property keeps UI option
+			rendering centralized and gives documentation a stable location for describing supported
+			choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ '',
 		         'RETRIEVAL_QUERY',
 		         'RETRIEVAL_DOCUMENT',
@@ -2182,46 +2389,51 @@ class Embeddings( Gemini ):
 		         'CODE_RETRIEVAL_QUERY' ]
 	
 	def normalize_dimensions( self, dimensions: int ) -> int | None:
-		"""
+		"""Normalize dimensions.
 		
-			Purpose:
-			--------
-			Normalizes the optional embedding output dimensionality.
-			
-			Parameters:
-			-----------
-			dimensions: int - Requested output dimensionality.
-			
-			Returns:
-			--------
-			int | None - Positive dimensionality or None.
+		Purpose:
+			Normalizes input values for the Embeddings workflow before they are passed to provider
+			calls or downstream processing. The method converts UI or caller-supplied values into a
+			stable shape expected by the wrapper.
 		
+		Args:
+			dimensions (int): dimensions value used by this workflow.
+		
+		Returns:
+			Normalized value suitable for provider calls or downstream processing.
 		"""
 		try:
-			throw_if( 'dimensions', dimensions)
+			throw_if( 'dimensions', dimensions )
 			self.dimensions = dimensions
 			if self.dimensions <= 0:
 				return None
 			
 			return self.dimensions
-		except Exception:
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = 'refresh_collections( self ) -> Dict[ str, str ]'
+			Logger( ).write( exception )
 			return None
 	
 	def normalize_contents( self, text: str | List[ str ] ) -> str | List[ str ]:
-		"""
+		"""Normalize contents.
 		
-			Purpose:
-			--------
-			Normalizes embedding input into either one text string or a list of text chunks.
-			
-			Parameters:
-			-----------
-			text: str | List[ str ] - Input text or text chunks.
-			
-			Returns:
-			--------
-			str | List[ str ] - Normalized embedding content.
+		Purpose:
+			Normalizes input values for the Embeddings workflow before they are passed to provider
+			calls or downstream processing. The method converts UI or caller-supplied values into a
+			stable shape expected by the wrapper.
 		
+		Args:
+			text (str | List[str]): text value used by this workflow.
+		
+		Returns:
+			Normalized value suitable for provider calls or downstream processing.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'text', text )
@@ -2247,27 +2459,31 @@ class Embeddings( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
 			exception.method = 'normalize_contents( self, text: str | List[ str ] )'
+			Logger( ).write( exception )
 			raise exception
 	
-	def build_embedding_config( self, model: str='gemini-embedding-001',
-			dimensions: int=None, task_type: str=None, title: str=None ) -> EmbedContentConfig:
-		"""
+	def build_embedding_config( self, model: str = 'gemini-embedding-001',
+			dimensions: int = None, task_type: str = None,
+			title: str = None ) -> EmbedContentConfig:
+		"""Build embedding config.
 		
-			Purpose:
-			--------
-			Builds the Gemini embedding configuration for the selected model.
-			
-			Parameters:
-			-----------
-			model: str - Gemini embedding model identifier.
-			dimensions: int - Optional output dimensionality.
-			task_type: str - Optional embedding task type.
-			title: str - Optional retrieval-document title.
-			
-			Returns:
-			--------
-			EmbedContentConfig - Embedding configuration object.
+		Purpose:
+			Builds the request component used by the Embeddings workflow. The method translates
+			caller options and current object state into provider-compatible configuration or
+			content values.
 		
+		Args:
+			model (str): model value used by this workflow.
+			dimensions (int): dimensions value used by this workflow.
+			task_type (str): task type value used by this workflow.
+			title (str): title value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.model = model
@@ -2277,14 +2493,14 @@ class Embeddings( Gemini ):
 			self.config_kwargs = { }
 			
 			if self.dimensions is not None:
-				self.config_kwargs[ 'output_dimensionality' ]=self.dimensions
+				self.config_kwargs[ 'output_dimensionality' ] = self.dimensions
 			
 			if self.task_type and 'gemini-embedding-2' not in self.model:
-				self.config_kwargs[ 'task_type' ]=self.task_type
+				self.config_kwargs[ 'task_type' ] = self.task_type
 			
 			if self.title and self.task_type == 'RETRIEVAL_DOCUMENT' \
 					and 'gemini-embedding-2' not in self.model:
-				self.config_kwargs[ 'title' ]=self.title
+				self.config_kwargs[ 'title' ] = self.title
 			
 			self.embedding_config = EmbedContentConfig( **self.config_kwargs )
 			return self.embedding_config
@@ -2293,19 +2509,23 @@ class Embeddings( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
 			exception.method = 'build_embedding_config( self, model, dimensions, task_type, title )'
+			Logger( ).write( exception )
 			raise exception
 	
 	def extract_embeddings( self ) -> List[ float ] | List[ List[ float ] ] | None:
-		"""
+		"""Extract embeddings.
 		
-			Purpose:
-			--------
-			Extracts embedding vectors from a Gemini embed_content response.
-			
-			Returns:
-			--------
-			List[ float ] | List[ List[ float ] ] | None - One vector, multiple vectors, or None.
+		Purpose:
+			Extracts provider response values from the current Embeddings response object. The
+			method normalizes nested SDK response structures into the return shape expected by the
+			application.
 		
+		Returns:
+			Result produced by the operation.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			if self.response is None:
@@ -2336,30 +2556,33 @@ class Embeddings( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
 			exception.method = 'extract_embeddings( self )'
+			Logger( ).write( exception )
 			raise exception
+	
+	def create( self, text: str | List[ str ], model: str = 'gemini-embedding-001',
+			dimensions: int = None, task_type: str = None, title: str = None,
+			encoding_format: str = 'float' ) -> List[ float ] | List[ List[ float ] ] | None:
+		"""Create.
 		
-	def create( self, text: str | List[ str ], model: str='gemini-embedding-001',
-			dimensions: int=None, task_type: str=None, title: str=None,
-			encoding_format: str='float' ) -> List[ float ] | List[ List[ float ] ] | None:
-		"""
-			
-			Purpose:
-			--------
-			Generates one or more vector representations of the provided text.
-			
-			Parameters:
-			-----------
-			text: str | List[ str ] - Input text string or chunk list.
-			model: str - Embedding model identifier.
-			dimensions: int - Optional output dimensionality.
-			task_type: str - Optional embedding task type.
-			title: str - Optional retrieval-document title.
-			encoding_format: str - UI-retained encoding format value.
-			
-			Returns:
-			--------
-			List[ float ] | List[ List[ float ] ] | None - Embedding vector or vectors.
+		Purpose:
+			Executes the create workflow for the Embeddings wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
 		
+		Args:
+			text (str | List[str]): text value used by this workflow.
+			model (str): model value used by this workflow.
+			dimensions (int): dimensions value used by this workflow.
+			task_type (str): task type value used by this workflow.
+			title (str): title value used by this workflow.
+			encoding_format (str): encoding format value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'text', text )
@@ -2384,30 +2607,29 @@ class Embeddings( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
 			exception.method = 'create( self, text, model ) -> List[ float ] | List[ List[ float ] ]'
+			Logger( ).write( exception )
 			raise exception
 
 class TTS( Gemini ):
+	"""TTS class.
+	
+	Purpose:
+		Converts text input into spoken audio using Gemini text-to-speech models. The class
+		normalizes voice and prompt options, requests audio output from the provider, wraps raw
+		PCM bytes in a WAV container, and optionally writes the generated audio to disk.
+	
+	Attributes:
+		speed (Optional[float]): Runtime field used by the TTS workflow.
+		voice (Optional[str]): Runtime field used by the TTS workflow.
+		response (Optional[GenerateContentResponse]): Runtime field used by the TTS workflow.
+		voice_config (Optional[VoiceConfig]): Runtime field used by the TTS workflow.
+		speech_config (Optional[SpeechConfig]): Runtime field used by the TTS workflow.
+		client (Optional[genai.Client]): Runtime field used by the TTS workflow.
+		audio_path (Optional[str]): Runtime field used by the TTS workflow.
+		response_format (Optional[str]): Runtime field used by the TTS workflow.
+		input_text (Optional[str]): Runtime field used by the TTS workflow.
+		audio_bytes (Optional[bytes]): Runtime field used by the TTS workflow.
 	"""
-
-	    Purpose
-	    ___________
-	    Class for conversion of text to speech using Gemini TTS output.
-
-	    Attributes:
-	    -----------
-	    speed           : float - Audio playback speed
-	    voice           : str - Persona identifier
-	    response        : GenerateContentResponse - Raw response
-	    client          : Client - genai instance
-	    audio_path      : str - Target path
-	    response_format : str - Audio format
-	    input_text      : str - Original text
-
-	    Methods:
-	    --------
-	    create_speech( text, filepath, model, format, speed, voice ) : Generates speech audio
-
-    """
 	speed: Optional[ float ]
 	voice: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
@@ -2419,7 +2641,17 @@ class TTS( Gemini ):
 	input_text: Optional[ str ]
 	audio_bytes: Optional[ bytes ]
 	
-	def __init__( self, model: str='gemini-2.5-flash-preview-tts' ):
+	def __init__( self, model: str = 'gemini-2.5-flash-preview-tts' ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the TTS instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		
+		Args:
+			model (str): model value used by this workflow.
+		"""
 		super( ).__init__( )
 		self.number = None
 		self.model = model
@@ -2441,61 +2673,61 @@ class TTS( Gemini ):
 		self.input_text = None
 		self.audio_bytes = None
 		self.response_modalities = [ ]
-		
+	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns list of TTS-capable Gemini models.
-
-			Returns:
-			--------
-			List[str] | None - Supported Gemini TTS model identifiers.
-
+		"""Model options.
+		
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts',
-				'gemini-2.5-pro-preview-tts' ]
+		         'gemini-2.5-pro-preview-tts' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns the supported output container formats for this wrapper.
-
-			Returns:
-			--------
-			List[str] | None - Supported local output formats.
-
+		"""Format options.
+		
+		Purpose:
+			Returns the format options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'audio/wav' ]
 	
-	def to_wave_bytes( self, pcm_data: bytes, rate: int=24000, channels: int=1,
-			sample_width: int=2 ) -> bytes:
-		"""
-
-			Purpose:
-			--------
-			Wraps raw PCM bytes returned by Gemini TTS into a WAV container.
-
-			Parameters:
-			-----------
-			pcm_data: bytes - Raw PCM audio bytes.
-			rate: int - Sample rate in Hz.
-			channels: int - Number of audio channels.
-			sample_width: int - Sample width in bytes.
-
-			Returns:
-			--------
-			bytes - WAV file bytes.
-
+	def to_wave_bytes( self, pcm_data: bytes, rate: int = 24000, channels: int = 1,
+			sample_width: int = 2 ) -> bytes:
+		"""To wave bytes.
+		
+		Purpose:
+			Performs the to wave bytes operation for the TTS wrapper. The method preserves provider-
+			specific handling behind the application-facing class interface.
+		
+		Args:
+			pcm_data (bytes): pcm data value used by this workflow.
+			rate (int): rate value used by this workflow.
+			channels (int): channels value used by this workflow.
+			sample_width (int): sample width value used by this workflow.
+		
+		Returns:
+			Result produced by the operation.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			import io
 			import wave
+			
 			throw_if( 'pcm_data', pcm_data )
 			with io.BytesIO( ) as buffer:
 				with wave.open( buffer, 'wb' ) as wf:
@@ -2510,23 +2742,26 @@ class TTS( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'TTS'
 			exception.method = 'to_wave_bytes( self, **kwargs) -> bytes'
+			Logger( ).write( exception )
 			raise exception
 	
-	def normalize_voice( self, voice: Optional[ str ]=None ) -> str:
-		"""
-
-			Purpose:
-			--------
-			Normalizes the UI-selected voice into a valid Gemini prebuilt voice name.
-
-			Parameters:
-			-----------
-			voice: Optional[str] - UI-selected voice name.
-
-			Returns:
-			--------
-			str - Valid Gemini TTS voice name.
-
+	def normalize_voice( self, voice: Optional[ str ] = None ) -> str:
+		"""Normalize voice.
+		
+		Purpose:
+			Normalizes input values for the TTS workflow before they are passed to provider calls or
+			downstream processing. The method converts UI or caller-supplied values into a stable
+			shape expected by the wrapper.
+		
+		Args:
+			voice (Optional[str]): voice value used by this workflow.
+		
+		Returns:
+			Normalized value suitable for provider calls or downstream processing.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.voice_name = str( voice or '' ).strip( )
@@ -2540,27 +2775,29 @@ class TTS( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'TTS'
 			exception.method = 'normalize_voice( self, voice: Optional[str]=None ) -> str'
+			Logger( ).write( exception )
 			raise exception
 	
-	def normalize_tts_prompt( self, text: str, speed: Optional[ float ]=None,
-			instruct: Optional[ str ]=None ) -> str:
-		"""
-
-			Purpose:
-			--------
-			Builds a Gemini TTS prompt using natural-language delivery instructions instead
-			of unsupported request parameters.
-
-			Parameters:
-			-----------
-			text: str - Text to synthesize.
-			speed: Optional[float] - Optional UI speed hint.
-			instruct: Optional[str] - Optional user/system delivery instruction.
-
-			Returns:
-			--------
-			str - Prompt text sent to the TTS model.
-
+	def normalize_tts_prompt( self, text: str, speed: Optional[ float ] = None,
+			instruct: Optional[ str ] = None ) -> str:
+		"""Normalize tts prompt.
+		
+		Purpose:
+			Normalizes input values for the TTS workflow before they are passed to provider calls or
+			downstream processing. The method converts UI or caller-supplied values into a stable
+			shape expected by the wrapper.
+		
+		Args:
+			text (str): text value used by this workflow.
+			speed (Optional[float]): speed value used by this workflow.
+			instruct (Optional[str]): instruct value used by this workflow.
+		
+		Returns:
+			Normalized value suitable for provider calls or downstream processing.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'text', text )
@@ -2584,6 +2821,7 @@ class TTS( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'TTS'
 			exception.method = 'normalize_tts_prompt( self, **kwargs ) -> str'
+			Logger( ).write( exception )
 			raise exception
 	
 	def create_speech( self, text: str, filepath: str = None,
@@ -2591,32 +2829,33 @@ class TTS( Gemini ):
 			speed: float = None, voice: str = None, frequency: float = None,
 			presense: float = None, max_tokens: int = None, instruct: str = None,
 			temperature: float = None, top_p: float = None ) -> bytes | str | None:
-		"""
-
-			Purpose:
-			--------
-			Converts text to speech using Gemini TTS. If filepath is provided, the generated
-			WAV is written to disk; otherwise WAV bytes are returned.
-
-			Parameters:
-			-----------
-			text: str - Input text string.
-			filepath: str - Optional target local path.
-			model: str - Gemini TTS model identifier.
-			format: str - Output audio format.
-			speed: float - Optional delivery pace hint converted into prompt text.
-			voice: str - Gemini prebuilt voice name.
-			frequency: float - UI-retained value; not sent to Gemini TTS.
-			presense: float - UI-retained value; not sent to Gemini TTS.
-			max_tokens: int - Maximum output token budget.
-			instruct: str - Optional delivery/system instruction.
-			temperature: float - Sampling temperature.
-			top_p: float - Nucleus sampling threshold.
-
-			Returns:
-			--------
-			bytes | str | None - WAV bytes or local path to the created file.
-
+		"""Create speech.
+		
+		Purpose:
+			Executes the create speech workflow for the TTS wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			text (str): text value used by this workflow.
+			filepath (str): filepath value used by this workflow.
+			model (str): model value used by this workflow.
+			format (str): format value used by this workflow.
+			speed (float): speed value used by this workflow.
+			voice (str): voice value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presense (float): presense value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'text', text )
@@ -2693,37 +2932,51 @@ class TTS( Gemini ):
 					'speed: float=None, voice: str=None, frequency: float=None, '
 					'presense: float=None, max_tokens: int=None, instruct: str=None, '
 					'temperature: float=None, top_p: float=None ) -> bytes | str | None')
+			Logger( ).write( exception )
 			error = ErrorDialog( exception )
 			error.show( )
 			return None
 
 class Transcription( Gemini ):
+	"""Transcription class.
+	
+	Purpose:
+		Transcribes local audio files into text using Gemini audio-understanding models. The
+		class normalizes audio MIME types, builds transcription prompts with optional language
+		and time-window hints, uploads the audio file, and returns the generated transcript
+		text.
+	
+	Attributes:
+		client (Optional[genai.Client]): Runtime field used by the Transcription workflow.
+		transcript (Optional[str]): Runtime field used by the Transcription workflow.
+		file_path (Optional[str]): Runtime field used by the Transcription workflow.
+		response (Optional[GenerateContentResponse]): Runtime field used by the Transcription workflow.
 	"""
-
-	    Purpose
-	    ___________
-	    Class handling audio-to-text transcription using Gemini audio understanding.
-
-	    Attributes:
-	    -----------
-	    client     : Client - GenAI instance
-	    transcript : str - Text result
-	    file_path  : str - Path to audio file
-	    response   : GenerateContentResponse - Raw response
-
-	    Methods:
-	    --------
-	    transcribe( path, model ) : Transcribes local audio file to text
-
-    """
 	client: Optional[ genai.Client ]
 	transcript: Optional[ str ]
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
-			top_p: float=0.9, frequency: float=0.0, presence: float=0.0,
-			max_tokens: int=10000, instruct: str=None ):
+	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
+			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0,
+			max_tokens: int = 10000, instruct: str = None ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the Transcription instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		
+		Args:
+			n (int): n value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		"""
 		super( ).__init__( )
 		self.number = n
 		self.model = model
@@ -2741,24 +2994,30 @@ class Transcription( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns list of llm supporting audio input.
-
+		"""Model options.
+		
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-3-flash-preview',
 		         'gemini-2.0-flash' ]
 	
 	@property
 	def language_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns list of language hints.
-
+		"""Language options.
+		
+		Purpose:
+			Returns the language options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'Auto',
 		         'English',
@@ -2767,20 +3026,18 @@ class Transcription( Gemini ):
 		         'Japanese',
 		         'German',
 		         'Chinese' ]
-		
+	
 	@property
-
 	def format_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns supported Gemini audio input MIME types.
-
-			Returns:
-			--------
-			List[str] | None - Supported audio MIME types.
-
+		"""Format options.
+		
+		Purpose:
+			Returns the format options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [
 				'audio/wav',
@@ -2792,25 +3049,27 @@ class Transcription( Gemini ):
 		]
 	
 	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
-		"""
-
-			Purpose:
-			--------
-			Normalizes UI-provided or filename-derived audio MIME types into Gemini-supported
-			audio MIME types.
-
-			Parameters:
-			-----------
-			path: str - Local audio file path.
-			mime_type: str - Optional UI-selected MIME type.
-
-			Returns:
-			--------
-			str - Gemini-supported audio MIME type.
-
+		"""Normalize mime type.
+		
+		Purpose:
+			Normalizes input values for the Transcription workflow before they are passed to
+			provider calls or downstream processing. The method converts UI or caller-supplied
+			values into a stable shape expected by the wrapper.
+		
+		Args:
+			path (str): path value used by this workflow.
+			mime_type (str): mime type value used by this workflow.
+		
+		Returns:
+			Normalized value suitable for provider calls or downstream processing.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			import mimetypes
+			
 			self.raw_mime_type = str( mime_type or '' ).strip( )
 			if not self.raw_mime_type:
 				self.raw_mime_type = mimetypes.guess_type( path )[ 0 ] or ''
@@ -2853,26 +3112,25 @@ class Transcription( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Transcription'
 			exception.method = 'normalize_mime_type( self, path: str, mime_type: str=None ) -> str'
+			Logger( ).write( exception )
 			raise exception
 	
-	def build_prompt( self, language: str=None, start_time: float=None,
-			end_time: float=None ) -> str:
-		"""
-
-			Purpose:
-			--------
-			Builds the transcription prompt for Gemini audio understanding.
-
-			Parameters:
-			-----------
-			language: str - Optional language hint.
-			start_time: float - Optional start timestamp in seconds.
-			end_time: float - Optional end timestamp in seconds.
-
-			Returns:
-			--------
-			str - Prompt text.
-
+	def build_prompt( self, language: str = None, start_time: float = None,
+			end_time: float = None ) -> str:
+		"""Build prompt.
+		
+		Purpose:
+			Builds the request component used by the Transcription workflow. The method translates
+			caller options and current object state into provider-compatible configuration or
+			content values.
+		
+		Args:
+			language (str): language value used by this workflow.
+			start_time (float): start time value used by this workflow.
+			end_time (float): end time value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
 		"""
 		self.prompt_parts = [ 'Generate a verbatim transcript of the speech.' ]
 		
@@ -2888,36 +3146,35 @@ class Transcription( Gemini ):
 		self.prompt_parts.append( 'Return only the transcript text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def transcribe( self, path: str, model: str='gemini-3-flash-preview',
-			language: str=None, mime_type: str=None, temperature: float=None,
-			top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None, start_time: float=None, end_time: float=None,
-			instruct: str=None ) -> Optional[ str ]:
-		"""
-
-			Purpose:
-			--------
-			Transcribes an audio file into text using Gemini audio understanding.
-
-			Parameters:
-			-----------
-			path: str - Local path to the source audio.
-			model: str - Specific GenAI model ID.
-			language: str - Optional language hint.
-			mime_type: str - Optional mime-type override.
-			temperature: float - Sampling temperature.
-			top_p: float - Nucleus sampling threshold.
-			frequency: float - Frequency penalty.
-			presence: float - Presence penalty.
-			max_tokens: int - Maximum output tokens.
-			start_time: float - Optional start timestamp in seconds.
-			end_time: float - Optional end timestamp in seconds.
-			instruct: str - Optional system instruction.
-
-			Returns:
-			--------
-			Optional[ str ] - Verbatim transcript text.
-
+	def transcribe( self, path: str, model: str = 'gemini-3-flash-preview',
+			language: str = None, mime_type: str = None, temperature: float = None,
+			top_p: float = None, frequency: float = None, presence: float = None,
+			max_tokens: int = None, start_time: float = None, end_time: float = None,
+			instruct: str = None ) -> Optional[ str ]:
+		"""Transcribe.
+		
+		Purpose:
+			Executes the transcribe workflow for the Transcription wrapper. The method validates
+			required inputs, prepares provider configuration, performs the requested provider or
+			storage operation, captures response state, and returns the result expected by the
+			application.
+		
+		Args:
+			path (str): path value used by this workflow.
+			model (str): model value used by this workflow.
+			language (str): language value used by this workflow.
+			mime_type (str): mime type value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			start_time (float): start time value used by this workflow.
+			end_time (float): end time value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
 		"""
 		try:
 			import mimetypes
@@ -2938,16 +3195,16 @@ class Transcription( Gemini ):
 			self.config_kwargs = { }
 			
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ]=self.temperature
+				self.config_kwargs[ 'temperature' ] = self.temperature
 			
 			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ]=self.top_p
+				self.config_kwargs[ 'top_p' ] = self.top_p
 			
 			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
+				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
 			
 			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.uploaded_file = self.client.files.upload( file=self.file_path )
@@ -2962,39 +3219,52 @@ class Transcription( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Transcription'
 			ex.method = 'transcribe( self, path, model, language ) -> str'
+			Logger( ).write( ex )
 			error = ErrorDialog( ex )
 			error.show( )
 
 class Translation( Gemini ):
+	"""Translation class.
+	
+	Purpose:
+		Translates spoken audio into target-language text using Gemini audio-understanding
+		models. The class normalizes MIME types, builds translation prompts with source and
+		target language hints, uploads the audio file, and returns translated text.
+	
+	Attributes:
+		client (Optional[genai.Client]): Runtime field used by the Translation workflow.
+		target_language (Optional[str]): Runtime field used by the Translation workflow.
+		source_language (Optional[str]): Runtime field used by the Translation workflow.
+		file_path (Optional[str]): Runtime field used by the Translation workflow.
+		response (Optional[GenerateContentResponse]): Runtime field used by the Translation workflow.
 	"""
-
-	    Purpose
-	    ___________
-	    Class for translating spoken audio into text using Gemini audio understanding.
-
-	    Attributes:
-	    -----------
-	    client          : Client - genai client instance
-	    target_language : str - Destination language
-	    source_language : str - Source language hint
-	    file_path       : str - Audio file path
-	    response        : GenerateContentResponse - Raw response
-
-	    Methods:
-	    --------
-	    translate( path, model, language ) : Translates speech in an audio file
-
-    """
 	client: Optional[ genai.Client ]
 	target_language: Optional[ str ]
 	source_language: Optional[ str ]
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
-			top_p: float=0.9, frequency: float=0.0, presence: float=0.0,
-			max_tokens: int=10000,
-			instruct: str=None ):
+	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
+			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0,
+			max_tokens: int = 10000,
+			instruct: str = None ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the Translation instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		
+		Args:
+			n (int): n value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		"""
 		super( ).__init__( )
 		self.number = n
 		self.model = model
@@ -3013,28 +3283,30 @@ class Translation( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns list of translation-capable audio llm.
-
+		"""Model options.
+		
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-3-flash-preview',
 		         'gemini-2.0-flash' ]
-		
+	
 	@property
 	def format_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns supported Gemini audio input MIME types.
-
-			Returns:
-			--------
-			List[str] | None - Supported audio MIME types.
-
+		"""Format options.
+		
+		Purpose:
+			Returns the format options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [
 				'audio/wav',
@@ -3046,22 +3318,23 @@ class Translation( Gemini ):
 		]
 	
 	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
-		"""
-
-			Purpose:
-			--------
-			Normalizes UI-provided or filename-derived audio MIME types into Gemini-supported
-			audio MIME types.
-
-			Parameters:
-			-----------
-			path: str - Local audio file path.
-			mime_type: str - Optional UI-selected MIME type.
-
-			Returns:
-			--------
-			str - Gemini-supported audio MIME type.
-
+		"""Normalize mime type.
+		
+		Purpose:
+			Normalizes input values for the Translation workflow before they are passed to provider
+			calls or downstream processing. The method converts UI or caller-supplied values into a
+			stable shape expected by the wrapper.
+		
+		Args:
+			path (str): path value used by this workflow.
+			mime_type (str): mime type value used by this workflow.
+		
+		Returns:
+			Normalized value suitable for provider calls or downstream processing.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			import mimetypes
@@ -3108,16 +3381,20 @@ class Translation( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Translation'
 			exception.method = 'normalize_mime_type( self, path: str, mime_type: str=None ) -> str'
+			Logger( ).write( exception )
 			raise exception
 	
 	@property
 	def language_options( self ) -> List[ str ] | None:
-		"""
-
-			Purpose:
-			--------
-			Returns list of available target languages.
-
+		"""Language options.
+		
+		Purpose:
+			Returns the language options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'English',
 		         'Spanish',
@@ -3126,25 +3403,23 @@ class Translation( Gemini ):
 		         'German',
 		         'Chinese' ]
 	
-	def build_prompt( self, target: str, source: str='Auto', start_time: float=None,
-			end_time: float=None ) -> str:
-		"""
-
-			Purpose:
-			--------
-			Builds the translation prompt for Gemini audio understanding.
-
-			Parameters:
-			-----------
-			target: str - Target translation language.
-			source: str - Optional source-language hint.
-			start_time: float - Optional start timestamp in seconds.
-			end_time: float - Optional end timestamp in seconds.
-
-			Returns:
-			--------
-			str - Prompt text.
-
+	def build_prompt( self, target: str, source: str = 'Auto', start_time: float = None,
+			end_time: float = None ) -> str:
+		"""Build prompt.
+		
+		Purpose:
+			Builds the request component used by the Translation workflow. The method translates
+			caller options and current object state into provider-compatible configuration or
+			content values.
+		
+		Args:
+			target (str): target value used by this workflow.
+			source (str): source value used by this workflow.
+			start_time (float): start time value used by this workflow.
+			end_time (float): end time value used by this workflow.
+		
+		Returns:
+			Provider-compatible request component or configuration value.
 		"""
 		self.prompt_parts = [ f'Translate the spoken audio into {target}.' ]
 		if source is not None and str( source ).strip( ) and str( source ).strip( ) != 'Auto':
@@ -3159,40 +3434,40 @@ class Translation( Gemini ):
 		self.prompt_parts.append( 'Return only the translated text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def translate( self, path: str, model: str='gemini-3-flash-preview',
-			language: str='English', source: str='Auto', mime_type: str=None,
-			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None, max_tokens: int=None, start_time: float=None,
-			end_time: float=None, instruct: str=None ) -> Optional[ str ]:
-		"""
-
-			Purpose:
-			--------
-			Translates spoken audio from one language to another.
-
-			Parameters:
-			-----------
-			path: str - Local path to the source audio.
-			model: str - Specific GenAI model ID.
-			language: str - Target language.
-			source: str - Source language hint.
-			mime_type: str - Optional mime-type override.
-			temperature: float - Sampling temperature.
-			top_p: float - Nucleus sampling threshold.
-			frequency: float - Frequency penalty.
-			presence: float - Presence penalty.
-			max_tokens: int - Maximum output tokens.
-			start_time: float - Optional start timestamp in seconds.
-			end_time: float - Optional end timestamp in seconds.
-			instruct: str - Optional system instruction.
-
-			Returns:
-			--------
-			Optional[ str ] - Translated text.
-
+	def translate( self, path: str, model: str = 'gemini-3-flash-preview',
+			language: str = 'English', source: str = 'Auto', mime_type: str = None,
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None, max_tokens: int = None, start_time: float = None,
+			end_time: float = None, instruct: str = None ) -> Optional[ str ]:
+		"""Translate.
+		
+		Purpose:
+			Executes the translate workflow for the Translation wrapper. The method validates
+			required inputs, prepares provider configuration, performs the requested provider or
+			storage operation, captures response state, and returns the result expected by the
+			application.
+		
+		Args:
+			path (str): path value used by this workflow.
+			model (str): model value used by this workflow.
+			language (str): language value used by this workflow.
+			source (str): source value used by this workflow.
+			mime_type (str): mime type value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			start_time (float): start time value used by this workflow.
+			end_time (float): end time value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
 		"""
 		try:
 			import mimetypes
+			
 			throw_if( 'path', path )
 			self.file_path = path
 			self.model = str( model or self.model or 'gemini-3-flash-preview' ).strip( )
@@ -3205,21 +3480,22 @@ class Translation( Gemini ):
 			self.max_tokens = max_tokens if max_tokens is not None else self.max_tokens
 			self.instructions = instruct if instruct is not None else self.instructions
 			self.mime_type = self.normalize_mime_type( path=self.file_path, mime_type=mime_type )
-			self.prompt = self.build_prompt( target=self.target_language, source=self.source_language,
+			self.prompt = self.build_prompt( target=self.target_language,
+				source=self.source_language,
 				start_time=start_time, end_time=end_time )
 			
 			self.config_kwargs = { }
 			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ]=self.temperature
+				self.config_kwargs[ 'temperature' ] = self.temperature
 			
 			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ]=self.top_p
+				self.config_kwargs[ 'top_p' ] = self.top_p
 			
 			if self.max_tokens is not None:
-				self.config_kwargs[ 'max_output_tokens' ]=self.max_tokens
+				self.config_kwargs[ 'max_output_tokens' ] = self.max_tokens
 			
 			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ]=str( self.instructions ).strip( )
+				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.uploaded_file = self.client.files.upload( file=self.file_path )
@@ -3231,35 +3507,38 @@ class Translation( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Translation'
 			ex.method = 'translate( self, path, model, language, source ) -> str'
+			Logger( ).write( ex )
 			error = ErrorDialog( ex )
 			error.show( )
 
 class Files( Gemini ):
-	'''
-
-		Purpose:
-		--------
-		Class encapsulating Gemini's FileStores API for uploading and managing remote assets.
-
-		Attributes:
-		-----------
-		client       : Client - Initialized GenAI client
-		file_id      : str - ID of the target file
-		display_name : str - User-friendly label for the file
-		mime_type    : str - Content type of the file
-		file_path    : str - Local filesystem path
-		file_list    : list - Collection of remote File objects
-		response     : any - RAW API response object
-		use_vertex   : bool - Integration flag
-
-		Methods:
-		--------
-		upload( path, name )      : Uploads a local file to Gemini storage
-		retrieve( file_id )       : Fetches metadata for a specific remote file
-		list_files( )             : Lists all files currently in remote storage
-		delete( file_id )         : Removes a file from remote storage
-
-	'''
+	"""Files class.
+	
+	Purpose:
+		Encapsulates Gemini file and document workflows used by the application. The class
+		uploads local files, lists configured storage assets, retrieves remote metadata,
+		summarizes documents, searches uploaded content, and deletes remote files when
+		requested.
+	
+	Attributes:
+		api_version (Optional[str]): Runtime field used by the Files workflow.
+		google_api_key (Optional[str]): Runtime field used by the Files workflow.
+		storage_client (Optional[storage.Client]): Runtime field used by the Files workflow.
+		project_id (Optional[str]): Runtime field used by the Files workflow.
+		project_location (Optional[str]): Runtime field used by the Files workflow.
+		file_id (Optional[str]): Runtime field used by the Files workflow.
+		bucket_id (Optional[str]): Runtime field used by the Files workflow.
+		display_name (Optional[str]): Runtime field used by the Files workflow.
+		mime_type (Optional[str]): Runtime field used by the Files workflow.
+		file_path (Optional[str]): Runtime field used by the Files workflow.
+		file_list (Optional[List[File]]): Runtime field used by the Files workflow.
+		file_paths (Optional[List[str]]): Runtime field used by the Files workflow.
+		file_lists (Optional[List[File]]): Runtime field used by the Files workflow.
+		response (Optional[Any]): Runtime field used by the Files workflow.
+		use_vertex (Optional[bool]): Runtime field used by the Files workflow.
+		collections (Optional[Dict[str, str]]): Runtime field used by the Files workflow.
+		documents (Optional[Dict[str, str]]): Runtime field used by the Files workflow.
+	"""
 	api_version: Optional[ str ]
 	google_api_key: Optional[ str ]
 	storage_client: Optional[ storage.Client ]
@@ -3278,7 +3557,17 @@ class Files( Gemini ):
 	collections: Optional[ Dict[ str, str ] ]
 	documents: Optional[ Dict[ str, str ] ]
 	
-	def __init__( self, model: str='gemini-2.0-flash' ):
+	def __init__( self, model: str = 'gemini-2.0-flash' ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the Files instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		
+		Args:
+			model (str): model value used by this workflow.
+		"""
 		super( ).__init__( )
 		self.google_api_key = cfg.GOOGLE_API_KEY
 		self.project_id = cfg.GOOGLE_CLOUD_PROJECT_ID
@@ -3311,23 +3600,29 @@ class Files( Gemini ):
 	
 	@property
 	def file_options( self ) -> List[ str ] | None:
-		"""
-			
-			Purpose:
-			--------
-			Returns list of available chat llm.
-			
+		"""File options.
+		
+		Purpose:
+			Returns the file options exposed by this provider wrapper. This property keeps UI option
+			rendering centralized and gives documentation a stable location for describing supported
+			choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return self.files
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""
-			
-			Purpose:
-			--------
-			Returns list of available chat llm.
-			
+		"""Model options.
+		
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-3.5-flash',
 		         'gemini-3.5 flash-lite',
@@ -3336,26 +3631,32 @@ class Files( Gemini ):
 	
 	@property
 	def media_options( self ):
-		'''
+		"""Media options.
 		
 		Purpose:
-		--------
-		Returns a List[ str ] of media resolution options.
+			Returns the media options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
 		
-		'''
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'media_resolution_high',
 		         'media_resolution_medium',
 		         'media_resolution_low' ]
 	
 	@property
 	def include_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of the includeable options
-
-		'''
+		"""Include options.
+		
+		Purpose:
+			Returns the include options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'file_search_call.results',
 		         'message.input_image.image_url',
 		         'message.output_text.logprobs',
@@ -3363,25 +3664,31 @@ class Files( Gemini ):
 	
 	@property
 	def reasoning_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of thinking effort options
-
-		'''
+		"""Reasoning options.
+		
+		Purpose:
+			Returns the reasoning options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL',
 		         'LOW', 'MEDIUM', 'HIGH' ]
 	
 	@property
 	def choice_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available tools options
-
-		'''
+		"""Choice options.
+		
+		Purpose:
+			Returns the choice options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'AUTO',
 		         'ANY',
 		         'NONE',
@@ -3389,13 +3696,16 @@ class Files( Gemini ):
 	
 	@property
 	def tool_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available tools options
-
-		'''
+		"""Tool options.
+		
+		Purpose:
+			Returns the tool options exposed by this provider wrapper. This property keeps UI option
+			rendering centralized and gives documentation a stable location for describing supported
+			choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'google_search',
 		         'google_maps',
 		         'file_search',
@@ -3405,43 +3715,52 @@ class Files( Gemini ):
 	
 	@property
 	def modality_options( self ) -> List[ str ] | None:
-		'''
-
-			Returns:
-			--------
-			A List[ str ] of available modality options
-
-		'''
+		"""Modality options.
+		
+		Purpose:
+			Returns the modality options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'MODALITY_UNSPECIFIED', 'TEXT', 'IMAGE', 'AUDIO' ]
 	
 	@property
 	def media_options( self ):
-		'''
+		"""Media options.
 		
 		Purpose:
-		--------
-		Returns a List[ str ] of media resolution options.
+			Returns the media options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
 		
-		'''
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'media_resolution_high',
 		         'media_resolution_medium',
 		         'media_resolution_low' ]
 	
-	def upload( self, filepath: str, name: str=None ) -> File | None:
-		"""
+	def upload( self, filepath: str, name: str = None ) -> File | None:
+		"""Upload.
 		
-			Purpose:
-			--------
-			Uploads a file from a local path to Gemini's remote temporal storage.
-			
-			Parameters:
-			-----------
-			path: str - Local filesystem path to the file.
-			name: str - Optional display name for the file.
-			Returns:
-			--------
-			Optional[ File ] - Metadata object of the uploaded file.
-			
+		Purpose:
+			Executes the upload workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			filepath (str): filepath value used by this workflow.
+			name (str): name value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'filepath', filepath )
@@ -3457,40 +3776,43 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'upload( self, path: str, name: str ) -> Optional[ File ]'
+			Logger( ).write( ex )
 			raise ex
-		
+	
 	def list( self, model: str = 'gemini-3.0-flash', top_p: float = 0.8, top_k: int = 50,
 			temperature: float = 0.5, frequency: float = 0.0, presence: float = 0.0,
 			max_tokens: int = 8192, tool_choice: str = 'auto', stops: List[ str ] = None,
 			tools: List[ str ] = None, domains: List[ str ] = None,
 			modalities: List[ str ] = None,
 			media_resolution: str = 'media_resolution_medium' ) -> Any | None:
-		"""
+		"""List.
 		
-			Purpose:
-			--------
-			Lists files from the existing Google Cloud Storage-backed file listing path.
-			
-			Parameters:
-			-----------
-			model: str - Gemini model identifier retained for UI compatibility.
-			top_p: float - Nucleus sampling value retained for UI compatibility.
-			top_k: int - Top-k token selection count retained for UI compatibility.
-			temperature: float - Sampling temperature retained for UI compatibility.
-			frequency: float - Frequency penalty retained for UI compatibility.
-			presence: float - Presence penalty retained for UI compatibility.
-			max_tokens: int - Maximum output tokens retained for UI compatibility.
-			tool_choice: str - Tool-choice value retained for UI compatibility.
-			stops: List[ str ] - Stop sequences retained for UI compatibility.
-			tools: List[ str ] - Tool names retained for UI compatibility.
-			domains: List[ str ] - Domain filters retained for UI compatibility.
-			modalities: List[ str ] - Modalities retained for UI compatibility.
-			media_resolution: str - Media resolution retained for UI compatibility.
-			
-			Returns:
-			--------
-			Any | None - List of file names or None.
-			
+		Purpose:
+			Executes the list workflow for the Files wrapper. The method validates required inputs,
+			prepares provider configuration, performs the requested provider or storage operation,
+			captures response state, and returns the result expected by the application.
+		
+		Args:
+			model (str): model value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			top_k (int): top k value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			tool_choice (str): tool choice value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			tools (List[str]): tools value used by this workflow.
+			domains (List[str]): domains value used by this workflow.
+			modalities (List[str]): modalities value used by this workflow.
+			media_resolution (str): media resolution value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.files = [ ]
@@ -3523,23 +3845,23 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'list( self ) -> Any | None'
+			Logger( ).write( ex )
 			raise ex
 		
-		"""
-			
-			Purpose:
-			-------
-			Uploads and summarizes a PDF or text document.
-			
-			Parameters:
-			-----------
-			prompt: str - Summarization instructions.
-			filepath: str - Path to the document file.
-			model: str - The model identifier for processing.
-			Returns:
-			--------
-			Optional[ str ] - The document summary or None on failure.
-			
+		"""List storage files legacy branch.
+		
+		Purpose:
+			Documents the legacy, unreachable branch retained inside the file-list workflow. The
+			branch preserves the original source structure and describes the document-oriented
+			storage listing behavior that follows the earlier return statement.
+		
+		Args:
+			prompt (str): Summarization or search instruction retained by the legacy branch.
+			filepath (str): Local document path retained by the legacy branch.
+			model (str): Gemini model identifier retained by the legacy branch.
+		
+		Returns:
+			File names collected from the configured storage prefix.
 		"""
 		try:
 			self.model = model
@@ -3561,23 +3883,26 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'list_files( self ) -> Optional[ List[ File ] ]'
+			Logger( ).write( ex )
 			raise ex
 	
 	def retrieve( self, file_id: str ) -> Optional[ File ]:
-		"""
-			
-			Purpose:
-			--------
-			Retrieves the metadata and state of a previously uploaded file.
-			
-			Parameters:
-			-----------
-			file_id: str - The unique identifier of the remote file.
-			
-			Returns:
-			--------
-			Optional[ File ] - File metadata object.
+		"""Retrieve.
 		
+		Purpose:
+			Executes the retrieve workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			file_id (str): file id value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'file_id', file_id )
@@ -3589,27 +3914,38 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'retrieve( self, file_id: str ) -> Optional[ File ]'
+			Logger( ).write( ex )
 			raise ex
 	
-	def summarize( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
-			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None, max_tokens: int=None, stops: List[ str ]=None,
-			instruct: str=None ) -> str | None:
-		"""
-			
-			Purpose:
-			-------
-			Uploads and summarizes a PDF or text document.
-			
-			Parameters:
-			-----------
-			prompt: str - Summarization instructions.
-			filepath: str - Path to the document file.
-			model: str - The model identifier for processing.
-			Returns:
-			--------
-			Optional[ str ] - The document summary or None on failure.
-			
+	def summarize( self, prompt: str, filepath: str, model: str = 'gemini-2.0-flash',
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+			instruct: str = None ) -> str | None:
+		"""Summarize.
+		
+		Purpose:
+			Executes the summarize workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			filepath (str): filepath value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -3641,27 +3977,38 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'summarize_document( self, prompt, filepath, model ) -> str'
+			Logger( ).write( ex )
 			raise ex
 	
-	def search( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
-			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None, max_tokens: int=None, stops: List[ str ]=None,
-			instruct: str=None ) -> str | None:
-		"""
-			
-			Purpose:
-			-------
-			Uploads and summarizes a PDF or text document.
-			
-			Parameters:
-			-----------
-			prompt: str - Summarization instructions.
-			filepath: str - Path to the document file.
-			model: str - The model identifier for processing.
-			Returns:
-			--------
-			Optional[ str ] - The document summary or None on failure.
-			
+	def search( self, prompt: str, filepath: str, model: str = 'gemini-2.0-flash',
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+			instruct: str = None ) -> str | None:
+		"""Search.
+		
+		Purpose:
+			Executes the search workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			filepath (str): filepath value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -3694,27 +4041,37 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'search( self, prompt, filepath, model ) -> str'
+			Logger( ).write( ex )
 			raise ex
 	
-	def survey( self, prompt: str, filepaths: List[ str ], model: str='gemini-2.0-flash',
-			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None, max_tokens: int=None,
-			stops: List[ str ]=None ) -> str | None:
-		"""
-			
-			Purpose:
-			-------
-			Uploads and summarizes a PDF or text document.
-			
-			Parameters:
-			-----------
-			prompt: str - Summarization instructions.
-			filepath: str - Path to the document file.
-			model: str - The model identifier for processing.
-			Returns:
-			--------
-			Optional[ str ] - The document summary or None on failure.
-			
+	def survey( self, prompt: str, filepaths: List[ str ], model: str = 'gemini-2.0-flash',
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None, max_tokens: int = None,
+			stops: List[ str ] = None ) -> str | None:
+		"""Survey.
+		
+		Purpose:
+			Executes the survey workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			filepaths (List[str]): filepaths value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -3745,26 +4102,33 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'survey( self, prompt, filepaths, model ) -> str'
+			Logger( ).write( ex )
 			raise ex
 	
-	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
-		"""
+	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None,
+			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+		"""Web search.
 		
-			Purpose:
-			--------
-			Generates a response grounded in Google Search results.
-			
-			Parameters:
-			-----------
-			prompt: str - The query for search-augmented generation.
-			model: str - The Gemini model identifier.
-			
-			Returns:
-			--------
-			Optional[ str ] - The grounded text response.
+		Purpose:
+			Executes the web search workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
 		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -3791,27 +4155,34 @@ class Files( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'web_search( self, prompt, model ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			error = ErrorDialog( exception )
 			error.show( )
 	
-	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None, top_p: float=None, frequency: float=None,
-			presence: float=None,
-			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
-		"""
+	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None,
+			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+		"""Search maps.
 		
-			Purpose:
-			--------
-			Uses Google Search grounding specifically for location and place-based queries.
-			
-			Parameters:
-			-----------
-			prompt: str - The location or directions query.
-			model: str - The Gemini model identifier.
-			Returns:
-			--------
-			Optional[ str ] - The grounded response containing place data.
-			
+		Purpose:
+			Executes the search maps workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -3838,24 +4209,24 @@ class Files( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'search_maps( self, prompt, model ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			error = ErrorDialog( exception )
 			error.show( )
 	
 	def delete( self, file_id: str ) -> bool | None:
-		"""
+		"""Delete.
 		
-			Purpose:
-			--------
-			Deletes a specific file from remote storage to free up project quota.
-			
-			Parameters:
-			-----------
-			file_id: str - Unique identifier of the file to remove.
-			
-			Returns:
-			--------
-			bool - True if deletion was successful.
+		Purpose:
+			Executes the delete workflow for the Files wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
 		
+		Args:
+			file_id (str): file id value used by this workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'file_id', file_id )
@@ -3867,31 +4238,24 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'FileStore'
 			ex.method = 'delete( self, file_id: str ) -> bool'
+			Logger( ).write( ex )
 			raise ex
 
 class FileSearch( Gemini ):
-	"""
-
-		Purpose:
-		--------
-		Encapsulate Gemini File Search Store management for the Jeni application.
-
-		Attributes:
-		-----------
-		client       : genai.Client | None
-		response     : Any
-		store_id     : str | None
-		store_name   : str | None
-		collections  : Dict[ str, str ]
-		stores       : List[ FileSearchStore ]
-
-		Methods:
-		--------
-		create( name )
-		retrieve( store_id )
-		list( )
-		delete( store_id )
-
+	"""FileSearch class.
+	
+	Purpose:
+		Manages Gemini File Search Store resources for retrieval-augmented workflows. The class
+		creates, retrieves, lists, deletes, and refreshes file-search store mappings so the UI
+		can expose stable display names for provider resource names.
+	
+	Attributes:
+		client (Optional[genai.Client]): Runtime field used by the FileSearch workflow.
+		response (Optional[Any]): Runtime field used by the FileSearch workflow.
+		store_id (Optional[str]): Runtime field used by the FileSearch workflow.
+		store_name (Optional[str]): Runtime field used by the FileSearch workflow.
+		collections (Optional[Dict[str, str]]): Runtime field used by the FileSearch workflow.
+		stores (Optional[List[FileSearchStore]]): Runtime field used by the FileSearch workflow.
 	"""
 	client: Optional[ genai.Client ]
 	response: Optional[ Any ]
@@ -3901,6 +4265,13 @@ class FileSearch( Gemini ):
 	stores: Optional[ List[ FileSearchStore ] ]
 	
 	def __init__( self ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the FileSearch instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		"""
 		super( ).__init__( )
 		self.client = None
 		self.response = None
@@ -3911,20 +4282,14 @@ class FileSearch( Gemini ):
 		self.refresh_collections( )
 	
 	def refresh_collections( self ) -> Dict[ str, str ]:
-		"""
-
-			Purpose:
-			--------
-			Refresh the in-memory mapping of display names to File Search Store resource names.
-
-			Parameters:
-			-----------
-			None
-
-			Returns:
-			--------
-			Dict[ str, str ]
-
+		"""Refresh collections.
+		
+		Purpose:
+			Performs the refresh collections operation for the FileSearch wrapper. The method
+			preserves provider-specific handling behind the application-facing class interface.
+		
+		Returns:
+			Result produced by the operation.
 		"""
 		try:
 			self.client = genai.Client( api_key=cfg.GEMINI_API_KEY )
@@ -3940,36 +4305,43 @@ class FileSearch( Gemini ):
 				
 				self.label = str( self.display_name ).strip( ) if self.display_name else str(
 					self.resource_name ).strip( )
-				self.collections[ self.label ]=str( self.resource_name ).strip( )
+				self.collections[ self.label ] = str( self.resource_name ).strip( )
 			
 			return self.collections
-		except Exception:
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'FileSearch'
+			exception.method = 'refresh_collections( self ) -> Dict[ str, str ]'
+			Logger( ).write( exception )
 			self.collections = { }
 			self.stores = [ ]
 			return self.collections
 	
 	def create( self, name: str ) -> FileSearchStore | Any:
-		"""
-
-			Purpose:
-			--------
-			Create a new Gemini File Search Store.
-
-			Parameters:
-			-----------
-			name: str
-				Display name for the File Search Store.
-
-			Returns:
-			--------
-			FileSearchStore | Any
-
+		"""Create.
+		
+		Purpose:
+			Executes the create workflow for the FileSearch wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			name (str): name value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'name', name )
 			self.store_name = str( name ).strip( )
 			self.client = genai.Client( api_key=cfg.GEMINI_API_KEY )
-			self.response = self.client.file_search_stores.create( config={ 'display_name': self.store_name } )
+			self.response = self.client.file_search_stores.create(
+				config={ 'display_name': self.store_name } )
 			self.refresh_collections( )
 			return self.response
 		except Exception as e:
@@ -3977,24 +4349,26 @@ class FileSearch( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
 			exception.method = 'create( self, name: str ) -> FileSearchStore | Any'
+			Logger( ).write( exception )
 			raise exception
 	
 	def retrieve( self, store_id: str ) -> FileSearchStore | Any:
-		"""
-
-			Purpose:
-			--------
-			Retrieve a specific Gemini File Search Store by resource name.
-
-			Parameters:
-			-----------
-			store_id: str
-				Resource name in the form fileSearchStores/<id>.
-
-			Returns:
-			--------
-			FileSearchStore | Any
-
+		"""Retrieve.
+		
+		Purpose:
+			Executes the retrieve workflow for the FileSearch wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			store_id (str): store id value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'store_id', store_id )
@@ -4007,23 +4381,23 @@ class FileSearch( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
 			exception.method = 'retrieve( self, store_id: str ) -> FileSearchStore | Any'
+			Logger( ).write( exception )
 			raise exception
 	
 	def list( self ) -> List[ FileSearchStore ] | Any:
-		"""
-
-			Purpose:
-			--------
-			List all Gemini File Search Stores available to the current project.
-
-			Parameters:
-			-----------
-			None
-
-			Returns:
-			--------
-			List[ FileSearchStore ] | Any
-
+		"""List.
+		
+		Purpose:
+			Executes the list workflow for the FileSearch wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.refresh_collections( )
@@ -4033,26 +4407,27 @@ class FileSearch( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
 			exception.method = 'list( self ) -> List[ FileSearchStore ] | Any'
+			Logger( ).write( exception )
 			raise exception
 	
-	def delete( self, store_id: str, force: bool=True ) -> bool | Any:
-		"""
-
-			Purpose:
-			--------
-			Delete a Gemini File Search Store.
-
-			Parameters:
-			-----------
-			store_id: str
-				Resource name in the form fileSearchStores/<id>.
-			force: bool
-				If True, delete contained documents and related objects as well.
-
-			Returns:
-			--------
-			bool | Any
-
+	def delete( self, store_id: str, force: bool = True ) -> bool | Any:
+		"""Delete.
+		
+		Purpose:
+			Executes the delete workflow for the FileSearch wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			store_id (str): store id value used by this workflow.
+			force (bool): force value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'store_id', store_id )
@@ -4067,37 +4442,30 @@ class FileSearch( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
 			exception.method = 'delete( self, store_id: str, force: bool=True ) -> bool | Any'
+			Logger( ).write( exception )
 			raise exception
-		
+
 class CloudBuckets( Gemini ):
-	'''
-
-		Purpose:
-		--------
-		Encapsulate Google Cloud Storage as a Vector Store backend for the Buddy
-		application. Buckets are treated as collections and objects (blobs) as
-		stored vector documents or assets.
-
-		Attributes:
-		-----------
-		project_id   : str | None
-		bucket_name  : str | None
-		object_name  : str | None
-		file_path    : str | None
-		client       : storage.Client | None
-		bucket       : storage.Bucket | None
-		response     : Any
-		collections  : Dict[ str, str ] | None
-		documents    : Dict[ str, str ] | None
-
-		Methods:
-		--------
-		upload( path, bucket, name )
-		retrieve( bucket, name )
-		list( bucket )
-		delete( bucket, name )
-
-	'''
+	"""CloudBuckets class.
+	
+	Purpose:
+		Wraps Google Cloud Storage bucket operations used as a document and asset backend. The
+		class uploads local files, retrieves blob metadata, lists bucket contents, deletes
+		objects, and exposes predefined collection mappings used by the application.
+	
+	Attributes:
+		project_id (Optional[str]): Runtime field used by the CloudBuckets workflow.
+		bucket_name (Optional[str]): Runtime field used by the CloudBuckets workflow.
+		object_name (Optional[str]): Runtime field used by the CloudBuckets workflow.
+		file_path (Optional[str]): Runtime field used by the CloudBuckets workflow.
+		file_ids (Optional[List[str]]): Runtime field used by the CloudBuckets workflow.
+		store_ids (Optional[List[str]]): Runtime field used by the CloudBuckets workflow.
+		client (Optional[storage.Client]): Runtime field used by the CloudBuckets workflow.
+		bucket (Optional[storage.Bucket]): Runtime field used by the CloudBuckets workflow.
+		response (Optional[Any]): Runtime field used by the CloudBuckets workflow.
+		collections (Optional[Dict[str, str]]): Runtime field used by the CloudBuckets workflow.
+		documents (Optional[Dict[str, str]]): Runtime field used by the CloudBuckets workflow.
+	"""
 	project_id: Optional[ str ]
 	bucket_name: Optional[ str ]
 	object_name: Optional[ str ]
@@ -4111,6 +4479,13 @@ class CloudBuckets( Gemini ):
 	documents: Optional[ Dict[ str, str ] ]
 	
 	def __init__( self ):
+		"""Initialize instance.
+		
+		Purpose:
+			Initializes the CloudBuckets instance with default configuration, runtime state, and
+			compatibility fields required by later method calls. The constructor prepares provider
+			settings and placeholders without performing request work beyond local state assignment.
+		"""
 		self.project_id = cfg.GOOGLE_CLOUD_PROJECT_ID
 		self.client = storage.Client( project=self.project_id )
 		self.bucket_name = None
@@ -4144,7 +4519,16 @@ class CloudBuckets( Gemini ):
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
-		"""Returns list of available chat llm."""
+		"""Model options.
+		
+		Purpose:
+			Returns the model options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
+		
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'gemini-2.5-flash',
 		         'gemini-2.5 flash image',
 		         'gemini-2.5 flash-tts',
@@ -4154,35 +4538,38 @@ class CloudBuckets( Gemini ):
 	
 	@property
 	def media_options( self ):
-		'''
+		"""Media options.
 		
 		Purpose:
-		--------
-		Returns a List[ str ] of media resolution options.
+			Returns the media options exposed by this provider wrapper. This property keeps UI
+			option rendering centralized and gives documentation a stable location for describing
+			supported choices.
 		
-		'''
+		Returns:
+			Available option values or configured wrapper values.
+		"""
 		return [ 'media_resolution_high',
 		         'media_resolution_medium',
 		         'media_resolution_low' ]
 	
 	def create( self, bucket: str, name: str ):
-		"""
-
-			Purpose:
-			--------
-			Delete an object from a GCS bucket.
-
-			Parameters:
-			-----------
-			bucket : str
-				GCS bucket name.
-			name   : str
-				Object (blob) name.
-
-			Returns:
-			--------
-			bool
-
+		"""Create.
+		
+		Purpose:
+			Executes the create workflow for the CloudBuckets wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			bucket (str): bucket value used by this workflow.
+			name (str): name value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'bucket', bucket )
@@ -4198,28 +4585,28 @@ class CloudBuckets( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'VectorStores'
 			ex.method = 'delete( self, bucket, name )'
+			Logger( ).write( ex )
 			raise ex
 	
-	def upload( self, path: str, bucket: str, name: str=None ):
-		"""
-
-			Purpose:
-			--------
-			Upload a local file to a Google Cloud Storage bucket.
-
-			Parameters:
-			-----------
-			path   : str
-				Local filesystem path to the file.
-			bucket : str
-				Target GCS bucket name.
-			name   : str | None
-				Optional object name override.
-
-			Returns:
-			--------
-			storage.Blob | None
-
+	def upload( self, path: str, bucket: str, name: str = None ):
+		"""Upload.
+		
+		Purpose:
+			Executes the upload workflow for the CloudBuckets wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			path (str): path value used by this workflow.
+			bucket (str): bucket value used by this workflow.
+			name (str): name value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'path', path )
@@ -4237,26 +4624,28 @@ class CloudBuckets( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'VectorStores'
 			ex.method = 'upload( self, path, bucket, name )'
+			Logger( ).write( ex )
 			raise ex
 	
 	def retrieve( self, bucket: str, name: str ):
-		"""
-	
-				Purpose:
-				--------
-				Retrieve metadata for a stored object in GCS.
-	
-				Parameters:
-				-----------
-				bucket : str
-					GCS bucket name.
-				name   : str
-					Object (blob) name.
-	
-				Returns:
-				--------
-				storage.Blob | None
-
+		"""Retrieve.
+		
+		Purpose:
+			Executes the retrieve workflow for the CloudBuckets wrapper. The method validates
+			required inputs, prepares provider configuration, performs the requested provider or
+			storage operation, captures response state, and returns the result expected by the
+			application.
+		
+		Args:
+			bucket (str): bucket value used by this workflow.
+			name (str): name value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'bucket', bucket )
@@ -4271,24 +4660,26 @@ class CloudBuckets( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'VectorStores'
 			ex.method = 'retrieve( self, bucket, name )'
+			Logger( ).write( ex )
 			raise ex
 	
 	def list( self, bucket: str ):
-		"""
-
-			Purpose:
-			--------
-			List all objects stored in a given GCS bucket.
-
-			Parameters:
-			-----------
-			bucket : str
-				GCS bucket name.
-
-			Returns:
-			--------
-			List[ storage.Blob ] | None
-
+		"""List.
+		
+		Purpose:
+			Executes the list workflow for the CloudBuckets wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			bucket (str): bucket value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'bucket', bucket )
@@ -4302,26 +4693,34 @@ class CloudBuckets( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'VectorStores'
 			ex.method = 'list( self, bucket )'
+			Logger( ).write( ex )
 			raise ex
 	
-	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
-		"""
+	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None,
+			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+		"""Web search.
 		
-			Purpose:
-			--------
-			Generates a response grounded in Google Search results.
-			
-			Parameters:
-			-----------
-			prompt: str - The query for search-augmented generation.
-			model: str - The Gemini model identifier.
-			
-			Returns:
-			--------
-			Optional[ str ] - The grounded text response.
+		Purpose:
+			Executes the web search workflow for the CloudBuckets wrapper. The method validates
+			required inputs, prepares provider configuration, performs the requested provider or
+			storage operation, captures response state, and returns the result expected by the
+			application.
 		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -4335,7 +4734,8 @@ class CloudBuckets( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [
+					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -4347,26 +4747,35 @@ class CloudBuckets( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'web_search( self, prompt, model ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			error = ErrorDialog( exception )
 			error.show( )
 	
-	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
-			temperature: float=None, top_p: float=None, frequency: float=None, presence: float=None,
-			max_tokens: int=None, stops: List[ str ]=None, instruct: str=None ) -> str | None:
-		"""
+	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+			temperature: float = None, top_p: float = None, frequency: float = None,
+			presence: float = None,
+			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+		"""Search maps.
 		
-			Purpose:
-			--------
-			Uses Google Search grounding specifically for location and place-based queries.
-			
-			Parameters:
-			-----------
-			prompt: str - The location or directions query.
-			model: str - The Gemini model identifier.
-			Returns:
-			--------
-			Optional[ str ] - The grounded response containing place data.
-			
+		Purpose:
+			Executes the search maps workflow for the CloudBuckets wrapper. The method validates
+			required inputs, prepares provider configuration, performs the requested provider or
+			storage operation, captures response state, and returns the result expected by the
+			application.
+		
+		Args:
+			prompt (str): prompt value used by this workflow.
+			model (str): model value used by this workflow.
+			temperature (float): temperature value used by this workflow.
+			top_p (float): top p value used by this workflow.
+			frequency (float): frequency value used by this workflow.
+			presence (float): presence value used by this workflow.
+			max_tokens (int): max tokens value used by this workflow.
+			stops (List[str]): stops value used by this workflow.
+			instruct (str): instruct value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
@@ -4380,7 +4789,8 @@ class CloudBuckets( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [
+					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -4392,27 +4802,28 @@ class CloudBuckets( Gemini ):
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
 			exception.method = 'search_maps( self, prompt, model ) -> Optional[ str ]'
+			Logger( ).write( exception )
 			error = ErrorDialog( exception )
 			error.show( )
 	
 	def delete( self, bucket: str, name: str ):
-		"""
-
-			Purpose:
-			--------
-			Delete an object from a GCS bucket.
-
-			Parameters:
-			-----------
-			bucket : str
-				GCS bucket name.
-			name   : str
-				Object (blob) name.
-
-			Returns:
-			--------
-			bool
-
+		"""Delete.
+		
+		Purpose:
+			Executes the delete workflow for the CloudBuckets wrapper. The method validates required
+			inputs, prepares provider configuration, performs the requested provider or storage
+			operation, captures response state, and returns the result expected by the application.
+		
+		Args:
+			bucket (str): bucket value used by this workflow.
+			name (str): name value used by this workflow.
+		
+		Returns:
+			Result produced by the requested provider, file, audio, image, or storage workflow.
+		
+		Raises:
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'bucket', bucket )
@@ -4428,4 +4839,5 @@ class CloudBuckets( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'VectorStores'
 			ex.method = 'delete( self, bucket, name )'
+			Logger( ).write( ex )
 			raise ex
