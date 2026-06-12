@@ -88,5 +88,6 @@ nav:
   - User Guide: user-guide.md
   - Architecture: architecture.md
   - API Reference:
+      - Application: api/app.md
       - Gemini: api/gemini.md
       - Configuration: api/config.md
