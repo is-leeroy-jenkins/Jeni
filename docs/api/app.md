@@ -5,7 +5,7 @@
 `app.py` is the main Streamlit application module for Jeni. It provides the application shell,
 initializes runtime state, renders the user interface, and routes user actions to Gemini provider
 wrappers and local data workflows.
-![](/images/Jeni-classes.png)
+![](../images/Jeni-classes.png)
 ## Responsibilities
 
 | Area                 | Responsibility                                                                                                                      |
