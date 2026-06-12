@@ -1,6 +1,6 @@
 ![](images/jeni_project.png)
 
-#### Jeni Documentation
+
 
 Jeni is a Python and Streamlit application for building, running, and managing Gemini-powered analytical assistants. It supports text generation, image generation and analysis, image editing, audio transcription, audio translation, text-to-speech, embeddings, document question answering, Gemini file operations, file-search stores, Google Cloud bucket management, prompt engineering, SQLite-backed data management, and export workflows.
 
