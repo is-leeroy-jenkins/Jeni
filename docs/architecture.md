@@ -2,6 +2,8 @@
 
 Jeni uses a layered Streamlit architecture. The application shell is defined in `app.py`, provider and cloud workflows are implemented in `gemini.py`, and runtime constants, model lists, paths, help text, and API defaults are centralized in `config.py`.
 
+![Jeni Architecture](images/jeni-architecture.png)
+
 ## High-Level Layers
 
 | Layer               | Responsibility                                                                                                                                       |
