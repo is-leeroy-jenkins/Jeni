@@ -28,6 +28,9 @@ knowledge retrieval, prompt management, and multimodal artificial intelligence e
 
 ## 🎥 Demo
 
+- Official Documentation
+
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-0078FC?style=for-the-badge&logo=githubpages&logoColor=white)](https://is-leeroy-jenkins.github.io/Jeni/)
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
 
 ## 🧱 Databricks
