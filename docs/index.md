@@ -1,4 +1,4 @@
-![](../images/jeni_project.png)
+![](..docs/images/jeni_project.png)
 
 #### Jeni Documentation
 
