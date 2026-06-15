@@ -13,8 +13,6 @@
   <a href="#-configuration">Configuration</a> |
   <a href="#-design-and-architecture">Architecture</a> |
   <a href="#-capabilities">Capabilities</a> |
-  <a href="#-data-management">Data</a> |
-  <a href="#-file-organization">File</a> |
 </p>
 
 ___
