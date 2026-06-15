@@ -17,6 +17,12 @@
   <a href="#-file-organization">File</a> |
 </p>
 
+___
+
+
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-0078FC?style=for-the-badge&logo=githubpages&logoColor=white)](https://is-leeroy-jenkins.github.io/Jeni/)
+
+
 Jeni is a Python and Streamlit application for building, running, and managing
 Gemini-powered analytical assistants. It supports text generation, image generation and
 analysis, image editing, audio transcription, audio translation, text-to-speech, embeddings,
@@ -29,10 +35,7 @@ knowledge retrieval, prompt management, and multimodal artificial intelligence e
 ## 🎥 Demo
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
 
-- Official Documentation
-
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-0078FC?style=for-the-badge&logo=githubpages&logoColor=white)](https://is-leeroy-jenkins.github.io/Jeni/)
-
+-
 ## 🧱 Databricks
 
 [![Jeni](https://img.shields.io/badge/Databricks-Jeni-FF3621?logo=databricks\&logoColor=white)](https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351)
