@@ -57,6 +57,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import tiktoken
+from google.cloud.storage.blob import Blob
 from reportlab.lib.pagesizes import LETTER
 import config as cfg
 import sqlite_vec
