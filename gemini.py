@@ -33,7 +33,7 @@ License:
 Contact:
     Terry Eppler, terryeppler@gmail.com or eppler.terry@epa.gov.
 """
-
+from __future__ import annotations
 from google.genai.file_search_stores import FileSearchStores
 import config as cfg
 import base64
@@ -43,6 +43,7 @@ import os
 import requests
 import PIL.Image
 from pathlib import Path
+from google.cloud.storage.blob import Blob
 from typing import Any, List, Optional, Dict, Union
 from google import genai
 from google.cloud import storage

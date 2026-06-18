@@ -57,7 +57,6 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import tiktoken
-from google.cloud.storage.blob import Blob
 from reportlab.lib.pagesizes import LETTER
 import config as cfg
 import sqlite_vec
@@ -68,7 +67,11 @@ from boogr import Error, Logger
 from reportlab.lib.pagesizes import LETTER
 from reportlab.pdfgen import canvas
 from sentence_transformers import SentenceTransformer
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+	from google.cloud.storage.blob import Blob
+	
 try:
 	import fitz
 except Exception:
