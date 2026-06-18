@@ -43,7 +43,20 @@ knowledge retrieval, prompt management, and multimodal artificial intelligence e
 ## 🎥 Demo
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
 
--
+___
+
+## 🧊 Azure
+
+[![Containerized](https://img.shields.io/badge/Docker-App-2496ED?logo=docker&logoColor=white)](https://jeni.grayrock-3f318ce3.eastus.azurecontainerapps.io)
+
+- Containerized app
+
+## 🔥 Streamlit
+
+[![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://jeni-py.streamlit.app/)
+
+- Web app
+
 ## 🧱 Databricks
 
 [![Jeni](https://img.shields.io/badge/Databricks-Jeni-FF3621?logo=databricks\&logoColor=white)](https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351)
