@@ -3,19 +3,33 @@
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni_project.png)
 
 <p align="center">
-  <a href="#-overview">Overview</a> |
-  <a href="#-features">Features</a> |
-  <a href="#-application-modes">Modes</a> |
-  <a href="#-requirements">Requirements</a> |
-  <a href="#-api-key-setup">Setup</a> |
-  <a href="#-installation">Installation</a> |
-  <a href="#-running-the-streamlit-application">Run</a> |
-  <a href="#-configuration">Configuration</a> |
-  <a href="#-design-and-architecture">Architecture</a> |
-  <a href="#-capabilities">Capabilities</a> |
-  <a href="#-data-management">Data</a> |
-  <a href="#-file-organization">File</a> |
+  <a href="#-overview">Overview</a> 
+  &bull;
+  <a href="#-features">Features</a>
+  &bull;
+  <a href="#-application-modes">Modes</a>
+  &bull;
+  <a href="#-requirements">Requirements</a> 
+  &bull;
+  <a href="#-api-key-setup">Setup</a> 
+  &bull;
+  <a href="#-installation">Installation</a> 
+  &bull;
+  <a href="#-running-the-streamlit-application">Run</a> 
+  &bull;
+  <a href="#-configuration">Configuration</a> 
+  &bull;
+  <a href="#-design-and-architecture">Architecture</a>
+  &bull;
+  <a href="#-capabilities">Capabilities</a> 
+  &bull;
 </p>
+
+___
+
+
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-0078FC?style=for-the-badge&logo=githubpages&logoColor=white)](https://is-leeroy-jenkins.github.io/Jeni/)
+
 
 Jeni is a Python and Streamlit application for building, running, and managing
 Gemini-powered analytical assistants. It supports text generation, image generation and
@@ -29,10 +43,7 @@ knowledge retrieval, prompt management, and multimodal artificial intelligence e
 ## 🎥 Demo
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
 
-- Official Documentation
-
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-0078FC?style=for-the-badge&logo=githubpages&logoColor=white)](https://is-leeroy-jenkins.github.io/Jeni/)
-
+-
 ## 🧱 Databricks
 
 [![Jeni](https://img.shields.io/badge/Databricks-Jeni-FF3621?logo=databricks\&logoColor=white)](https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351)
