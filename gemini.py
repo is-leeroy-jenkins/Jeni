@@ -1132,8 +1132,7 @@ class Images( Gemini ):
 							exception = Error( e )
 							exception.module = 'gemini'
 							exception.cause = 'Images'
-							exception.method = ('get_first_image( self ) -> Optional[ '
-							                    'PIL.Image.Image ]')
+							exception.method = ('get_first_image( self ) -> Optional[ Image ]')
 							Logger( ).write( exception )
 							continue
 			
@@ -1280,8 +1279,8 @@ class Images( Gemini ):
 		aspect: str=None, number: int=None, temperature: float=None, top_p: float=None,
 		frequency: float=None, presence: float=None, max_tokens: int=None,
 		resolution: str=None, instruct: str=None, output_mime_type: str=None,
-		response_modalities: str=None, grounded: bool=False, image_search: bool=False ) -> \
-	Optional[ str ]:
+		response_modalities: str=None, grounded: bool=False,
+		image_search: bool=False ) -> Optional[ str ]:
 		"""Analyze.
 		
 		Purpose:
@@ -1352,8 +1351,8 @@ class Images( Gemini ):
 		aspect: str=None, number: int=None, temperature: float=None, top_p: float=None,
 		frequency: float=None, presence: float=None, max_tokens: int=None,
 		resolution: str=None, instruct: str=None, output_mime_type: str=None,
-		response_modalities: str=None, grounded: bool=False, image_search: bool=False ) -> \
-	Optional[ PIL.Image.Image ]:
+		response_modalities: str=None, grounded: bool=False,
+		image_search: bool=False ) ->  Optional[ PIL.Image.Image ]:
 		"""Edit.
 		
 		Purpose:
@@ -1757,8 +1756,7 @@ class Embeddings( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
-			exception.method = ('create( self, text, model ) -> List[ float ] | List[ List[ float '
-			                    '] ]')
+			exception.method = ('create( self, *args ) -> List[ float ] | List[ List[ float ] ]')
 			Logger( ).write( exception )
 			raise exception
 
@@ -1882,7 +1880,6 @@ class TTS( Gemini ):
 		try:
 			import io
 			import wave
-			
 			throw_if( 'pcm_data', pcm_data )
 			with io.BytesIO( ) as buffer:
 				with wave.open( buffer, 'wb' ) as wf:
@@ -1970,8 +1967,7 @@ class TTS( Gemini ):
 				if self.speed_value < 0.85:
 					self.prompt_parts.append( 'Read the following text at a slow, clear pace.' )
 				elif self.speed_value > 1.15:
-					self.prompt_parts.append(
-						'Read the following text at a faster, energetic pace.' )
+					self.prompt_parts.append( 'Read the following text at a faster, energetic pace.' )
 			
 			self.prompt_parts.append( str( text ).strip( ) )
 			return '\n\n'.join( self.prompt_parts )
