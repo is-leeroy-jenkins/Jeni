@@ -60,7 +60,6 @@ import tiktoken
 from reportlab.lib.pagesizes import LETTER
 import config as cfg
 import sqlite_vec
-
 import streamlit as st
 from typing import List, Dict, Any, Optional, Tuple
 from boogr import Error, Logger
@@ -5416,8 +5415,9 @@ elif mode == 'Document Q&A':
 	with center:
 		st.subheader( '📓 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
 		st.divider( )
+		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
+			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -5436,9 +5436,7 @@ elif mode == 'Document Q&A':
 					set_docqna_include = st.multiselect( label='Include', options=include_options,
 						key='docqna_include', help=cfg.INCLUDE, placeholder='Options' )
 					
-					docqna_include = [ d.strip( ) for d in set_docqna_include
-					                   if d.strip( ) ]
-					
+					docqna_include = [ d.strip( ) for d in set_docqna_include if d.strip( ) ]
 					docqna_include = st.session_state[ 'docqna_include' ]
 				
 				# ---------- Allowed Domains ------------
@@ -5771,7 +5769,9 @@ elif mode == 'Files':
 	with center:
 		st.subheader( '📚 Files API', help=cfg.FILES_API )
 		st.divider( )
+		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5, llm_c6 = st.columns(
 					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
@@ -5813,16 +5813,16 @@ elif mode == 'Files':
 				# ---------- Presense ------------
 				with llm_c5:
 					set_files_presence = st.slider( label='Presense Penalty', min_value=-2.0,
-						max_value=2.0,
-						step=0.01, help=cfg.PRESENCE_PENALTY, key='files_presence_penalty' )
+						max_value=2.0, step=0.01, help=cfg.PRESENCE_PENALTY,
+						key='files_presence_penalty' )
 					
 					files_presence = st.session_state[ 'files_presence_penalty' ]
 				
 				# ---------- Frequency ------------
 				with llm_c6:
 					set_files_freq = st.slider( label='Frequency Penalty', min_value=-2.0,
-						max_value=2.0,
-						step=0.01, help=cfg.FREQUENCY_PENALTY, key='files_frequency_penalty' )
+						max_value=2.0, step=0.01, help=cfg.FREQUENCY_PENALTY,
+						key='files_frequency_penalty' )
 					
 					files_fequency = st.session_state[ 'files_frequency_penalty' ]
 				
@@ -5863,10 +5863,8 @@ elif mode == 'Files':
 					set_files_include = st.multiselect( label='Include', options=include_options,
 						key='files_include', help=cfg.INCLUDE, placeholder='Options' )
 					
-					files_include = [ d.strip( ) for d in set_files_include
-					                  if d.strip( ) ]
-					
-					files_include = st.session_state[ 'files_include' ]
+					files_include = [ d.strip( ) for d in set_files_include if d.strip( ) ]
+					st.session_state[ 'files_include' ] = files_include
 				
 				# ---------- Domains ------------
 				with tool_c4:
@@ -6035,43 +6033,23 @@ elif mode == 'Files':
 						list_method = getattr( files, 'list' )
 						files_resp = list_method( )
 						rows = [ ]
-						files_list = (
-								files_resp.data if hasattr( files_resp, 'data' ) else files_resp
-								if isinstance( files_resp, list ) else [ ])
+						files_list = (files_resp.data if hasattr( files_resp,
+							'data' ) else files_resp if isinstance( files_resp, list ) else [ ])
 						
 						for f in files_list:
 							if isinstance( f, str ):
-								rows.append( {
-										'id': f,
-										'filename': f,
-										'files_purpose': '',
-								} )
+								rows.append( { 'id': f, 'filename': f, 'files_purpose': '', } )
 							elif isinstance( f, dict ):
-								name = (
-										f.get( 'name' )
-										or f.get( 'id' )
-										or f.get( 'filename' )
-										or f.get( 'display_name' )
-										or ''
-								)
-								rows.append( {
-										'id': str( name ),
-										'filename': str( name ),
-										'files_purpose': str( f.get( 'files_purpose', '' ) ),
-								} )
+								name = (f.get( 'name' ) or f.get( 'id' ) or f.get(
+									'filename' ) or f.get( 'display_name' ) or '')
+								rows.append( { 'id': str( name ), 'filename': str( name ),
+									'files_purpose': str( f.get( 'files_purpose', '' ) ), } )
 							else:
-								name = (
-										getattr( f, 'name', None )
-										or getattr( f, 'id', None )
-										or getattr( f, 'filename', None )
-										or getattr( f, 'display_name', None )
-										or ''
-								)
-								rows.append( {
-										'id': str( name ),
-										'filename': str( name ),
-										'files_purpose': str( getattr( f, 'files_purpose', '' ) ),
-								} )
+								name = (getattr( f, 'name', None ) or getattr( f, 'id',
+									None ) or getattr( f, 'filename', None ) or getattr( f,
+									'display_name', None ) or '')
+								rows.append( { 'id': str( name ), 'filename': str( name ),
+									'files_purpose': str( getattr( f, 'files_purpose', '' ) ), } )
 						
 						st.session_state.files_table = rows
 				
@@ -6220,6 +6198,7 @@ elif mode == 'File Search Stores':
 						except Exception as exc:
 							st.error( f'Create store failed: {exc}' )
 			vs_map = getattr( searcher, 'collections', None )
+			
 			# --------------------------------------------------------------
 			# Expander - Retreive Files
 			# --------------------------------------------------------------
@@ -6316,7 +6295,7 @@ elif mode == 'Google Cloud Buckets':
 	
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
-		st.subheader( '🧊 Google Cloud Buckets', help=cfg.VECTORSTORES_API )
+		st.subheader( '🧊 GCP Buckets', help=cfg.VECTORSTORES_API )
 		st.divider( )
 		st.caption( 'Cloud Bucket Management' )
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )

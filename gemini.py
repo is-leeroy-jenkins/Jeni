@@ -49,39 +49,14 @@ from google import genai
 from google.cloud import storage
 from google.genai import types
 from google.genai.pagers import Pager
-from google.genai.types import (
-	Part,
-	GenerateContentConfig,
-	ImageConfig,
-	FunctionCallingConfig,
-	GenerateImagesConfig,
-	GenerateVideosConfig,
-	ThinkingConfig,
-	GeneratedImage,
-	EmbedContentConfig,
-	Content,
-	ContentEmbedding,
-	Candidate,
-	HttpOptions,
-	GenerateImagesResponse,
-	Field,
-	FileSearchStore,
-	FileSearch,
-	GenerateContentResponse,
-	GenerateVideosResponse,
-	Image,
-	File,
-	SpeakerVoiceConfig,
-	VoiceConfig,
-	SpeechConfig,
-	Tool,
-	ToolConfig,
-	GoogleSearch,
-	UrlContext,
-	SafetySetting,
-	HarmCategory,
-	HarmBlockThreshold,
-)
+from google.genai.types import (Part, GenerateContentConfig, ImageConfig, FunctionCallingConfig,
+                                GenerateImagesConfig, GenerateVideosConfig, ThinkingConfig,
+                                GeneratedImage, EmbedContentConfig, Content, ContentEmbedding,
+                                Candidate, HttpOptions, GenerateImagesResponse, Field,
+                                FileSearchStore, FileSearch, GenerateContentResponse,
+                                GenerateVideosResponse, Image, File, SpeakerVoiceConfig,
+                                VoiceConfig, SpeechConfig, Tool, ToolConfig, GoogleSearch,
+                                UrlContext, SafetySetting, HarmCategory, HarmBlockThreshold, )
 
 def throw_if( name: str, value: object ) -> None:
 	"""Validate that a required argument has a usable value.
@@ -265,7 +240,7 @@ class Chat( Gemini ):
 	safety_profile: Optional[ str ]
 	safety_settings: Optional[ List[ SafetySetting ] ]
 	
-	def __init__( self, model: str = "gemini-2.5-flash-lite" ) -> None:
+	def __init__( self, model: str="gemini-2.5-flash-lite" ) -> None:
 		"""Initialize the Chat wrapper.
 
 		Purpose:
@@ -335,16 +310,9 @@ class Chat( Gemini ):
 		Returns:
 			Supported Gemini text-generation model names.
 		"""
-		return [
-				"gemini-2.5-flash",
-				"gemini-2.5-flash-lite",
-				"gemini-2.5-pro",
-				"gemini-3-flash-preview",
-				"gemini-3.1-flash-lite-preview",
-				"gemini-3.1-pro-preview",
-				"gemini-2.0-flash",
-				"gemini-2.0-flash-lite",
-		]
+		return [ "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro",
+			"gemini-3-flash-preview", "gemini-3.1-flash-lite-preview", "gemini-3.1-pro-preview",
+			"gemini-2.0-flash", "gemini-2.0-flash-lite", ]
 	
 	@property
 	def tool_options( self ) -> List[ str ]:
@@ -356,13 +324,7 @@ class Chat( Gemini ):
 		Returns:
 			Supported tool names.
 		"""
-		return [
-				"google_search",
-				"google_maps",
-				"url_context",
-				"file_search",
-				"code_execution",
-		]
+		return [ "google_search", "google_maps", "url_context", "file_search", "code_execution", ]
 	
 	@property
 	def reasoning_options( self ) -> List[ str ]:
@@ -374,13 +336,7 @@ class Chat( Gemini ):
 		Returns:
 			Supported reasoning-level option values.
 		"""
-		return [
-				"THINKING_LEVEL_UNSPECIFIED",
-				"MINIMAL",
-				"LOW",
-				"MEDIUM",
-				"HIGH",
-		]
+		return [ "THINKING_LEVEL_UNSPECIFIED", "MINIMAL", "LOW", "MEDIUM", "HIGH", ]
 	
 	@property
 	def media_options( self ) -> List[ str ]:
@@ -392,11 +348,7 @@ class Chat( Gemini ):
 		Returns:
 			Supported media-resolution option values.
 		"""
-		return [
-				"media_resolution_high",
-				"media_resolution_medium",
-				"media_resolution_low",
-		]
+		return [ "media_resolution_high", "media_resolution_medium", "media_resolution_low", ]
 	
 	@property
 	def choice_options( self ) -> List[ str ]:
@@ -421,12 +373,8 @@ class Chat( Gemini ):
 		Returns:
 			Supported include option values.
 		"""
-		return [
-				"file_search_call.results",
-				"message.input_image.image_url",
-				"message.output_text.logprobs",
-				"reasoning.encrypted_content",
-		]
+		return [ "file_search_call.results", "message.input_image.image_url",
+			"message.output_text.logprobs", "reasoning.encrypted_content", ]
 	
 	@property
 	def modality_options( self ) -> List[ str ]:
@@ -450,11 +398,7 @@ class Chat( Gemini ):
 		Returns:
 			Supported response MIME types.
 		"""
-		return [
-				"text/plain",
-				"application/json",
-				"text/x.enum",
-		]
+		return [ "text/plain", "application/json", "text/x.enum", ]
 	
 	def get_supported_tools( self, model: str ) -> List[ str ]:
 		"""Return tool options supported by a model.
@@ -508,15 +452,9 @@ class Chat( Gemini ):
 		try:
 			throw_if( "model", model )
 			self.model_name = model.strip( ).lower( )
-			self.maps_models = {
-					"gemini-3.1-pro-preview",
-					"gemini-3.1-flash-lite-preview",
-					"gemini-3-flash-preview",
-					"gemini-2.5-pro",
-					"gemini-2.5-flash",
-					"gemini-2.5-flash-lite",
-					"gemini-2.0-flash",
-			}
+			self.maps_models = { "gemini-3.1-pro-preview", "gemini-3.1-flash-lite-preview",
+				"gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash",
+				"gemini-2.5-flash-lite", "gemini-2.0-flash", }
 			return self.model_name in self.maps_models
 		except Exception as e:
 			exception = Error( e )
@@ -526,7 +464,7 @@ class Chat( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_urls( self, urls: List[ str ], max_urls: int = 10 ) -> List[ str ]:
+	def build_urls( self, urls: List[ str ], max_urls: int=10 ) -> List[ str ]:
 		"""Build the URL context list for a text request.
 
 		Purpose:
@@ -567,7 +505,7 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = "gemini"
 			exception.cause = "Chat"
-			exception.method = "build_urls(self, urls: List[str], max_urls: int = 10) -> List[str]"
+			exception.method = "build_urls(self, urls: List[str], max_urls: int=10) -> List[str]"
 			Logger( ).write( exception )
 			raise exception
 
@@ -594,13 +532,14 @@ class Images( Gemini ):
 	resolution: Optional[ str ]
 	size: Optional[ str ]
 	
-	def __init__( self, model: str = 'gemini-2.5-flash-image' ):
+	def __init__( self, model: str='gemini-2.5-flash-image' ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Images instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		
 		Args:
 			model (str): model value used by this workflow.
@@ -650,8 +589,7 @@ class Images( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'gemini-2.5-flash-image',
-		         'gemini-3.1-flash-image-preview' ]
+		return [ 'gemini-2.5-flash-image', 'gemini-3.1-flash-image-preview' ]
 	
 	@property
 	def include_options( self ) -> List[ str ] | None:
@@ -665,10 +603,8 @@ class Images( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'file_search_call.results',
-		         'message.input_image.image_url',
-		         'message.output_text.logprobs',
-		         'reasoning.encrypted_content' ]
+		return [ 'file_search_call.results', 'message.input_image.image_url',
+			'message.output_text.logprobs', 'reasoning.encrypted_content' ]
 	
 	@property
 	def aspect_options( self ) -> List[ str ] | None:
@@ -694,9 +630,7 @@ class Images( Gemini ):
 			supported choices.
 		
 		"""
-		return [ 'media_resolution_high',
-		         'media_resolution_medium',
-		         'media_resolution_low' ]
+		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
 	
 	@property
 	def modality_options( self ) -> List[ str ] | None:
@@ -724,16 +658,17 @@ class Images( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'unspecified', 'minimal',
-		         'low', 'medium', 'high' ]
+		return [ 'unspecified', 'minimal', 'low', 'medium', 'high' ]
 	
 	@property
 	def size_options( self ) -> List[ str ] | None:
 		"""Size options.
 		
 		Purpose:
-			Returns the size options exposed by this provider wrapper. This property keeps UI option
-			rendering centralized and gives documentation a stable location for describing supported
+			Returns the size options exposed by this provider wrapper. This property keeps UI 
+			option
+			rendering centralized and gives documentation a stable location for describing 
+			supported
 			choices.
 		
 		"""
@@ -744,8 +679,10 @@ class Images( Gemini ):
 		"""Tool options.
 		
 		Purpose:
-			Returns the tool options exposed by this provider wrapper. This property keeps UI option
-			rendering centralized and gives documentation a stable location for describing supported
+			Returns the tool options exposed by this provider wrapper. This property keeps UI 
+			option
+			rendering centralized and gives documentation a stable location for describing 
+			supported
 			choices.
 		
 		Returns:
@@ -779,25 +716,23 @@ class Images( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'text/plain',
-		         'application/json',
-		         'text/x.enum' ]
+		return [ 'text/plain', 'application/json', 'text/x.enum' ]
 	
 	@property
 	def mime_options( self ) -> List[ str ] | None:
 		"""Mime options.
 		
 		Purpose:
-			Returns the mime options exposed by this provider wrapper. This property keeps UI option
-			rendering centralized and gives documentation a stable location for describing supported
+			Returns the mime options exposed by this provider wrapper. This property keeps UI 
+			option
+			rendering centralized and gives documentation a stable location for describing 
+			supported
 			choices.
 		
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'image/jpeg',
-		         'image/png',
-		         'image/webp' ]
+		return [ 'image/jpeg', 'image/png', 'image/webp' ]
 	
 	@property
 	def resolution_options( self ) -> List[ str ] | None:
@@ -813,7 +748,7 @@ class Images( Gemini ):
 		"""
 		return [ '1K', '2K', '4K' ]
 	
-	def supports_image_size( self, model: str = 'gemini-2.5-flash-image' ) -> bool:
+	def supports_image_size( self, model: str='gemini-2.5-flash-image' ) -> bool:
 		"""Supports image size.
 		
 		Purpose:
@@ -828,13 +763,14 @@ class Images( Gemini ):
 			True when the selected model supports the requested feature; otherwise False.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.model_name = str( model or '' ).strip( ).lower( )
 			self.image_size_models = [ 'gemini-3.1-flash-image-preview',
-			                           'gemini-3-pro-image-preview' ]
+				'gemini-3-pro-image-preview' ]
 			return self.model_name in self.image_size_models
 		except Exception as e:
 			exception = Error( e )
@@ -844,7 +780,7 @@ class Images( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def supports_search_grounding( self, model: str = 'gemini-2.5-flash-image' ) -> bool:
+	def supports_search_grounding( self, model: str='gemini-2.5-flash-image' ) -> bool:
 		"""Supports search grounding.
 		
 		Purpose:
@@ -859,13 +795,14 @@ class Images( Gemini ):
 			True when the selected model supports the requested feature; otherwise False.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			self.model_name = str( model or '' ).strip( ).lower( )
 			self.search_grounding_models = [ 'gemini-3.1-flash-image-preview',
-			                                 'gemini-3-pro-image-preview' ]
+				'gemini-3-pro-image-preview' ]
 			return self.model_name in self.search_grounding_models
 		except Exception as e:
 			exception = Error( e )
@@ -875,7 +812,7 @@ class Images( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def supports_image_search( self, model: str = 'gemini-2.5-flash-image' ) -> bool:
+	def supports_image_search( self, model: str='gemini-2.5-flash-image' ) -> bool:
 		"""Supports image search.
 		
 		Purpose:
@@ -890,7 +827,8 @@ class Images( Gemini ):
 			True when the selected model supports the requested feature; otherwise False.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -905,12 +843,14 @@ class Images( Gemini ):
 			raise exception
 	
 	def normalize_response_modalities( self, response_modalities: Optional[ str ],
-			image_only: bool = False ) -> List[ str ]:
+		image_only: bool=False ) -> List[ str ]:
 		"""Normalize response modalities.
 		
 		Purpose:
-			Normalizes input values for the Images workflow before they are passed to provider calls
-			or downstream processing. The method converts UI or caller-supplied values into a stable
+			Normalizes input values for the Images workflow before they are passed to provider 
+			calls
+			or downstream processing. The method converts UI or caller-supplied values into a 
+			stable
 			shape expected by the wrapper.
 		
 		Args:
@@ -921,7 +861,8 @@ class Images( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -946,13 +887,11 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = (
-					'normalize_response_modalities( self, response_modalities: Optional[str], '
-					'image_only: bool=False ) -> List[str]')
+			exception.method = 'normalize_response_modalities( self, *args ) -> List[str]'
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_grounding_tool( self, image_search: bool = False ) -> Optional[ Tool ]:
+	def build_grounding_tool( self, image_search: bool=False ) -> Optional[ Tool ]:
 		"""Build grounding tool.
 		
 		Purpose:
@@ -967,7 +906,8 @@ class Images( Gemini ):
 			Provider-compatible request component or configuration value.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -977,26 +917,28 @@ class Images( Gemini ):
 			self.use_image_search = bool( image_search )
 			self.model_name = str( self.model or '' ).strip( ).lower( )
 			if self.use_image_search and self.supports_image_search( self.model_name ):
-				return Tool( google_search=types.GoogleSearch( search_types=types.SearchTypes(
-					web_search=types.WebSearch( ), image_search=types.ImageSearch( ) ) ) )
+				return Tool( google_search=types.GoogleSearch(
+					search_types=types.SearchTypes( web_search=types.WebSearch( ),
+						image_search=types.ImageSearch( ) ) ) )
 			
 			return Tool( google_search=types.GoogleSearch( ) )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'build_grounding_tool( self, image_search: bool=False ) -> Optional[Tool]'
+			exception.method = 'build_grounding_tool( self, *args ) -> Optional[Tool]'
 			Logger( ).write( exception )
 			raise exception
 	
-	def get_content_config( self, response_modalities: Optional[ str ], image_only: bool = False,
-			image_search: bool = False, grounded: bool = False,
-			output_mime_type: Optional[ str ] = None ) -> GenerateContentConfig:
+	def get_content_config( self, response_modalities: Optional[ str ], image_only: bool=False,
+		image_search: bool=False, grounded: bool=False, 
+		output_mime_type: Optional[ str ]=None ) -> GenerateContentConfig:
 		"""Get content config.
 		
 		Purpose:
 			Retrieves a derived value from the current Images runtime state. The method shields
-			callers from provider response-shape differences and returns a stable application-facing
+			callers from provider response-shape differences and returns a stable 
+			application-facing
 			value.
 		
 		Args:
@@ -1010,7 +952,8 @@ class Images( Gemini ):
 			Derived value extracted from the current runtime state.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1086,7 +1029,8 @@ class Images( Gemini ):
 			Result produced by the operation.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1110,7 +1054,8 @@ class Images( Gemini ):
 			diagnostic use.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1141,14 +1086,16 @@ class Images( Gemini ):
 		
 		Purpose:
 			Retrieves a derived value from the current Images runtime state. The method shields
-			callers from provider response-shape differences and returns a stable application-facing
+			callers from provider response-shape differences and returns a stable 
+			application-facing
 			value.
 		
 		Returns:
 			Derived value extracted from the current runtime state.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1185,7 +1132,8 @@ class Images( Gemini ):
 							exception = Error( e )
 							exception.module = 'gemini'
 							exception.cause = 'Images'
-							exception.method = 'get_first_image( self ) -> Optional[ PIL.Image.Image ]'
+							exception.method = ('get_first_image( self ) -> Optional[ '
+							                    'PIL.Image.Image ]')
 							Logger( ).write( exception )
 							continue
 			
@@ -1203,14 +1151,16 @@ class Images( Gemini ):
 		
 		Purpose:
 			Retrieves a derived value from the current Images runtime state. The method shields
-			callers from provider response-shape differences and returns a stable application-facing
+			callers from provider response-shape differences and returns a stable 
+			application-facing
 			value.
 		
 		Returns:
 			Derived value extracted from the current runtime state.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1257,12 +1207,11 @@ class Images( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def generate( self, prompt: str, model: str = 'gemini-2.5-flash-image', aspect: str = None,
-			number: int = None, temperature: float = None, top_p: float = None,
-			frequency: float = None, presence: float = None, max_tokens: int = None,
-			resolution: str = None, instruct: str = None, output_mime_type: str = None,
-			response_modalities: str = None, grounded: bool = False,
-			image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+	def generate( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
+		number: int=None, temperature: float=None, top_p: float=None, frequency: float= None,
+		presence: float=None, max_tokens: int=None, resolution: str=None,
+		instruct: str=None, output_mime_type: str=None, response_modalities: str=None,
+		grounded: bool=False, image_search: bool=False ) -> Optional[ PIL.Image.Image ]:
 		"""Generate.
 		
 		Purpose:
@@ -1291,7 +1240,8 @@ class Images( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1326,12 +1276,12 @@ class Images( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def analyze( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
-			aspect: str = None, number: int = None, temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, resolution: str = None, instruct: str = None,
-			output_mime_type: str = None, response_modalities: str = None,
-			grounded: bool = False, image_search: bool = False ) -> Optional[ str ]:
+	def analyze( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
+		aspect: str=None, number: int=None, temperature: float=None, top_p: float=None,
+		frequency: float=None, presence: float=None, max_tokens: int=None,
+		resolution: str=None, instruct: str=None, output_mime_type: str=None,
+		response_modalities: str=None, grounded: bool=False, image_search: bool=False ) -> \
+	Optional[ str ]:
 		"""Analyze.
 		
 		Purpose:
@@ -1361,7 +1311,8 @@ class Images( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1381,9 +1332,8 @@ class Images( Gemini ):
 			self.output_mime_type = output_mime_type
 			self.response_mode = response_modalities or 'text'
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self.get_content_config( image_only=False,
-				grounded=grounded, image_search=image_search,
-				response_modalities=self.response_mode,
+			self.content_config = self.get_content_config( image_only=False, grounded=grounded,
+				image_search=image_search, response_modalities=self.response_mode,
 				output_mime_type=self.output_mime_type )
 			self.content_response = self.client.models.generate_content( model=self.model,
 				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
@@ -1398,16 +1348,17 @@ class Images( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def edit( self, prompt: str, path: str, model: str = 'gemini-2.5-flash-image',
-			aspect: str = None, number: int = None, temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, resolution: str = None, instruct: str = None,
-			output_mime_type: str = None, response_modalities: str = None,
-			grounded: bool = False, image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+	def edit( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
+		aspect: str=None, number: int=None, temperature: float=None, top_p: float=None,
+		frequency: float=None, presence: float=None, max_tokens: int=None,
+		resolution: str=None, instruct: str=None, output_mime_type: str=None,
+		response_modalities: str=None, grounded: bool=False, image_search: bool=False ) -> \
+	Optional[ PIL.Image.Image ]:
 		"""Edit.
 		
 		Purpose:
-			Executes the edit workflow for the Images wrapper. The method validates required inputs,
+			Executes the edit workflow for the Images wrapper. The method validates required 
+			inputs,
 			prepares provider configuration, performs the requested provider or storage operation,
 			captures response state, and returns the result expected by the application.
 		
@@ -1433,7 +1384,8 @@ class Images( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1453,9 +1405,8 @@ class Images( Gemini ):
 			self.output_mime_type = output_mime_type
 			self.response_mode = response_modalities or 'image'
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self.get_content_config( image_only=True,
-				grounded=grounded, image_search=image_search,
-				response_modalities=self.response_mode,
+			self.content_config = self.get_content_config( image_only=True, grounded=grounded,
+				image_search=image_search, response_modalities=self.response_mode,
 				output_mime_type=self.output_mime_type )
 			self.content_response = self.client.models.generate_content( model=self.model,
 				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
@@ -1481,12 +1432,14 @@ class Embeddings( Gemini ):
 	Attributes:
 		client (Optional[genai.Client]): Runtime field used by the Embeddings workflow.
 		response (Optional[Any]): Runtime field used by the Embeddings workflow.
-		embedding (Optional[List[float] | List[List[float]]]): Runtime field used by the Embeddings workflow.
+		embedding (Optional[List[float] | List[List[float]]]): Runtime field used by the 
+		Embeddings workflow.
 		encoding_format (Optional[str]): Runtime field used by the Embeddings workflow.
 		dimensions (Optional[int]): Runtime field used by the Embeddings workflow.
 		task_type (Optional[str]): Runtime field used by the Embeddings workflow.
 		title (Optional[str]): Runtime field used by the Embeddings workflow.
-		embedding_config (Optional[types.EmbedContentConfig]): Runtime field used by the Embeddings workflow.
+		embedding_config (Optional[types.EmbedContentConfig]): Runtime field used by the 
+		Embeddings workflow.
 		contents (Optional[str | List[str]]): Runtime field used by the Embeddings workflow.
 		input_text (Optional[str | List[str]]): Runtime field used by the Embeddings workflow.
 		file_path (Optional[str]): Runtime field used by the Embeddings workflow.
@@ -1505,13 +1458,14 @@ class Embeddings( Gemini ):
 	file_path: Optional[ str ]
 	response_modalities: Optional[ str ]
 	
-	def __init__( self, model: str = 'gemini-embedding-001' ):
+	def __init__( self, model: str='gemini-embedding-001' ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Embeddings instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		
 		Args:
 			model (str): model value used by this workflow.
@@ -1546,11 +1500,8 @@ class Embeddings( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'gemini-embedding-001',
-		         'gemini-embedding-2',
-		         'gemini-embedding-2-preview',
-		         'text-embedding-004',
-		         'text-multilingual-embedding-002' ]
+		return [ 'gemini-embedding-001', 'gemini-embedding-2', 'gemini-embedding-2-preview',
+			'text-embedding-004', 'text-multilingual-embedding-002' ]
 	
 	@property
 	def encoding_options( self ) -> List[ str ]:
@@ -1571,22 +1522,18 @@ class Embeddings( Gemini ):
 		"""Task options.
 		
 		Purpose:
-			Returns the task options exposed by this provider wrapper. This property keeps UI option
-			rendering centralized and gives documentation a stable location for describing supported
+			Returns the task options exposed by this provider wrapper. This property keeps UI 
+			option
+			rendering centralized and gives documentation a stable location for describing 
+			supported
 			choices.
 		
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ '',
-		         'RETRIEVAL_QUERY',
-		         'RETRIEVAL_DOCUMENT',
-		         'SEMANTIC_SIMILARITY',
-		         'CLASSIFICATION',
-		         'CLUSTERING',
-		         'QUESTION_ANSWERING',
-		         'FACT_VERIFICATION',
-		         'CODE_RETRIEVAL_QUERY' ]
+		return [ '', 'RETRIEVAL_QUERY', 'RETRIEVAL_DOCUMENT', 'SEMANTIC_SIMILARITY',
+			'CLASSIFICATION', 'CLUSTERING', 'QUESTION_ANSWERING', 'FACT_VERIFICATION',
+			'CODE_RETRIEVAL_QUERY' ]
 	
 	def normalize_dimensions( self, dimensions: int ) -> int | None:
 		"""Normalize dimensions.
@@ -1632,7 +1579,8 @@ class Embeddings( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1662,9 +1610,8 @@ class Embeddings( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_embedding_config( self, model: str = 'gemini-embedding-001',
-			dimensions: int = None, task_type: str = None,
-			title: str = None ) -> EmbedContentConfig:
+	def build_embedding_config( self, model: str='gemini-embedding-001', dimensions: int=None,
+		task_type: str=None, title: str=None ) -> EmbedContentConfig:
 		"""Build embedding config.
 		
 		Purpose:
@@ -1682,7 +1629,8 @@ class Embeddings( Gemini ):
 			Provider-compatible request component or configuration value.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1698,8 +1646,8 @@ class Embeddings( Gemini ):
 			if self.task_type and 'gemini-embedding-2' not in self.model:
 				self.config_kwargs[ 'task_type' ] = self.task_type
 			
-			if self.title and self.task_type == 'RETRIEVAL_DOCUMENT' \
-					and 'gemini-embedding-2' not in self.model:
+			if (self.title and self.task_type == 'RETRIEVAL_DOCUMENT' and 'gemini-embedding-2' not 
+					in self.model):
 				self.config_kwargs[ 'title' ] = self.title
 			
 			self.embedding_config = EmbedContentConfig( **self.config_kwargs )
@@ -1708,7 +1656,8 @@ class Embeddings( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
-			exception.method = 'build_embedding_config( self, model, dimensions, task_type, title )'
+			exception.method = ('build_embedding_config( self, model, dimensions, task_type, '
+			                    'title )')
 			Logger( ).write( exception )
 			raise exception
 	
@@ -1724,7 +1673,8 @@ class Embeddings( Gemini ):
 			Result produced by the operation.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1759,9 +1709,9 @@ class Embeddings( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def create( self, text: str | List[ str ], model: str = 'gemini-embedding-001',
-			dimensions: int = None, task_type: str = None, title: str = None,
-			encoding_format: str = 'float' ) -> List[ float ] | List[ List[ float ] ] | None:
+	def create( self, text: str | List[ str ], model: str='gemini-embedding-001',
+		dimensions: int=None, task_type: str=None, title: str=None,
+		encoding_format: str='float' ) -> List[ float ] | List[ List[ float ] ] | None:
 		"""Create.
 		
 		Purpose:
@@ -1781,7 +1731,8 @@ class Embeddings( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1806,7 +1757,8 @@ class Embeddings( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
-			exception.method = 'create( self, text, model ) -> List[ float ] | List[ List[ float ] ]'
+			exception.method = ('create( self, text, model ) -> List[ float ] | List[ List[ float '
+			                    '] ]')
 			Logger( ).write( exception )
 			raise exception
 
@@ -1841,13 +1793,14 @@ class TTS( Gemini ):
 	input_text: Optional[ str ]
 	audio_bytes: Optional[ bytes ]
 	
-	def __init__( self, model: str = 'gemini-2.5-flash-preview-tts' ):
+	def __init__( self, model: str='gemini-2.5-flash-preview-tts' ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the TTS instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		
 		Args:
 			model (str): model value used by this workflow.
@@ -1887,7 +1840,7 @@ class TTS( Gemini ):
 			Available option values or configured wrapper values.
 		"""
 		return [ 'gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts',
-		         'gemini-2.5-pro-preview-tts' ]
+			'gemini-2.5-pro-preview-tts' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
@@ -1903,12 +1856,13 @@ class TTS( Gemini ):
 		"""
 		return [ 'audio/wav' ]
 	
-	def to_wave_bytes( self, pcm_data: bytes, rate: int = 24000, channels: int = 1,
-			sample_width: int = 2 ) -> bytes:
+	def to_wave_bytes( self, pcm_data: bytes, rate: int=24000, channels: int=1,
+		sample_width: int=2 ) -> bytes:
 		"""To wave bytes.
 		
 		Purpose:
-			Performs the to wave bytes operation for the TTS wrapper. The method preserves provider-
+			Performs the to wave bytes operation for the TTS wrapper. The method preserves 
+			provider-
 			specific handling behind the application-facing class interface.
 		
 		Args:
@@ -1921,7 +1875,8 @@ class TTS( Gemini ):
 			Result produced by the operation.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1949,7 +1904,8 @@ class TTS( Gemini ):
 		"""Normalize voice.
 		
 		Purpose:
-			Normalizes input values for the TTS workflow before they are passed to provider calls or
+			Normalizes input values for the TTS workflow before they are passed to provider 
+			calls or
 			downstream processing. The method converts UI or caller-supplied values into a stable
 			shape expected by the wrapper.
 		
@@ -1960,7 +1916,8 @@ class TTS( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -1979,11 +1936,12 @@ class TTS( Gemini ):
 			raise exception
 	
 	def normalize_tts_prompt( self, text: str, speed: Optional[ float ] = None,
-			instruct: Optional[ str ] = None ) -> str:
+		instruct: Optional[ str ] = None ) -> str:
 		"""Normalize tts prompt.
 		
 		Purpose:
-			Normalizes input values for the TTS workflow before they are passed to provider calls or
+			Normalizes input values for the TTS workflow before they are passed to provider 
+			calls or
 			downstream processing. The method converts UI or caller-supplied values into a stable
 			shape expected by the wrapper.
 		
@@ -1996,7 +1954,8 @@ class TTS( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -2024,11 +1983,12 @@ class TTS( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def create_speech( self, text: str, filepath: str = None,
-			model: str = 'gemini-3.1-flash-tts-preview', format: str = 'audio/wav',
-			speed: float = None, voice: str = None, frequency: float = None,
-			presense: float = None, max_tokens: int = None, instruct: str = None,
-			temperature: float = None, top_p: float = None ) -> bytes | str | None:
+	def create_speech( self, text: str, filepath: str=None,
+		model: str='gemini-3.1-flash-tts-preview', format: str='audio/wav', speed: float=
+		None,
+		voice: str=None, frequency: float=None, presense: float=None, max_tokens: int=None,
+		instruct: str=None, temperature: float=None,
+		top_p: float=None ) -> bytes | str | None:
 		"""Create speech.
 		
 		Purpose:
@@ -2054,14 +2014,13 @@ class TTS( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'text', text )
-			self.input_text = self.normalize_tts_prompt(
-				text=text,
-				speed=speed,
+			self.input_text = self.normalize_tts_prompt( text=text, speed=speed, 
 				instruct=instruct )
 			self.audio_path = filepath
 			self.response_format = str( format or 'audio/wav' ).strip( )
@@ -2082,13 +2041,10 @@ class TTS( Gemini ):
 				raise ValueError( f'Unsupported Gemini TTS model: {self.model}' )
 			
 			self.voice_config = VoiceConfig(
-				prebuilt_voice_config=types.PrebuiltVoiceConfig(
-					voice_name=self.voice ) )
+				prebuilt_voice_config=types.PrebuiltVoiceConfig( voice_name=self.voice ) )
 			self.speech_config = SpeechConfig( voice_config=self.voice_config )
-			self.config_kwargs = {
-					'response_modalities': self.response_modalities,
-					'speech_config': self.speech_config
-			}
+			self.config_kwargs = { 'response_modalities': self.response_modalities,
+				'speech_config': self.speech_config }
 			
 			if self.temperature is not None:
 				self.config_kwargs[ 'temperature' ] = self.temperature
@@ -2101,10 +2057,8 @@ class TTS( Gemini ):
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.response = self.client.models.generate_content(
-				model=self.model,
-				contents=self.input_text,
-				config=self.content_config )
+			self.response = self.client.models.generate_content( model=self.model,
+				contents=self.input_text, config=self.content_config )
 			
 			self.audio_bytes = None
 			for part in self.response.candidates[ 0 ].content.parts:
@@ -2126,12 +2080,13 @@ class TTS( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'TTS'
-			exception.method = (
-					'create_speech( self, text: str, filepath: str=None, '
-					'model: str="gemini-3.1-flash-tts-preview", format: str="audio/wav", '
-					'speed: float=None, voice: str=None, frequency: float=None, '
-					'presense: float=None, max_tokens: int=None, instruct: str=None, '
-					'temperature: float=None, top_p: float=None ) -> bytes | str | None')
+			exception.method = ('create_speech( self, text: str, filepath: str=None, '
+			                    'model: str="gemini-3.1-flash-tts-preview", format: '
+			                    'str="audio/wav", '
+			                    'speed: float=None, voice: str=None, frequency: float=None, '
+			                    'presense: float=None, max_tokens: int=None, instruct: str=None, '
+			                    'temperature: float=None, top_p: float=None ) -> bytes | str | '
+			                    'None')
 			Logger( ).write( exception )
 			error = ErrorDialog( exception )
 			error.show( )
@@ -2150,22 +2105,25 @@ class Transcription( Gemini ):
 		client (Optional[genai.Client]): Runtime field used by the Transcription workflow.
 		transcript (Optional[str]): Runtime field used by the Transcription workflow.
 		file_path (Optional[str]): Runtime field used by the Transcription workflow.
-		response (Optional[GenerateContentResponse]): Runtime field used by the Transcription workflow.
+		response (Optional[GenerateContentResponse]): Runtime field used by the Transcription 
+		workflow.
 	"""
 	client: Optional[ genai.Client ]
 	transcript: Optional[ str ]
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
-			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0,
-			max_tokens: int = 10000, instruct: str = None ):
+	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=
+	0.8,
+		top_p: float=0.9, frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
+		instruct: str=None ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Transcription instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		
 		Args:
 			n (int): n value used by this workflow.
@@ -2204,8 +2162,7 @@ class Transcription( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'gemini-3-flash-preview',
-		         'gemini-2.0-flash' ]
+		return [ 'gemini-3-flash-preview', 'gemini-2.0-flash' ]
 	
 	@property
 	def language_options( self ) -> List[ str ] | None:
@@ -2219,13 +2176,7 @@ class Transcription( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'Auto',
-		         'English',
-		         'Spanish',
-		         'French',
-		         'Japanese',
-		         'German',
-		         'Chinese' ]
+		return [ 'Auto', 'English', 'Spanish', 'French', 'Japanese', 'German', 'Chinese' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
@@ -2239,16 +2190,9 @@ class Transcription( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [
-				'audio/wav',
-				'audio/mp3',
-				'audio/aiff',
-				'audio/aac',
-				'audio/ogg',
-				'audio/flac'
-		]
+		return [ 'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac' ]
 	
-	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
+	def normalize_mime_type( self, path: str, mime_type: str=None ) -> str:
 		"""Normalize mime type.
 		
 		Purpose:
@@ -2264,7 +2208,8 @@ class Transcription( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -2274,34 +2219,20 @@ class Transcription( Gemini ):
 			if not self.raw_mime_type:
 				self.raw_mime_type = mimetypes.guess_type( path )[ 0 ] or ''
 			
-			self.mime_aliases = {
-					'audio/mpeg': 'audio/mp3',
-					'audio/x-mp3': 'audio/mp3',
-					'audio/x-wav': 'audio/wav',
-					'audio/wave': 'audio/wav',
-					'audio/x-m4a': 'audio/aac',
-					'audio/m4a': 'audio/aac',
-					'audio/mp4': 'audio/aac',
-					'audio/x-aiff': 'audio/aiff',
-					'audio/aif': 'audio/aiff',
-					'audio/x-flac': 'audio/flac'
-			}
+			self.mime_aliases = { 'audio/mpeg': 'audio/mp3', 'audio/x-mp3': 'audio/mp3',
+				'audio/x-wav': 'audio/wav', 'audio/wave': 'audio/wav', 'audio/x-m4a': 'audio/aac',
+				'audio/m4a': 'audio/aac', 'audio/mp4': 'audio/aac', 'audio/x-aiff': 'audio/aiff',
+				'audio/aif': 'audio/aiff', 'audio/x-flac': 'audio/flac' }
 			self.mime_type = self.mime_aliases.get( self.raw_mime_type, self.raw_mime_type )
 			
 			if self.mime_type in self.format_options:
 				return self.mime_type
 			
 			self.suffix = str( Path( path ).suffix or '' ).strip( ).lower( )
-			self.extension_map = {
-					'.wav': 'audio/wav',
-					'.mp3': 'audio/mp3',
-					'.aiff': 'audio/aiff',
-					'.aif': 'audio/aiff',
-					'.aac': 'audio/aac',
-					'.m4a': 'audio/aac',
-					'.ogg': 'audio/ogg',
-					'.flac': 'audio/flac'
-			}
+			self.extension_map = { '.wav': 'audio/wav', '.mp3': 'audio/mp3', '.aiff': 'audio/aiff',
+				'.aif': 'audio/aiff', '.aac': 'audio/aac', '.m4a': 'audio/aac', '.ogg': 
+					'audio/ogg',
+				'.flac': 'audio/flac' }
 			
 			if self.suffix in self.extension_map:
 				return self.extension_map[ self.suffix ]
@@ -2315,8 +2246,8 @@ class Transcription( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_prompt( self, language: str = None, start_time: float = None,
-			end_time: float = None ) -> str:
+	def build_prompt( self, language: str=None, start_time: float=None,
+		end_time: float=None ) -> str:
 		"""Build prompt.
 		
 		Purpose:
@@ -2334,7 +2265,8 @@ class Transcription( Gemini ):
 		"""
 		self.prompt_parts = [ 'Generate a verbatim transcript of the speech.' ]
 		
-		if language is not None and str( language ).strip( ) and str( language ).strip( ) != 'Auto':
+		if (language is not None and str( language ).strip( ) and str( language ).strip( ) != 
+				'Auto'):
 			self.prompt_parts.append(
 				f'The expected spoken language is {str( language ).strip( )}.' )
 		
@@ -2346,11 +2278,11 @@ class Transcription( Gemini ):
 		self.prompt_parts.append( 'Return only the transcript text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def transcribe( self, path: str, model: str = 'gemini-3-flash-preview',
-			language: str = None, mime_type: str = None, temperature: float = None,
-			top_p: float = None, frequency: float = None, presence: float = None,
-			max_tokens: int = None, start_time: float = None, end_time: float = None,
-			instruct: str = None ) -> Optional[ str ]:
+	def transcribe( self, path: str, model: str='gemini-3-flash-preview', language: str=None,
+		mime_type: str=None, temperature: float=None, top_p: float=None,
+		frequency: float=None, presence: float=None, max_tokens: int=None,
+		start_time: float=None, end_time: float=None, instruct: str=None ) -> Optional[ 
+		str ]:
 		"""Transcribe.
 		
 		Purpose:
@@ -2408,10 +2340,8 @@ class Transcription( Gemini ):
 			
 			self.content_config = GenerateContentConfig( **self.config_kwargs )
 			self.uploaded_file = self.client.files.upload( file=self.file_path )
-			self.response = self.client.models.generate_content(
-				model=self.model,
-				contents=[ self.prompt, self.uploaded_file ],
-				config=self.content_config )
+			self.response = self.client.models.generate_content( model=self.model,
+				contents=[ self.prompt, self.uploaded_file ], config=self.content_config )
 			self.transcript = self.response.text
 			return self.transcript
 		except Exception as e:
@@ -2436,7 +2366,8 @@ class Translation( Gemini ):
 		target_language (Optional[str]): Runtime field used by the Translation workflow.
 		source_language (Optional[str]): Runtime field used by the Translation workflow.
 		file_path (Optional[str]): Runtime field used by the Translation workflow.
-		response (Optional[GenerateContentResponse]): Runtime field used by the Translation workflow.
+		response (Optional[GenerateContentResponse]): Runtime field used by the Translation 
+		workflow.
 	"""
 	client: Optional[ genai.Client ]
 	target_language: Optional[ str ]
@@ -2444,16 +2375,17 @@ class Translation( Gemini ):
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float = 0.8,
-			top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0,
-			max_tokens: int = 10000,
-			instruct: str = None ):
+	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=
+	0.8,
+		top_p: float=0.9, frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
+		instruct: str=None ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Translation instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		
 		Args:
 			n (int): n value used by this workflow.
@@ -2493,8 +2425,7 @@ class Translation( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'gemini-3-flash-preview',
-		         'gemini-2.0-flash' ]
+		return [ 'gemini-3-flash-preview', 'gemini-2.0-flash' ]
 	
 	@property
 	def format_options( self ) -> List[ str ] | None:
@@ -2508,16 +2439,9 @@ class Translation( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [
-				'audio/wav',
-				'audio/mp3',
-				'audio/aiff',
-				'audio/aac',
-				'audio/ogg',
-				'audio/flac'
-		]
+		return [ 'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac' ]
 	
-	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
+	def normalize_mime_type( self, path: str, mime_type: str=None ) -> str:
 		"""Normalize mime type.
 		
 		Purpose:
@@ -2533,7 +2457,8 @@ class Translation( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -2543,34 +2468,20 @@ class Translation( Gemini ):
 			if not self.raw_mime_type:
 				self.raw_mime_type = mimetypes.guess_type( path )[ 0 ] or ''
 			
-			self.mime_aliases = {
-					'audio/mpeg': 'audio/mp3',
-					'audio/x-mp3': 'audio/mp3',
-					'audio/x-wav': 'audio/wav',
-					'audio/wave': 'audio/wav',
-					'audio/x-m4a': 'audio/aac',
-					'audio/m4a': 'audio/aac',
-					'audio/mp4': 'audio/aac',
-					'audio/x-aiff': 'audio/aiff',
-					'audio/aif': 'audio/aiff',
-					'audio/x-flac': 'audio/flac'
-			}
+			self.mime_aliases = { 'audio/mpeg': 'audio/mp3', 'audio/x-mp3': 'audio/mp3',
+				'audio/x-wav': 'audio/wav', 'audio/wave': 'audio/wav', 'audio/x-m4a': 'audio/aac',
+				'audio/m4a': 'audio/aac', 'audio/mp4': 'audio/aac', 'audio/x-aiff': 'audio/aiff',
+				'audio/aif': 'audio/aiff', 'audio/x-flac': 'audio/flac' }
 			self.mime_type = self.mime_aliases.get( self.raw_mime_type, self.raw_mime_type )
 			
 			if self.mime_type in self.format_options:
 				return self.mime_type
 			
 			self.suffix = str( Path( path ).suffix or '' ).strip( ).lower( )
-			self.extension_map = {
-					'.wav': 'audio/wav',
-					'.mp3': 'audio/mp3',
-					'.aiff': 'audio/aiff',
-					'.aif': 'audio/aiff',
-					'.aac': 'audio/aac',
-					'.m4a': 'audio/aac',
-					'.ogg': 'audio/ogg',
-					'.flac': 'audio/flac'
-			}
+			self.extension_map = { '.wav': 'audio/wav', '.mp3': 'audio/mp3', '.aiff': 'audio/aiff',
+				'.aif': 'audio/aiff', '.aac': 'audio/aac', '.m4a': 'audio/aac', '.ogg': 
+					'audio/ogg',
+				'.flac': 'audio/flac' }
 			
 			if self.suffix in self.extension_map:
 				return self.extension_map[ self.suffix ]
@@ -2596,15 +2507,10 @@ class Translation( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'English',
-		         'Spanish',
-		         'French',
-		         'Japanese',
-		         'German',
-		         'Chinese' ]
+		return [ 'English', 'Spanish', 'French', 'Japanese', 'German', 'Chinese' ]
 	
-	def build_prompt( self, target: str, source: str = 'Auto', start_time: float = None,
-			end_time: float = None ) -> str:
+	def build_prompt( self, target: str, source: str='Auto', start_time: float=None,
+		end_time: float=None ) -> str:
 		"""Build prompt.
 		
 		Purpose:
@@ -2623,8 +2529,8 @@ class Translation( Gemini ):
 		"""
 		self.prompt_parts = [ f'Translate the spoken audio into {target}.' ]
 		if source is not None and str( source ).strip( ) and str( source ).strip( ) != 'Auto':
-			self.prompt_parts.append(
-				f'The expected source language is {str( source ).strip( )}.' )
+			self.prompt_parts.append( f'The expected source language is '
+			                          f'{str( source ).strip( )}.' )
 		
 		if start_time is not None and end_time is not None and end_time >= start_time:
 			self.prompt_parts.append(
@@ -2634,11 +2540,11 @@ class Translation( Gemini ):
 		self.prompt_parts.append( 'Return only the translated text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def translate( self, path: str, model: str = 'gemini-3-flash-preview',
-			language: str = 'English', source: str = 'Auto', mime_type: str = None,
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None, max_tokens: int = None, start_time: float = None,
-			end_time: float = None, instruct: str = None ) -> Optional[ str ]:
+	def translate( self, path: str, model: str='gemini-3-flash-preview',
+		language: str='English', source: str='Auto', mime_type: str=None,
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, start_time: float=None,
+		end_time: float=None, instruct: str=None ) -> Optional[ str ]:
 		"""Translate.
 		
 		Purpose:
@@ -2681,8 +2587,7 @@ class Translation( Gemini ):
 			self.instructions = instruct if instruct is not None else self.instructions
 			self.mime_type = self.normalize_mime_type( path=self.file_path, mime_type=mime_type )
 			self.prompt = self.build_prompt( target=self.target_language,
-				source=self.source_language,
-				start_time=start_time, end_time=end_time )
+				source=self.source_language, start_time=start_time, end_time=end_time )
 			
 			self.config_kwargs = { }
 			if self.temperature is not None:
@@ -2757,13 +2662,14 @@ class Files( Gemini ):
 	collections: Optional[ Dict[ str, str ] ]
 	documents: Optional[ Dict[ str, str ] ]
 	
-	def __init__( self, model: str = 'gemini-2.0-flash' ):
+	def __init__( self, model: str='gemini-2.0-flash' ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Files instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		
 		Args:
 			model (str): model value used by this workflow.
@@ -2803,8 +2709,10 @@ class Files( Gemini ):
 		"""File options.
 		
 		Purpose:
-			Returns the file options exposed by this provider wrapper. This property keeps UI option
-			rendering centralized and gives documentation a stable location for describing supported
+			Returns the file options exposed by this provider wrapper. This property keeps UI 
+			option
+			rendering centralized and gives documentation a stable location for describing 
+			supported
 			choices.
 		
 		Returns:
@@ -2824,10 +2732,8 @@ class Files( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'gemini-3.5-flash',
-		         'gemini-3.5 flash-lite',
-		         'gemini-3.0-flash',
-		         'gemini-3.0-flash-lite' ]
+		return [ 'gemini-3.5-flash', 'gemini-3.5 flash-lite', 'gemini-3.0-flash',
+			'gemini-3.0-flash-lite' ]
 	
 	@property
 	def media_options( self ):
@@ -2841,9 +2747,7 @@ class Files( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'media_resolution_high',
-		         'media_resolution_medium',
-		         'media_resolution_low' ]
+		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
 	
 	@property
 	def include_options( self ) -> List[ str ] | None:
@@ -2857,10 +2761,8 @@ class Files( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'file_search_call.results',
-		         'message.input_image.image_url',
-		         'message.output_text.logprobs',
-		         'reasoning.encrypted_content' ]
+		return [ 'file_search_call.results', 'message.input_image.image_url',
+			'message.output_text.logprobs', 'reasoning.encrypted_content' ]
 	
 	@property
 	def reasoning_options( self ) -> List[ str ] | None:
@@ -2874,8 +2776,7 @@ class Files( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL',
-		         'LOW', 'MEDIUM', 'HIGH' ]
+		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH' ]
 	
 	@property
 	def choice_options( self ) -> List[ str ] | None:
@@ -2889,29 +2790,24 @@ class Files( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'AUTO',
-		         'ANY',
-		         'NONE',
-		         'VALIDATED' ]
+		return [ 'AUTO', 'ANY', 'NONE', 'VALIDATED' ]
 	
 	@property
 	def tool_options( self ) -> List[ str ] | None:
 		"""Tool options.
 		
 		Purpose:
-			Returns the tool options exposed by this provider wrapper. This property keeps UI option
-			rendering centralized and gives documentation a stable location for describing supported
+			Returns the tool options exposed by this provider wrapper. This property keeps UI 
+			option
+			rendering centralized and gives documentation a stable location for describing 
+			supported
 			choices.
 		
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'google_search',
-		         'google_maps',
-		         'file_search',
-		         'url_context',
-		         'code_execution',
-		         'computer_use' ]
+		return [ 'google_search', 'google_maps', 'file_search', 'url_context', 'code_execution',
+			'computer_use' ]
 	
 	@property
 	def modality_options( self ) -> List[ str ] | None:
@@ -2937,11 +2833,9 @@ class Files( Gemini ):
 			supported choices.
 		
 		"""
-		return [ 'media_resolution_high',
-		         'media_resolution_medium',
-		         'media_resolution_low' ]
+		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
 	
-	def upload( self, filepath: str, name: str = None ) -> File | None:
+	def upload( self, filepath: str, name: str=None ) -> File | None:
 		"""Upload.
 		
 		Purpose:
@@ -2957,7 +2851,8 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -2977,12 +2872,11 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def list( self, model: str = 'gemini-3.0-flash', top_p: float = 0.8, top_k: int = 50,
-			temperature: float = 0.5, frequency: float = 0.0, presence: float = 0.0,
-			max_tokens: int = 8192, tool_choice: str = 'auto', stops: List[ str ] = None,
-			tools: List[ str ] = None, domains: List[ str ] = None,
-			modalities: List[ str ] = None,
-			media_resolution: str = 'media_resolution_medium' ) -> Any | None:
+	def list( self, model: str='gemini-3.0-flash', top_p: float=0.8, top_k: int=50,
+		temperature: float=0.5, frequency: float=0.0, presence: float=0.0,
+		max_tokens: int=8192, tool_choice: str='auto', stops: List[ str ] = None,
+		tools: List[ str ] = None, domains: List[ str ] = None, modalities: List[ str ] = None,
+		media_resolution: str='media_resolution_medium' ) -> Any | None:
 		"""List.
 		
 		Purpose:
@@ -3009,7 +2903,8 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3099,7 +2994,8 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3115,10 +3011,10 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def summarize( self, prompt: str, filepath: str, model: str = 'gemini-2.0-flash',
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
-			instruct: str = None ) -> str | None:
+	def summarize( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
+		instruct: str=None ) -> str | None:
 		"""Summarize.
 		
 		Purpose:
@@ -3142,7 +3038,8 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3178,10 +3075,10 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def search( self, prompt: str, filepath: str, model: str = 'gemini-2.0-flash',
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
-			instruct: str = None ) -> str | None:
+	def search( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
+		instruct: str=None ) -> str | None:
 		"""Search.
 		
 		Purpose:
@@ -3205,7 +3102,8 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3231,8 +3129,7 @@ class Files( Gemini ):
 			else:
 				uploaded_file = self.client.files.upload( path=self.file_path )
 				response = self.client.models.generate_content( model=self.model,
-					contents=[ uploaded_file,
-					           self.prompt ], config=self.content_config )
+					contents=[ uploaded_file, self.prompt ], config=self.content_config )
 			return response.text
 		except Exception as e:
 			ex = Error( e )
@@ -3242,10 +3139,9 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def survey( self, prompt: str, filepaths: List[ str ], model: str = 'gemini-2.0-flash',
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None, max_tokens: int = None,
-			stops: List[ str ] = None ) -> str | None:
+	def survey( self, prompt: str, filepaths: List[ str ], model: str='gemini-2.0-flash',
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, stops: List[ str ] = None ) -> str | None:
 		"""Survey.
 		
 		Purpose:
@@ -3268,7 +3164,8 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3303,10 +3200,10 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None,
-			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
+		instruct: str=None ) -> str | None:
 		"""Web search.
 		
 		Purpose:
@@ -3341,7 +3238,7 @@ class Files( Gemini ):
 			self.stops = stops
 			self.instructions = instruct
 			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+				types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -3356,10 +3253,10 @@ class Files( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None,
-			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
+		instruct: str=None ) -> str | None:
 		"""Search maps.
 		
 		Purpose:
@@ -3394,7 +3291,7 @@ class Files( Gemini ):
 			self.stops = stops
 			self.instructions = instruct
 			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+				types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -3421,7 +3318,8 @@ class Files( Gemini ):
 			file_id (str): file id value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3466,7 +3364,8 @@ class FileSearch( Gemini ):
 		Purpose:
 			Initializes the FileSearch instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		"""
 		super( ).__init__( )
 		self.client = None
@@ -3529,7 +3428,8 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3552,7 +3452,8 @@ class FileSearch( Gemini ):
 		"""Retrieve.
 		
 		Purpose:
-			Executes the retrieve workflow for the FileSearch wrapper. The method validates required
+			Executes the retrieve workflow for the FileSearch wrapper. The method validates 
+			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
 		
@@ -3563,7 +3464,8 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3592,7 +3494,8 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3606,7 +3509,7 @@ class FileSearch( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def delete( self, store_id: str, force: bool = True ) -> bool | Any:
+	def delete( self, store_id: str, force: bool=True ) -> bool | Any:
 		"""Delete.
 		
 		Purpose:
@@ -3622,7 +3525,8 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3680,7 +3584,8 @@ class CloudBuckets( Gemini ):
 		Purpose:
 			Initializes the CloudBuckets instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state assignment.
+			settings and placeholders without performing request work beyond local state 
+			assignment.
 		"""
 		self.project_id = cfg.GOOGLE_CLOUD_PROJECT_ID
 		self.client = storage.Client( project=self.project_id )
@@ -3697,21 +3602,15 @@ class CloudBuckets( Gemini ):
 		self.http_options = { }
 		self.bucket = None
 		self.response = None
-		self.collections = \
-			{
-					'Federal Financial Data': 'jeni-financial/data',
-					'Federal Financial Regulations': 'jeni-financial/regulations',
-					'DoW Financial Data': 'jeni-dow/budget/data',
-					'DoW Financial Regulations': 'jeni-dow/budget/regulations',
-					'DoA Financial Data': 'jenni-doa/Financial Data',
-			}
-		self.documents = \
-			{
-					'Account_Balances.csv': 'file-U6wFeRGSeg38Db5uJzo5sj',
-					'SF133.csv': 'file-32s641QK1Xb5QUatY3zfWF',
-					'Authority.csv': 'file-Qi2rw2QsdxKBX1iiaQxY3m',
-					'Outlays.csv': 'file-GHEwSWR7ezMvHrQ3X648wn'
-			}
+		self.collections = { 'Federal Financial Data': 'jeni-financial/data',
+			'Federal Financial Regulations': 'jeni-financial/regulations',
+			'DoW Financial Data': 'jeni-dow/budget/data',
+			'DoW Financial Regulations': 'jeni-dow/budget/regulations',
+			'DoA Financial Data': 'jenni-doa/Financial Data', }
+		self.documents = { 'Account_Balances.csv': 'file-U6wFeRGSeg38Db5uJzo5sj',
+			'SF133.csv': 'file-32s641QK1Xb5QUatY3zfWF',
+			'Authority.csv': 'file-Qi2rw2QsdxKBX1iiaQxY3m',
+			'Outlays.csv': 'file-GHEwSWR7ezMvHrQ3X648wn' }
 	
 	@property
 	def model_options( self ) -> List[ str ] | None:
@@ -3725,12 +3624,8 @@ class CloudBuckets( Gemini ):
 		Returns:
 			Available option values or configured wrapper values.
 		"""
-		return [ 'gemini-2.5-flash',
-		         'gemini-2.5 flash image',
-		         'gemini-2.5 flash-tts',
-		         'gemini-2.5 flash-lite',
-		         'gemini-2.0-flash',
-		         'gemini-2.0-flash-lite' ]
+		return [ 'gemini-2.5-flash', 'gemini-2.5 flash image', 'gemini-2.5 flash-tts',
+			'gemini-2.5 flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite' ]
 	
 	@property
 	def media_options( self ) -> List[ str ] | None:
@@ -3742,15 +3637,14 @@ class CloudBuckets( Gemini ):
 			supported choices.
 		
 		"""
-		return [ 'media_resolution_high',
-		         'media_resolution_medium',
-		         'media_resolution_low' ]
+		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
 	
 	def create( self, bucket: str, name: str ) -> bool | None:
 		"""Create.
 		
 		Purpose:
-			Executes the create workflow for the CloudBuckets wrapper. The method validates required
+			Executes the create workflow for the CloudBuckets wrapper. The method validates 
+			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
 		
@@ -3759,7 +3653,8 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3779,11 +3674,12 @@ class CloudBuckets( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def upload( self, path: str, bucket: str, name: str = None ) -> Blob | None:
+	def upload( self, path: str, bucket: str, name: str=None ) -> Blob | None:
 		"""Upload.
 		
 		Purpose:
-			Executes the upload workflow for the CloudBuckets wrapper. The method validates required
+			Executes the upload workflow for the CloudBuckets wrapper. The method validates 
+			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
 		
@@ -3793,7 +3689,8 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3829,7 +3726,8 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3860,7 +3758,8 @@ class CloudBuckets( Gemini ):
 			bucket (str): bucket value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
@@ -3878,10 +3777,10 @@ class CloudBuckets( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None,
-			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
+		instruct: str=None ) -> str | None:
 		"""Web search.
 		
 		Purpose:
@@ -3917,7 +3816,7 @@ class CloudBuckets( Gemini ):
 			self.stops = stops
 			self.instructions = instruct
 			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+				types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -3933,10 +3832,10 @@ class CloudBuckets( Gemini ):
 			error = ErrorDialog( exception )
 			error.show( )
 	
-	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-			temperature: float = None, top_p: float = None, frequency: float = None,
-			presence: float = None,
-			max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str | None:
+	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
+		temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
+		instruct: str=None ) -> str | None:
 		"""Search maps.
 		
 		Purpose:
@@ -3972,7 +3871,7 @@ class CloudBuckets( Gemini ):
 			self.stops = stops
 			self.instructions = instruct
 			self.tool_config = [
-					types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+				types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -3992,7 +3891,8 @@ class CloudBuckets( Gemini ):
 		"""Delete.
 		
 		Purpose:
-			Executes the delete workflow for the CloudBuckets wrapper. The method validates required
+			Executes the delete workflow for the CloudBuckets wrapper. The method validates 
+			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
 		
@@ -4001,7 +3901,8 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and logged.
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
