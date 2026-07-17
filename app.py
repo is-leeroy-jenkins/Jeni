@@ -3869,7 +3869,7 @@ if mode == 'Text':
 					if key in st.session_state:
 						del st.session_state[ key ]
 			
-			with st.expander( label='Model Settings', icon='🧊', expanded=False, width='stretch' ):
+			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				model_c1, model_c2, model_c3, model_c4, model_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -4283,6 +4283,7 @@ elif mode == "Images":
 		st.divider( )
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4 = st.columns(
 					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
@@ -4475,7 +4476,6 @@ elif mode == "Images":
 		
 		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-			
 			prompt_names = fetch_prompt_names( cfg.DB_PATH )
 			if not prompt_names:
 				prompt_names = [ '' ]
@@ -4490,7 +4490,6 @@ elif mode == "Images":
 					text = fetch_prompt_text( cfg.DB_PATH, name )
 					if text is not None:
 						st.session_state[ 'image_system_instructions' ] = text
-			
 			with in_right:
 				st.selectbox( label='Use Template', options=prompt_names, index=None,
 					key='image_instructions_template', on_change=_on_image_template_change )
@@ -4541,7 +4540,6 @@ elif mode == "Images":
 				pass
 		
 		tab_gen, tab_analyze, tab_edit = st.tabs( [ 'Generate', 'Analyze', 'Edit' ] )
-		
 		with tab_gen:
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
@@ -4550,7 +4548,6 @@ elif mode == "Images":
 			
 			prompt = st.chat_input( 'Enter image generation prompt...' )
 			gen_c1, gen_c2, gen_c3 = st.columns( [ 0.2, 0.2, 0.8 ] )
-			
 			with gen_c1:
 				if st.button( 'Generate Image' ):
 					with st.spinner( 'Generating…' ):
@@ -4561,30 +4558,19 @@ elif mode == "Images":
 								st.warning( 'Select a model before generating an image.' )
 							else:
 								_append_image_message( 'user', prompt )
-								
-								result = image.generate(
-									prompt=prompt,
-									model=image_model,
-									aspect=image_aspect_ratio,
-									number=image_number,
-									temperature=image_temperature,
-									top_p=image_top_percent,
-									max_tokens=image_max_tokens,
-									resolution=image_size,
+								result = image.generate( prompt=prompt, model=image_model,
+									aspect=image_aspect_ratio, number=image_number,
+									temperature=image_temperature, top_p=image_top_percent,
+									max_tokens=image_max_tokens, resolution=image_size,
 									instruct=st.session_state.get( 'image_system_instructions',
-										'' ),
-									output_mime_type=image_mime_type,
-									response_modalities=image_modality,
-									grounded=image_grounded,
-									image_search=image_image_search
-								)
+										'' ), output_mime_type=image_mime_type,
+									response_modalities=image_modality, grounded=image_grounded,
+									image_search=image_image_search )
 								
 								if result is not None:
 									st.image( result, use_column_width=True )
-									_append_image_message(
-										'assistant',
-										'Generated image returned successfully.'
-									)
+									_append_image_message( 'assistant',
+										'Generated image returned successfully.' )
 								else:
 									st.warning( 'No image was returned by the model.' )
 								
@@ -4619,7 +4605,6 @@ elif mode == "Images":
 			
 			prompt = st.chat_input( 'Enter image analysis prompt …' )
 			ana_c1, ana_c2 = st.columns( [ 0.2, 0.8 ] )
-			
 			with ana_c1:
 				if st.button( 'Analyze Image' ):
 					with st.spinner( 'Analyzing image…' ):
@@ -4632,21 +4617,13 @@ elif mode == "Images":
 								st.warning( 'Select a model before analyzing an image.' )
 							else:
 								_append_image_message( 'user', prompt )
-								
-								analysis_result = image.analyze(
-									prompt=prompt,
-									path=tmp_path,
-									model=image_model,
-									number=image_number,
-									temperature=image_temperature,
-									top_p=image_top_percent,
+								analysis_result = image.analyze( prompt=prompt, path=tmp_path,
+									model=image_model, number=image_number,
+									temperature=image_temperature, top_p=image_top_percent,
 									max_tokens=image_max_tokens,
-									instruct=st.session_state.get( 'image_system_instructions',
-										'' ),
-									response_modalities=image_modality,
-									grounded=image_grounded,
-									image_search=image_image_search
-								)
+									instruct=st.session_state.get( 'image_system_instructions', '' ),
+									response_modalities=image_modality, grounded=image_grounded,
+									image_search=image_image_search )
 								
 								if analysis_result is None:
 									st.warning( 'No analysis output returned by the model.' )
@@ -4686,7 +4663,6 @@ elif mode == "Images":
 			
 			prompt = st.chat_input( 'Enter image editing prompt …' )
 			edit_c1, edit_c2 = st.columns( [ 0.2, 0.8 ] )
-			
 			with edit_c1:
 				if st.button( 'Edit Image' ):
 					with st.spinner( 'Editing image…' ):
@@ -4699,31 +4675,20 @@ elif mode == "Images":
 								st.warning( 'Select a model before editing an image.' )
 							else:
 								_append_image_message( 'user', prompt )
-								
-								edit_result = image.edit(
-									prompt=prompt,
-									path=tmp_path,
-									model=image_model,
-									aspect=image_aspect_ratio,
-									number=image_number,
-									temperature=image_temperature,
-									top_p=image_top_percent,
-									max_tokens=image_max_tokens,
+								edit_result = image.edit( prompt=prompt, path=tmp_path,
+									model=image_model, aspect=image_aspect_ratio,
+									number=image_number, temperature=image_temperature,
+									top_p=image_top_percent, max_tokens=image_max_tokens,
 									resolution=image_size,
 									instruct=st.session_state.get( 'image_system_instructions',
-										'' ),
-									output_mime_type=image_mime_type,
-									response_modalities=image_modality,
-									grounded=image_grounded,
-									image_search=image_image_search
-								)
+										'' ), output_mime_type=image_mime_type,
+									response_modalities=image_modality, grounded=image_grounded,
+									image_search=image_image_search )
 								
 								if edit_result is not None:
 									st.image( edit_result, use_column_width=True )
-									_append_image_message(
-										'assistant',
-										'Edited image returned successfully.'
-									)
+									_append_image_message( 'assistant',
+										'Edited image returned successfully.' )
 								else:
 									st.warning( 'No edited image was returned by the model.' )
 								
