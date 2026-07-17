@@ -1809,6 +1809,21 @@ def clear_history( ) -> None:
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute( "DELETE FROM chat_history" )
 
+def reset_files_tool_settings( ) -> None:
+	"""Reset Files tool settings.
+	
+	Purpose:
+	    Removes the Files Mode tool-setting widget values and their derived state
+	    before Streamlit instantiates the controls during the subsequent rerun.
+	
+	Returns:
+	    None: This function updates Streamlit session state through side effects.
+	"""
+	for key in [ 'files_max_calls', 'files_tool_choice', 'files_include',
+		'files_tools',
+		'files_domains', 'files_domains_input', 'files_background' ]:
+		st.session_state.pop( key, None )
+
 # ----------  DOCQNA UTILITIES ----------
 
 def extract_text_from_bytes( file_bytes: bytes ) -> str:
@@ -1857,32 +1872,108 @@ def extract_text_from_bytes( file_bytes: bytes ) -> str:
 			return ""
 
 def route_document_query( prompt: str ) -> str:
-	"""Route document query.
-    
-    Purpose:
-        Supports the Jeni Streamlit application by executing the route document query workflow.
-        The function coordinates local state, input validation, and downstream helper calls
-        needed by the surrounding application mode.
-    
-    Args:
-        prompt (str): Prompt value used by this workflow.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
-	user_input = build_document_user_input( prompt )
-	if not user_input:
-		user_input = (prompt or '').strip( )
+	"""Route a Document Q&A query through Gemini.
 	
-	return run_llm_turn(
-		user_input=user_input,
-		temperature=float( st.session_state.get( 'temperature', 0.0 ) ),
-		top_p=float( st.session_state.get( 'top_percent', 0.95 ) ),
-		repeat_penalty=float( st.session_state.get( 'repeat_penalty', 1.1 ) ),
-		max_tokens=int( st.session_state.get( 'max_tokens', 1024 ) ) or 1024,
-		stream=False,
-		output=None
-	)
+	Purpose:
+	    Builds a retrieval-augmented prompt from the active document, applies the current
+	    Document Q&A model and inference settings, submits the request through the Gemini
+	    text-generation wrapper, and returns the normalized response text.
+	
+	Args:
+	    prompt (str): User question or document-summary instruction submitted for execution.
+	
+	Returns:
+	    str: Generated answer based on the retrieved document context.
+	
+	Raises:
+	    Error: Raised when validation, document retrieval, or Gemini execution fails.
+	"""
+	try:
+		throw_if( 'prompt', prompt )
+		
+		# ------------------------------------------------------------------
+		# Build Retrieval-Augmented Input
+		# ------------------------------------------------------------------
+		user_input = build_document_user_input( prompt )
+		if not user_input:
+			user_input = str( prompt ).strip( )
+		
+		if not user_input:
+			raise ValueError( 'A document question is required.' )
+		
+		# ------------------------------------------------------------------
+		# Resolve Document Q&A Configuration
+		# ------------------------------------------------------------------
+		model = str( st.session_state.get( 'docqna_model', '' ) or '' ).strip( )
+		
+		if not model:
+			raise ValueError( 'Select a Document Q&A model before submitting a question.' )
+		
+		temperature = float( st.session_state.get( 'docqna_temperature', 0.0 ) or 0.0 )
+		top_p = float( st.session_state.get( 'docqna_top_percent', 0.95 ) or 0.95 )
+		top_k = int( st.session_state.get( 'docqna_top_k', 0 ) or 0 )
+		max_tokens = int( st.session_state.get( 'docqna_max_tokens', 1024 ) or 1024 )
+		frequency_penalty = float( st.session_state.get( 'docqna_frequency_penalty', 0.0 ) or 0.0 )
+		presence_penalty = float( st.session_state.get( 'docqna_presence_penalty', 0.0 ) or 0.0 )
+		system_instructions = str(
+			st.session_state.get( 'docqna_system_instructions', '' ) or '' ).strip( )
+		
+		reasoning = st.session_state.get( 'docqna_reasoning', '' )
+		response_format = st.session_state.get( 'docqna_response_format', '' )
+		media_resolution = st.session_state.get( 'docqna_media_resolution', '' )
+		stops = st.session_state.get( 'docqna_stops', [ ] )
+		if not isinstance( stops, list ):
+			stops = [ ]
+		
+		modalities = st.session_state.get( 'docqna_modalities', [ ] )
+		if not isinstance( modalities, list ):
+			modalities = [ ]
+		
+		context = st.session_state.get( 'docqna_messages', [ ] )
+		if not isinstance( context, list ):
+			context = [ ]
+		
+		if context:
+			context = context[ :-1 ]
+		
+		# ------------------------------------------------------------------
+		# Execute Gemini Query
+		# ------------------------------------------------------------------
+		apply_gemini_runtime_config( )
+		chat = Chat( )
+		response = chat.generate_text( prompt=user_input, model=model, number=1,
+			temperature=temperature, top_p=top_p, top_k=top_k, frequency=frequency_penalty,
+			presence=presence_penalty, max_tokens=max_tokens, stops=stops,
+			instruct=system_instructions, response_format=response_format, tools=[ ],
+			tool_choice=None, reasoning=reasoning, modalities=modalities,
+			media_resolution=media_resolution, context=context, content='', urls=[ ], max_urls=0,
+			response_schema='', safety_profile='', file_search_store_names=[ ], stream=False,
+			stream_handler=None )
+		
+		# ------------------------------------------------------------------
+		# Normalize Response
+		# ------------------------------------------------------------------
+		if response is None:
+			raise ValueError( 'Gemini returned no Document Q&A response.' )
+		
+		answer = str( response ).strip( )
+		if not answer:
+			raise ValueError( 'Gemini returned an empty Document Q&A response.' )
+		
+		try:
+			update_counters( getattr( chat, 'response', None ) )
+		except Exception:
+			pass
+		
+		return answer
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'route_document_query'
+		exception.method = 'route_document_query( prompt: str ) -> str'
+		Logger( ).write( exception )
+		raise exception
 
 def summarize_active_document( ) -> str:
 	"""Summarize active document.
@@ -5811,7 +5902,7 @@ elif mode == 'Files':
 						value=int( st.session_state.get( 'files_max_calls', 0 ) ), step=1,
 						help=cfg.MAX_TOOL_CALLS, key='files_max_calls' )
 					
-					files_max_calls = st.session_state[ 'files_max_calls' ]
+					files_max_calls = set_files_calls
 				
 				# ---------- Choice ------------
 				with tool_c2:
@@ -5820,7 +5911,7 @@ elif mode == 'Files':
 						key='files_tool_choice', help=cfg.CHOICE, index=None,
 						placeholder='Options' )
 					
-					files_tool_choice = st.session_state[ 'files_tool_choice' ]
+					files_tool_choice = set_files_choice
 				
 				# ---------- Include ------------
 				with tool_c3:
@@ -5828,8 +5919,8 @@ elif mode == 'Files':
 					set_files_include = st.multiselect( label='Include', options=include_options,
 						key='files_include', help=cfg.INCLUDE, placeholder='Options' )
 					
-					files_include = [ d.strip( ) for d in set_files_include if d.strip( ) ]
-					st.session_state[ 'files_include' ] = files_include
+					files_include = [ str( include ).strip( ) for include in set_files_include if
+						str( include ).strip( ) ]
 				
 				# ---------- Domains ------------
 				with tool_c4:
@@ -5838,8 +5929,8 @@ elif mode == 'Files':
 						value=','.join( st.session_state.get( 'files_domains', [ ] ) ),
 						help=cfg.ALLOWED_DOMAINS, width='stretch', placeholder='Enter Domains' )
 					
-					files_domains = [ d.strip( ) for d in set_files_domains.split( ',' )
-					                  if d.strip( ) ]
+					files_domains = [ domain.strip( ) for domain in set_files_domains.split( ',' )
+						if domain.strip( ) ]
 					
 					st.session_state[ 'files_domains' ] = files_domains
 				
@@ -5849,26 +5940,19 @@ elif mode == 'Files':
 					set_files_tools = st.multiselect( label='Tools', options=tool_options,
 						key='files_tools', help=cfg.TOOLS, placeholder='Options' )
 					
-					files_tools = [ d.strip( ) for d in set_files_tools
-					                if d.strip( ) ]
-					
-					files_tools = st.session_state[ 'files_tools' ]
+					files_tools = [ str( tool ).strip( ) for tool in set_files_tools if
+						str( tool ).strip( ) ]
 				
 				# ---------- Background ------------
 				with tool_c6:
 					set_files_background = st.toggle( label='Background', key='files_background',
 						help=cfg.BACKGROUND_MODE )
 					
-					files_background = st.session_state[ 'files_background' ]
+					files_background = set_files_background
 				
 				# ---------- Reset Tools ------------
-				if st.button( label='Reset', key='reset_files_tools', width='stretch' ):
-					for key in [ 'files_max_calls', 'files_tool_choice', 'files_include',
-					             'files_tools', 'files_domains', 'files_background' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
-					
-					st.rerun( )
+				st.button( label='Reset', key='reset_files_tools', width='stretch',
+					on_click=reset_files_tool_settings )
 			
 			with st.expander( label='Response Settings', icon='↔️', expanded=False,
 					width='stretch' ):

@@ -1958,7 +1958,6 @@ class TTS( Gemini ):
 		try:
 			throw_if( 'text', text )
 			self.prompt_parts = [ ]
-			
 			if instruct is not None and str( instruct ).strip( ):
 				self.prompt_parts.append( str( instruct ).strip( ) )
 			
@@ -1980,8 +1979,7 @@ class TTS( Gemini ):
 			raise exception
 	
 	def create_speech( self, text: str, filepath: str=None,
-		model: str='gemini-3.1-flash-tts-preview', format: str='audio/wav', speed: float=
-		None,
+		model: str='gemini-3.1-flash-tts-preview', format: str='audio/wav', speed: float=None,
 		voice: str=None, frequency: float=None, presense: float=None, max_tokens: int=None,
 		instruct: str=None, temperature: float=None,
 		top_p: float=None ) -> bytes | str | None:
@@ -2029,7 +2027,6 @@ class TTS( Gemini ):
 			self.temperature = temperature
 			self.top_p = top_p
 			self.response_modalities = [ 'AUDIO' ]
-			
 			if self.response_format != 'audio/wav':
 				raise ValueError( 'Gemini TTS wrapper currently supports local WAV output only.' )
 			
@@ -2084,9 +2081,7 @@ class TTS( Gemini ):
 			                    'temperature: float=None, top_p: float=None ) -> bytes | str | '
 			                    'None')
 			Logger( ).write( exception )
-			error = ErrorDialog( exception )
-			error.show( )
-			return None
+			raise exception
 
 class Transcription( Gemini ):
 	"""Transcription class.
@@ -2109,8 +2104,7 @@ class Transcription( Gemini ):
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=
-	0.8,
+	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
 		top_p: float=0.9, frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
 		instruct: str=None ):
 		"""Initialize instance.
@@ -2277,8 +2271,7 @@ class Transcription( Gemini ):
 	def transcribe( self, path: str, model: str='gemini-3-flash-preview', language: str=None,
 		mime_type: str=None, temperature: float=None, top_p: float=None,
 		frequency: float=None, presence: float=None, max_tokens: int=None,
-		start_time: float=None, end_time: float=None, instruct: str=None ) -> Optional[ 
-		str ]:
+		start_time: float=None, end_time: float=None, instruct: str=None ) -> Optional[ str ]:
 		"""Transcribe.
 		
 		Purpose:
@@ -2306,7 +2299,6 @@ class Transcription( Gemini ):
 		"""
 		try:
 			import mimetypes
-			
 			throw_if( 'path', path )
 			self.file_path = path
 			self.model = str( model or self.model or 'gemini-3-flash-preview' ).strip( )
@@ -2321,7 +2313,6 @@ class Transcription( Gemini ):
 				end_time=end_time )
 			
 			self.config_kwargs = { }
-			
 			if self.temperature is not None:
 				self.config_kwargs[ 'temperature' ] = self.temperature
 			
@@ -2346,8 +2337,7 @@ class Transcription( Gemini ):
 			ex.cause = 'Transcription'
 			ex.method = 'transcribe( self, path, model, language ) -> str'
 			Logger( ).write( ex )
-			error = ErrorDialog( ex )
-			error.show( )
+			raise ex
 
 class Translation( Gemini ):
 	"""Translation class.
@@ -2371,8 +2361,7 @@ class Translation( Gemini ):
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=
-	0.8,
+	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
 		top_p: float=0.9, frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
 		instruct: str=None ):
 		"""Initialize instance.
@@ -2609,8 +2598,7 @@ class Translation( Gemini ):
 			ex.cause = 'Translation'
 			ex.method = 'translate( self, path, model, language, source ) -> str'
 			Logger( ).write( ex )
-			error = ErrorDialog( ex )
-			error.show( )
+			raise ex
 
 class Files( Gemini ):
 	"""Files class.
@@ -2870,8 +2858,8 @@ class Files( Gemini ):
 	
 	def list( self, model: str='gemini-3.0-flash', top_p: float=0.8, top_k: int=50,
 		temperature: float=0.5, frequency: float=0.0, presence: float=0.0,
-		max_tokens: int=8192, tool_choice: str='auto', stops: List[ str ] = None,
-		tools: List[ str ] = None, domains: List[ str ] = None, modalities: List[ str ] = None,
+		max_tokens: int=8192, tool_choice: str='auto', stops: List[ str ]=None,
+		tools: List[ str ]=None, domains: List[ str ]=None, modalities: List[ str ]=None,
 		media_resolution: str='media_resolution_medium' ) -> Any | None:
 		"""List.
 		
@@ -2918,12 +2906,10 @@ class Files( Gemini ):
 			self.domains = domains if domains is not None else [ ]
 			self.response_modalities = modalities if modalities is not None else [ ]
 			self.media_resolution = media_resolution
-			
 			self.storage_client = storage.Client( )
 			name = 'jeni-financial'
 			prefix = 'regulations'
 			bucket = self.storage_client.bucket( bucket_name=name )
-			
 			for blob in bucket.list_blobs( prefix=prefix ):
 				self.files.append( blob.name )
 			
@@ -2934,44 +2920,6 @@ class Files( Gemini ):
 			ex.module = 'gemini'
 			ex.cause = 'Files'
 			ex.method = 'list( self ) -> Any | None'
-			Logger( ).write( ex )
-			raise ex
-		
-		"""List storage files legacy branch.
-		
-		Purpose:
-			Documents the legacy, unreachable branch retained inside the file-list workflow. The
-			branch preserves the original source structure and describes the document-oriented
-			storage listing behavior that follows the earlier return statement.
-		
-		Args:
-			prompt (str): Summarization or search instruction retained by the legacy branch.
-			filepath (str): Local document path retained by the legacy branch.
-			model (str): Gemini model identifier retained by the legacy branch.
-		
-		Returns:
-			File names collected from the configured storage prefix.
-		"""
-		try:
-			self.model = model
-			self.top_p = top_p;
-			self.temperature = temperature
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_tokens = max_tokens
-			self.stops = stops
-			self.storage_client = storage.Client( api_key=cfg.GOOGLE_API_KEY )
-			name = "jeni-financial"
-			prefix = "regulations"
-			bucket = self.storage_client.bucket( bucket_name=name )
-			for blob in bucket.list_blobs( prefix=prefix ):
-				self.files.append( blob.name )
-			return self.files
-		except Exception as e:
-			ex = Error( e );
-			ex.module = 'gemini'
-			ex.cause = 'Files'
-			ex.method = 'list_files( self ) -> Optional[ List[ File ] ]'
 			Logger( ).write( ex )
 			raise ex
 	
@@ -3137,7 +3085,7 @@ class Files( Gemini ):
 	
 	def survey( self, prompt: str, filepaths: List[ str ], model: str='gemini-2.0-flash',
 		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ] = None ) -> str | None:
+		presence: float=None, max_tokens: int=None, stops: List[ str ]=None ) -> str | None:
 		"""Survey.
 		
 		Purpose:
@@ -3233,8 +3181,7 @@ class Files( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [
-				types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
