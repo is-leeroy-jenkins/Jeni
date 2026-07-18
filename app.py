@@ -4291,7 +4291,7 @@ if mode == 'Text':
 						st.error( 'Generation Failed!.' )
 		
 		# --------  Reset Button
-		if st.button( 'Clear Messages' ):
+		if st.button( label='Clear Messages', icon='🧹' ):
 			st.session_state.text_messages = [ ]
 			st.session_state.text_gemini_history = [ ]
 			st.session_state.last_answer = ''
@@ -4655,7 +4655,7 @@ elif mode == "Images":
 							st.error( f'Image generation failed: {exc}' )
 			
 			with gen_c2:
-				if st.button( 'Clear Messages', key='clear_image_generation' ):
+				if st.button( label='Clear Messages', key='clear_image_generation', icon='🧹' ):
 					_clear_image_messages( )
 					st.rerun( )
 		
@@ -4714,7 +4714,7 @@ elif mode == "Images":
 							st.error( f'Analysis Failed: {exc}' )
 			
 			with ana_c2:
-				if st.button( 'Clear Messages', key='clear_image_analysis' ):
+				if st.button( label='Clear Messages', key='clear_image_analysis', icon='🧹' ):
 					_clear_image_messages( )
 					st.rerun( )
 		
@@ -6227,7 +6227,8 @@ elif mode == 'Document Q&A':
 		# ------------------------------------------------------------------
 		# Clear Messages
 		# ------------------------------------------------------------------
-		if st.button( label='Clear Messages', key='docqna_clear_messages', width='content' ):
+		if st.button( label='Clear Messages', key='docqna_clear_messages',
+				width='content', icon='🧹' ):
 			st.session_state[ 'docqna_messages' ] = [ ]
 			st.session_state[ 'docqna_context' ] = [ ]
 			st.session_state[ 'last_answer' ] = ''
@@ -6627,7 +6628,7 @@ elif mode == 'Files':
 			st.rerun( )
 		
 		# --------  Reset Button
-		if st.button( 'Clear Messages' ):
+		if st.button( 'Clear Messages', icon='🧹' ):
 			reset_state( )
 			st.rerun( )
 
@@ -6769,12 +6770,21 @@ elif mode == 'Google Cloud Buckets':
 	bucket_background = st.session_state.get( 'bucket_background', None )
 	searcher = None
 	
+	# ------------------------------------------------------------------
+	# Session-State Guards
+	# ------------------------------------------------------------------
+	if not isinstance( st.session_state.get( 'bucket_messages' ), list ):
+		st.session_state[ 'bucket_messages' ] = [ ]
+	
+	# ------------------------------------------------------------------
+	# Clear Bucket Messages
+	# ------------------------------------------------------------------
 	def clear_bucket_messages( ) -> None:
-		"""Clear Google Cloud Buckets conversation history.
+		"""Clear Google Cloud Buckets messages.
 		
 		Purpose:
-		    Removes conversational messages and derived response state without changing the
-		    selected bucket, uploaded objects, model settings, or bucket-management controls.
+		    Removes the Google Cloud Buckets conversation history without changing selected
+		    buckets, uploaded files, or bucket-management state.
 		
 		Returns:
 		    None: This function updates Streamlit session state through side effects.
@@ -6782,8 +6792,6 @@ elif mode == 'Google Cloud Buckets':
 		try:
 			st.session_state[ 'bucket_messages' ] = [ ]
 			st.session_state[ 'bucket_input' ] = [ ]
-			st.session_state[ 'last_answer' ] = ''
-			st.session_state[ 'last_sources' ] = [ ]
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'app'
@@ -6802,44 +6810,53 @@ elif mode == 'Google Cloud Buckets':
 		st.subheader( '🧊 GCP Buckets', help=cfg.VECTORSTORES_API )
 		st.divider( )
 		st.caption( 'Cloud Bucket Management' )
+		
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
+		
 		with stores_left:
 			# --------------------------------------------------------------
 			# Expander - Create File Search Store
 			# --------------------------------------------------------------
 			with st.expander( 'Create:', expanded=True ):
 				new_store_name = st.text_input( 'New Cloud Bucket name' )
+				
 				if st.button( '➕ Create' ):
 					if not new_store_name:
 						st.warning( 'Enter a Cloud Bucket Name.' )
 					else:
 						try:
 							res = searcher.create( new_store_name )
-							created_name = getattr( res, 'name', None ) or new_store_name
-							st.success( f"Created Cloud Bucket: {created_name}" )
+							created_name = (getattr( res, 'name', None ) or new_store_name)
+							
+							st.success( f'Created Cloud Bucket: {created_name}' )
 						except Exception as exc:
 							st.error( f'Create bucket failed: {exc}' )
+			
 			vs_map = getattr( searcher, 'collections', None )
+			
 			# --------------------------------------------------------------
-			# Expander - Retreive Files
+			# Expander - Retrieve Files
 			# --------------------------------------------------------------
 			with st.expander( 'Retreive:', expanded=True ):
 				options = [ ]
+				
 				if vs_map and isinstance( vs_map, dict ):
 					options = list( vs_map.items( ) )
 				
-				# --------------------------------------------------------------
+				# ----------------------------------------------------------
 				# Select / Retrieve / Delete
-				# --------------------------------------------------------------
+				# ----------------------------------------------------------
 				if options:
-					names = [ f'{n} — {i}' for n, i in options ]
+					names = [ f'{name} — {identifier}' for name, identifier in options ]
+					
 					sel = st.selectbox( 'Select Cloud Bucket', options=names,
 						key='select_buckets' )
 					
 					sel_id = ''
-					for n, i in options:
-						if f'{n} — {i}' == sel:
-							sel_id = i
+					
+					for name, identifier in options:
+						if f'{name} — {identifier}' == sel:
+							sel_id = identifier
 							break
 					
 					opt_c1, opt_c2 = st.columns( [ 0.5, 0.5 ] )
@@ -6850,9 +6867,13 @@ elif mode == 'Google Cloud Buckets':
 							else:
 								try:
 									vs = searcher.retrieve( store_id=sel_id )
+									
 									st.write( 'Name:', vs.name )
+									
 									st.write( 'Files:', vs.file_counts )
-									st.write( 'Size (MB):', round( vs.usage_bytes / 1_048_576, 2 ) )
+									
+									st.write( 'Size (MB):', round( vs.usage_bytes / 1_048_576,
+										2 ) )
 								except Exception as exc:
 									st.error( f'retrieve() failed: {exc}' )
 					
@@ -6863,46 +6884,55 @@ elif mode == 'Google Cloud Buckets':
 								st.warning( 'No Cloud Bucket Selected.' )
 							else:
 								try:
-									vs = searcher.delete( store_id=sel_id )
+									searcher.delete( store_id=sel_id )
+									
+									st.success( 'Cloud Bucket deleted.' )
 								except Exception as exc:
 									st.error( f'Delete failed: {exc}' )
-			# --------- Uploader
-			with stores_right:
-				uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
-					type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
+				else:
+					st.info( 'No Cloud Buckets are currently available.' )
+		
+		with stores_right:
+			# --------------------------------------------------------------
+			# Uploader
+			# --------------------------------------------------------------
+			uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
+				type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ],
+				key='bucket_file_uploader' )
+			
+			if uploaded_file:
+				tmp_path = save_temp( uploaded_file )
+				upload_fn = None
 				
-				if uploaded_file:
-					tmp_path = save_temp( uploaded_file )
-					upload_fn = None
-					for name in ('upload_file', 'upload', 'files_upload'):
-						if hasattr( searcher, name ):
-							upload_fn = getattr( searcher, name )
-							break
-					
-					if not upload_fn:
-						st.warning( 'No upload function found on chat object.' )
-					else:
-						with st.spinner( 'Uploading to Files API...' ):
-							try:
-								fid = upload_fn( tmp_path )
-								st.success( f'Uploaded; file id: {fid}' )
-							except Exception as exc:
-								st.error( f"Upload failed: {exc}" )
+				for name in ('upload_file', 'upload', 'files_upload'):
+					if hasattr( searcher, name ):
+						upload_fn = getattr( searcher, name )
+						break
+				
+				if not upload_fn:
+					st.warning( 'No upload function found on CloudBuckets.' )
+				elif not tmp_path:
+					st.warning( 'The uploaded file could not be prepared.' )
+				else:
+					with st.spinner( 'Uploading to Files API...' ):
+						try:
+							fid = upload_fn( tmp_path )
+							st.success( f'Uploaded; file id: {fid}' )
+						except Exception as exc:
+							st.error( f'Upload failed: {exc}' )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		# ------------------------------------------------------------------
-		# Google Cloud Buckets Conversation
+		# Bucket Message History
 		# ------------------------------------------------------------------
-		if not isinstance( st.session_state.get( 'bucket_messages' ), list ):
-			st.session_state[ 'bucket_messages' ] = [ ]
-		
 		for message in st.session_state.get( 'bucket_messages', [ ] ):
 			if not isinstance( message, dict ):
 				continue
 			
-			role = str( message.get( 'role', 'assistant' ) or 'assistant' ).strip( )
+			role = str( message.get( 'role', 'user' ) or 'user' ).strip( )
 			content = str( message.get( 'content', '' ) or '' ).strip( )
+			
 			if not content:
 				continue
 			
@@ -6911,76 +6941,27 @@ elif mode == 'Google Cloud Buckets':
 				st.markdown( content )
 		
 		# ------------------------------------------------------------------
-		# Google Cloud Buckets Chat Input
+		# Bucket Chat Input
 		# ------------------------------------------------------------------
-		bucket_prompt = st.chat_input( 'Ask a question about the selected Google Cloud bucket …',
+		bucket_prompt = st.chat_input( 'Enter a Google Cloud Buckets request …',
 			key='bucket_chat_input' )
 		
 		if bucket_prompt is not None and str( bucket_prompt ).strip( ):
 			bucket_prompt = str( bucket_prompt ).strip( )
-			selected_bucket_id = str( st.session_state.get( 'bucket_id', '' ) or '' ).strip( )
-			selected_bucket_model = str( st.session_state.get( 'bucket_model', '' ) or '' ).strip( )
-			st.session_state[ 'bucket_messages' ].append( { 'role': 'user', 'content': bucket_prompt, } )
-			with st.chat_message( 'assistant', avatar=cfg.JENI ):
-				with st.spinner( 'Searching Google Cloud bucket…' ):
-					try:
-						if not selected_bucket_id:
-							raise ValueError(
-								'Select a Google Cloud bucket before submitting a question.' )
-						
-						if not selected_bucket_model:
-							raise ValueError(
-								'Select a model before submitting a bucket question.' )
-						
-						apply_gemini_runtime_config( )
-						bucket_context = st.session_state.get( 'bucket_messages', [ ] )[ :-1 ]
-						response = bucket.generate( prompt=bucket_prompt,
-							model=selected_bucket_model, bucket_id=selected_bucket_id,
-							temperature=st.session_state.get( 'bucket_temperature' ),
-							top_p=st.session_state.get( 'bucket_top_percent' ),
-							frequency=st.session_state.get( 'bucket_frequency_penalty' ),
-							presence=st.session_state.get( 'bucket_presence_penalty' ),
-							max_tokens=st.session_state.get( 'bucket_max_tokens' ),
-							response_format=st.session_state.get( 'bucket_response_format' ),
-							tool_choice=st.session_state.get( 'bucket_tool_choice' ),
-							reasoning=st.session_state.get( 'bucket_reasoning' ),
-							tools=st.session_state.get( 'bucket_tools', [ ] ),
-							stops=st.session_state.get( 'bucket_stops', [ ] ),
-							include=st.session_state.get( 'bucket_include', [ ] ),
-							context=bucket_context,
-							stream=st.session_state.get( 'bucket_stream', False ) )
-						
-						if response is None or not str( response ).strip( ):
-							raise ValueError(
-								'The Google Cloud bucket request returned an empty response.' )
-						
-						response_text = str( response ).strip( )
-						st.markdown( response_text )
-						st.session_state[ 'bucket_messages' ].append(
-							{ 'role': 'assistant', 'content': response_text, } )
-						
-						st.session_state[ 'last_answer' ] = response_text
-						
-						try:
-							update_counters( getattr( bucket, 'response', None ) )
-						except Exception:
-							pass
-					
-					except Exception as e:
-						exception = Error( e )
-						exception.module = 'app'
-						exception.cause = 'Google Cloud Buckets'
-						exception.method = ('Google Cloud Buckets chat execution')
-						Logger( ).write( exception )
-						st.error( f'Google Cloud bucket query failed: {exception.info}' )
+			
+			st.session_state[ 'bucket_messages' ].append(
+				{ 'role': 'user', 'content': bucket_prompt, } )
+			
+			st.session_state[ 'bucket_input' ] = [ { 'role': 'user', 'content': bucket_prompt, } ]
+			
+			st.rerun( )
 		
 		# ------------------------------------------------------------------
 		# Clear Messages
 		# ------------------------------------------------------------------
-		if st.button( label='Clear Messages', key='bucket_clear_messages', width='content',
-				on_click=clear_bucket_messages ):
-			st.rerun( )
-			
+		st.button( label='Clear Messages', key='bucket_clear_messages', width='content',
+			on_click=clear_bucket_messages, icon = '🧹' )
+
 # ======================================================================================
 # PROMPT ENGINEERING MODE
 # ======================================================================================
@@ -7042,7 +7023,6 @@ elif mode == 'Prompt Engineering':
 		# Filters
 		# ------------------------------------------------------------------
 		c1, c2, c3, c4 = st.columns( [ 4, 2, 2, 3 ] )
-		
 		with c1:
 			st.text_input( 'Search (Name/Text contains)', key='pe_search' )
 		
