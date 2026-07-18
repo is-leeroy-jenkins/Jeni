@@ -4371,6 +4371,7 @@ elif mode == "Images":
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
+			# ------- LLM Settings ------------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4 = st.columns(
 					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
@@ -4416,6 +4417,7 @@ elif mode == "Images":
 							del st.session_state[ key ]
 					st.rerun( )
 			
+			# ------- Response Settings ------------
 			with st.expander( label='Response Settings', icon='↔️', expanded=False,
 					width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4 = st.columns(
@@ -4469,6 +4471,7 @@ elif mode == "Images":
 							del st.session_state[ key ]
 					st.rerun( )
 			
+			# ------- Visual Settings ------------
 			with st.expander( label='Visual Settings', icon='👁️', expanded=False,
 					width='stretch' ):
 				img_c1, img_c2, img_c3, img_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
@@ -4608,6 +4611,7 @@ elif mode == "Images":
 					pass
 				pass
 		
+		# ------- Image Generation ------------
 		tab_gen, tab_analyze, tab_edit = st.tabs( [ 'Generate', 'Analyze', 'Edit' ] )
 		with tab_gen:
 			if st.session_state.get( 'image_input' ) is not None:
@@ -4655,6 +4659,7 @@ elif mode == "Images":
 					_clear_image_messages( )
 					st.rerun( )
 		
+		# ------- Image Analysis ------------
 		with tab_analyze:
 			uploaded_img = st.file_uploader( 'Upload an image for analysis',
 				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
@@ -4713,6 +4718,7 @@ elif mode == "Images":
 					_clear_image_messages( )
 					st.rerun( )
 		
+		# ------- Image Editing ------------
 		with tab_edit:
 			uploaded_img = st.file_uploader( 'Upload Image for Edit',
 				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
@@ -5090,9 +5096,8 @@ elif mode == 'Audio':
 		# Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			# ------------------------------------------------------------------
-			# LLM Settings
-			# ------------------------------------------------------------------
+			
+			# -------- LLM Settings ---------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				aud_c1, aud_c2, aud_c3, aud_c4, aud_c5 = st.columns( [ 0.2, 0.2, 0.2, 0.2, 0.2 ],
 					gap='xxsmall', border=True )
@@ -5163,11 +5168,8 @@ elif mode == 'Audio':
 				st.button( label='Reset', key='audio_model_reset', width='stretch',
 					on_click=reset_audio_model_settings )
 			
-			# ------------------------------------------------------------------
-			# Inference Settings
-			# ------------------------------------------------------------------
-			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
-					width='stretch' ):
+			# -------- Inference Settings --------
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
 					border=True, gap='medium' )
 				
@@ -5192,11 +5194,8 @@ elif mode == 'Audio':
 				st.button( label='Reset', key='audio_inference_reset', width='stretch',
 					on_click=reset_audio_inference_settings )
 			
-			# ------------------------------------------------------------------
-			# Response Settings
-			# ------------------------------------------------------------------
-			with st.expander( label='Response Settings', icon='↔️', expanded=False,
-					width='stretch' ):
+			# -------- Response Settings --------
+			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], gap='xxsmall', border=True )
 				
@@ -5304,89 +5303,6 @@ elif mode == 'Audio':
 					on_click=convert_audio_system_instructions )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
-		
-		# ------------------------------------------------------------------
-		# Audio Conversation History
-		# ------------------------------------------------------------------
-		for message in st.session_state.get( 'audio_messages', [ ] ):
-			if not isinstance( message, dict ):
-				continue
-			
-			message_role = str( message.get( 'role', 'assistant' ) or 'assistant' ).strip( )
-			message_content = str( message.get( 'content', '' ) or '' ).strip( )
-			if not message_content:
-				continue
-			
-			message_avatar = cfg.JENI if message_role == 'assistant' else ''
-			with st.chat_message( message_role, avatar=message_avatar ):
-				st.markdown( message_content )
-		
-		# ------------------------------------------------------------------
-		# Audio Chat Input
-		# ------------------------------------------------------------------
-		if audio_task == 'Text-to-Speech':
-			audio_chat_placeholder = 'Enter text to synthesize …'
-		elif audio_task == 'Transcribe':
-			audio_chat_placeholder = 'Enter optional transcription instructions …'
-		elif audio_task == 'Translate':
-			audio_chat_placeholder = 'Enter optional translation instructions …'
-		else:
-			audio_chat_placeholder = 'Select an Audio Mode, then enter a request …'
-		
-		audio_prompt = st.chat_input( audio_chat_placeholder, key='audio_chat_input' )
-		if audio_prompt is not None and str( audio_prompt ).strip( ):
-			audio_prompt = str( audio_prompt ).strip( )
-			append_audio_message( role='user', content=audio_prompt )
-			st.session_state[ 'audio_input' ] = audio_prompt
-			if audio_task == 'Text-to-Speech':
-				with st.chat_message( 'assistant', avatar=cfg.JENI ):
-					with st.spinner( 'Synthesizing speech…' ):
-						try:
-							apply_gemini_runtime_config( )
-							audio_bytes = run_text_to_speech( audio_prompt )
-							
-							if audio_bytes is None:
-								raise ValueError(
-									'The text-to-speech model returned no audio output.' )
-							
-							st.session_state[ 'audio_output_bytes' ] = audio_bytes
-							st.session_state[ 'audio_output' ] = ''
-							st.audio( audio_bytes, format='audio/wav',
-								loop=bool( st.session_state.get( 'audio_loop', False ) ),
-								autoplay=bool( st.session_state.get( 'audio_autoplay', False ) ) )
-							
-							response_message = (
-								'The requested speech audio was generated successfully.')
-							
-							st.markdown( response_message )
-							append_audio_message( role='assistant', content=response_message )
-							
-							try:
-								update_counters( getattr( tts, 'response', None ) )
-							except Exception:
-								pass
-						
-						except Exception as e:
-							st.error( f'Text-to-speech failed: {e}' )
-			
-			elif audio_task in ('Transcribe', 'Translate'):
-				st.session_state[ 'audio_chat_instruction' ] = audio_prompt
-				response_message = (f'The instruction was saved for the next '
-				                    f'{audio_task.lower( )} '
-				                    'request. Upload or record audio and run the selected task.')
-				
-				append_audio_message( role='assistant', content=response_message )
-				st.rerun( )
-			
-			else:
-				response_message = (
-					'Select Transcribe, Translate, or Text-to-Speech before submitting '
-					'an audio request.')
-				
-				append_audio_message( role='assistant', content=response_message )
-				st.rerun( )
-		
-		st.divider( )
 		
 		# ------------------------------------------------------------------
 		# Audio Workspace
@@ -5515,7 +5431,6 @@ elif mode == 'Audio':
 									raise ValueError( 'The recorded audio could not be prepared.' )
 								
 								result = run_audio_task( record_path )
-								
 								if result is None or not str( result ).strip( ):
 									raise ValueError(
 										f'The {audio_task.lower( )} model returned no output.' )
@@ -5528,7 +5443,6 @@ elif mode == 'Audio':
 									content=f'{audio_task} the recorded audio.' )
 								
 								append_audio_message( role='assistant', content=result_text )
-								
 								st.text_area( label=f'Recorded {audio_task}', value=result_text,
 									height=220, disabled=True,
 									key=f'audio_recorded_result_{audio_task}' )
@@ -5584,7 +5498,89 @@ elif mode == 'Audio':
 				else:
 					st.info( 'No audio output is currently available.' )
 		
-		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		st.divider( )
+		
+		# ------------------------------------------------------------------
+		# Audio Conversation History
+		# ------------------------------------------------------------------
+		for message in st.session_state.get( 'audio_messages', [ ] ):
+			if not isinstance( message, dict ):
+				continue
+			
+			message_role = str( message.get( 'role', 'assistant' ) or 'assistant' ).strip( )
+			message_content = str( message.get( 'content', '' ) or '' ).strip( )
+			if not message_content:
+				continue
+			
+			message_avatar = cfg.JENI if message_role == 'assistant' else ''
+			with st.chat_message( message_role, avatar=message_avatar ):
+				st.markdown( message_content )
+		
+		# ------------------------------------------------------------------
+		# Audio Chat Input
+		# ------------------------------------------------------------------
+		if audio_task == 'Text-to-Speech':
+			audio_chat_placeholder = 'Enter text to synthesize …'
+		elif audio_task == 'Transcribe':
+			audio_chat_placeholder = 'Enter optional transcription instructions …'
+		elif audio_task == 'Translate':
+			audio_chat_placeholder = 'Enter optional translation instructions …'
+		else:
+			audio_chat_placeholder = 'Select an Audio Mode, then enter a request …'
+		
+		audio_prompt = st.chat_input( audio_chat_placeholder, key='audio_chat_input' )
+		if audio_prompt is not None and str( audio_prompt ).strip( ):
+			audio_prompt = str( audio_prompt ).strip( )
+			append_audio_message( role='user', content=audio_prompt )
+			st.session_state[ 'audio_input' ] = audio_prompt
+			if audio_task == 'Text-to-Speech':
+				with st.chat_message( 'assistant', avatar=cfg.JENI ):
+					with st.spinner( 'Synthesizing speech…' ):
+						try:
+							apply_gemini_runtime_config( )
+							audio_bytes = run_text_to_speech( audio_prompt )
+							
+							if audio_bytes is None:
+								raise ValueError(
+									'The text-to-speech model returned no audio output.' )
+							
+							st.session_state[ 'audio_output_bytes' ] = audio_bytes
+							st.session_state[ 'audio_output' ] = ''
+							st.audio( audio_bytes, format='audio/wav',
+								loop=bool( st.session_state.get( 'audio_loop', False ) ),
+								autoplay=bool( st.session_state.get( 'audio_autoplay', False ) ) )
+							
+							response_message = (
+								'The requested speech audio was generated successfully.')
+							
+							st.markdown( response_message )
+							append_audio_message( role='assistant', content=response_message )
+							
+							try:
+								update_counters( getattr( tts, 'response', None ) )
+							except Exception:
+								pass
+						
+						except Exception as e:
+							st.error( f'Text-to-speech failed: {e}' )
+			
+			elif audio_task in ('Transcribe', 'Translate'):
+				st.session_state[ 'audio_chat_instruction' ] = audio_prompt
+				response_message = (f'The instruction was saved for the next '
+				                    f'{audio_task.lower( )} '
+				                    'request. Upload or record audio and run the selected task.')
+				
+				append_audio_message( role='assistant', content=response_message )
+				st.rerun( )
+			
+			else:
+				response_message = (
+					'Select Transcribe, Translate, or Text-to-Speech before submitting '
+					'an audio request.')
+				
+				append_audio_message( role='assistant', content=response_message )
+				st.rerun( )
+		
 		
 		# ------------------------------------------------------------------
 		# Conversation and Output Controls
