@@ -189,7 +189,7 @@ DB_PATH = r'stores/sqlite/datamodels/Data.db'
 BASE_DIR = Path( __file__ ).resolve( ).parent
 FAVICON = r'resources/images/favicon.ico'
 LOGO_PATH = r'resources/images/jeni_logo.png'
-BLUE_DIVIDER = "<div style='height:2px;align:left;background:#0078FC;margin:6px 0 10px 0;'></div>"
+BLUE_DIVIDER = "<div style='height:2px;align:left;background:#0078FC;margin:30px 0 30px 0;'></div>"
 APP_TITLE = 'Jeni'
 APP_SUBTITLE = "Multi-Modal AI based on Google's Gemini API"
 OPEN_TAG = re.compile( r'<([A-Za-z0-9_\-:.]+)>' )
