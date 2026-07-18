@@ -6176,14 +6176,62 @@ elif mode == 'Document Q&A':
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
-		for msg in st.session_state.docqna_messages:
-			with st.chat_message( msg[ 'role' ] ):
-				st.markdown( msg[ 'content' ] )
+		# ------------------------------------------------------------------
+		# Document Q&A Conversation
+		# ------------------------------------------------------------------
+		for msg in st.session_state.get( 'docqna_messages', [ ] ):
+			if not isinstance( msg, dict ):
+				continue
+			
+			role = str( msg.get( 'role', 'assistant' ) or 'assistant' ).strip( )
+			content = str( msg.get( 'content', '' ) or '' ).strip( )
+			if not content:
+				continue
+			
+			avatar = cfg.JENI if role == 'assistant' else ''
+			with st.chat_message( role, avatar=avatar ):
+				st.markdown( content )
 		
-		if prompt := st.chat_input( 'Ask a question about the document' ):
-			st.session_state.docqna_messages.append( { 'role': 'user', 'content': prompt } )
-			response = route_document_query( prompt )
-			st.session_state.docqna_messages.append( { 'role': 'assistant', 'content': response } )
+		# ------------------------------------------------------------------
+		# Document Q&A Input
+		# ------------------------------------------------------------------
+		prompt = st.chat_input( 'Ask a question about the document', key='docqna_chat_input' )
+		
+		if prompt is not None and str( prompt ).strip( ):
+			prompt = str( prompt ).strip( )
+			st.session_state[ 'docqna_messages' ].append( { 'role': 'user', 'content': prompt, } )
+			with st.chat_message( 'assistant', avatar=cfg.JENI ):
+				with st.spinner( 'Reviewing document…' ):
+					try:
+						response = route_document_query( prompt )
+						if response is None or not str( response ).strip( ):
+							raise ValueError(
+								'The Document Q&A request returned an empty response.' )
+						
+						response_text = str( response ).strip( )
+						st.markdown( response_text )
+						
+						st.session_state[ 'docqna_messages' ].append(
+							{ 'role': 'assistant', 'content': response_text, } )
+						
+						st.session_state[ 'last_answer' ] = response_text
+					
+					except Exception as e:
+						exception = Error( e )
+						exception.module = 'app'
+						exception.cause = 'Document Q&A'
+						exception.method = ('Document Q&A chat execution')
+						Logger( ).write( exception )
+						st.error( f'Document Q&A failed: {exception.info}' )
+		
+		# ------------------------------------------------------------------
+		# Clear Messages
+		# ------------------------------------------------------------------
+		if st.button( label='Clear Messages', key='docqna_clear_messages', width='content' ):
+			st.session_state[ 'docqna_messages' ] = [ ]
+			st.session_state[ 'docqna_context' ] = [ ]
+			st.session_state[ 'last_answer' ] = ''
+			st.session_state[ 'last_sources' ] = [ ]
 			st.rerun( )
 
 # ======================================================================================
@@ -6721,6 +6769,29 @@ elif mode == 'Google Cloud Buckets':
 	bucket_background = st.session_state.get( 'bucket_background', None )
 	searcher = None
 	
+	def clear_bucket_messages( ) -> None:
+		"""Clear Google Cloud Buckets conversation history.
+		
+		Purpose:
+		    Removes conversational messages and derived response state without changing the
+		    selected bucket, uploaded objects, model settings, or bucket-management controls.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			st.session_state[ 'bucket_messages' ] = [ ]
+			st.session_state[ 'bucket_input' ] = [ ]
+			st.session_state[ 'last_answer' ] = ''
+			st.session_state[ 'last_sources' ] = [ ]
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'clear_bucket_messages'
+			exception.method = 'clear_bucket_messages( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
 	# ------------------------------------------------------------------
 	# Main Chat UI
 	# ------------------------------------------------------------------
@@ -6817,7 +6888,99 @@ elif mode == 'Google Cloud Buckets':
 								st.success( f'Uploaded; file id: {fid}' )
 							except Exception as exc:
 								st.error( f"Upload failed: {exc}" )
-
+		
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ------------------------------------------------------------------
+		# Google Cloud Buckets Conversation
+		# ------------------------------------------------------------------
+		if not isinstance( st.session_state.get( 'bucket_messages' ), list ):
+			st.session_state[ 'bucket_messages' ] = [ ]
+		
+		for message in st.session_state.get( 'bucket_messages', [ ] ):
+			if not isinstance( message, dict ):
+				continue
+			
+			role = str( message.get( 'role', 'assistant' ) or 'assistant' ).strip( )
+			content = str( message.get( 'content', '' ) or '' ).strip( )
+			if not content:
+				continue
+			
+			avatar = cfg.JENI if role == 'assistant' else ''
+			with st.chat_message( role, avatar=avatar ):
+				st.markdown( content )
+		
+		# ------------------------------------------------------------------
+		# Google Cloud Buckets Chat Input
+		# ------------------------------------------------------------------
+		bucket_prompt = st.chat_input( 'Ask a question about the selected Google Cloud bucket …',
+			key='bucket_chat_input' )
+		
+		if bucket_prompt is not None and str( bucket_prompt ).strip( ):
+			bucket_prompt = str( bucket_prompt ).strip( )
+			selected_bucket_id = str( st.session_state.get( 'bucket_id', '' ) or '' ).strip( )
+			selected_bucket_model = str( st.session_state.get( 'bucket_model', '' ) or '' ).strip( )
+			st.session_state[ 'bucket_messages' ].append( { 'role': 'user', 'content': bucket_prompt, } )
+			with st.chat_message( 'assistant', avatar=cfg.JENI ):
+				with st.spinner( 'Searching Google Cloud bucket…' ):
+					try:
+						if not selected_bucket_id:
+							raise ValueError(
+								'Select a Google Cloud bucket before submitting a question.' )
+						
+						if not selected_bucket_model:
+							raise ValueError(
+								'Select a model before submitting a bucket question.' )
+						
+						apply_gemini_runtime_config( )
+						bucket_context = st.session_state.get( 'bucket_messages', [ ] )[ :-1 ]
+						response = bucket.generate( prompt=bucket_prompt,
+							model=selected_bucket_model, bucket_id=selected_bucket_id,
+							temperature=st.session_state.get( 'bucket_temperature' ),
+							top_p=st.session_state.get( 'bucket_top_percent' ),
+							frequency=st.session_state.get( 'bucket_frequency_penalty' ),
+							presence=st.session_state.get( 'bucket_presence_penalty' ),
+							max_tokens=st.session_state.get( 'bucket_max_tokens' ),
+							response_format=st.session_state.get( 'bucket_response_format' ),
+							tool_choice=st.session_state.get( 'bucket_tool_choice' ),
+							reasoning=st.session_state.get( 'bucket_reasoning' ),
+							tools=st.session_state.get( 'bucket_tools', [ ] ),
+							stops=st.session_state.get( 'bucket_stops', [ ] ),
+							include=st.session_state.get( 'bucket_include', [ ] ),
+							context=bucket_context,
+							stream=st.session_state.get( 'bucket_stream', False ) )
+						
+						if response is None or not str( response ).strip( ):
+							raise ValueError(
+								'The Google Cloud bucket request returned an empty response.' )
+						
+						response_text = str( response ).strip( )
+						st.markdown( response_text )
+						st.session_state[ 'bucket_messages' ].append(
+							{ 'role': 'assistant', 'content': response_text, } )
+						
+						st.session_state[ 'last_answer' ] = response_text
+						
+						try:
+							update_counters( getattr( bucket, 'response', None ) )
+						except Exception:
+							pass
+					
+					except Exception as e:
+						exception = Error( e )
+						exception.module = 'app'
+						exception.cause = 'Google Cloud Buckets'
+						exception.method = ('Google Cloud Buckets chat execution')
+						Logger( ).write( exception )
+						st.error( f'Google Cloud bucket query failed: {exception.info}' )
+		
+		# ------------------------------------------------------------------
+		# Clear Messages
+		# ------------------------------------------------------------------
+		if st.button( label='Clear Messages', key='bucket_clear_messages', width='stretch',
+				on_click=clear_bucket_messages ):
+			st.rerun( )
+			
 # ======================================================================================
 # PROMPT ENGINEERING MODE
 # ======================================================================================
