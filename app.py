@@ -6977,7 +6977,7 @@ elif mode == 'Google Cloud Buckets':
 		# ------------------------------------------------------------------
 		# Clear Messages
 		# ------------------------------------------------------------------
-		if st.button( label='Clear Messages', key='bucket_clear_messages', width='stretch',
+		if st.button( label='Clear Messages', key='bucket_clear_messages', width='content',
 				on_click=clear_bucket_messages ):
 			st.rerun( )
 			
