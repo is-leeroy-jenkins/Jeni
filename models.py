@@ -1,14 +1,14 @@
 '''
   ******************************************************************************************
       Assembly:                Jeni
-      Filename:                llm.py
+      Filename:                models.py
       Author:                  Terry D. Eppler
       Created:                 05-31-2022
 
       Last Modified By:        Terry D. Eppler
       Last Modified On:        05-01-2025
   ******************************************************************************************
-  <copyright file="llm.py" company="Terry D. Eppler">
+  <copyright file="models.py" company="Terry D. Eppler">
 
 	     Jeni is a df analysis tool integrating various Generative GPT, GptText-Processing, and
 	     Machine-Learning algorithms for federal analysts.
@@ -38,10 +38,10 @@
 
   </copyright>
   <summary>
-    llm.py
+    models.py
   </summary>
   ******************************************************************************************
-  '''
+'''
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -49,7 +49,35 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 
-class Prompt( BaseModel ):
+class Message( ):
+	'''
+
+		Purpose:
+		--------
+		Represents a structured “Message” or instruction bundle used to interact with an LLM.
+		This model is intended to capture the canonical components you pass into Jeni when you
+		want to track prompts as first-class objects (versioning, variables, and provenance).
+
+		Attributes:
+		----------
+		content: Optional[ str ]
+			Optional background context provided to the model (policies, references, etc.).
+
+		role Optional[ str ]
+			Optional a role associated with the content.
+
+	'''
+	role: Optional[ str ]
+	content: Optional[ str ]
+
+	def __init__( self, content: str, role: str ):
+		self.role = role
+		self.content = content
+
+	def __dir__( self ) -> List[ str ]:
+		return [ 'role', 'content' ]
+	
+class System( Message ):
 	'''
 
 		Purpose:
@@ -60,120 +88,85 @@ class Prompt( BaseModel ):
 
 		Attributes:
 		----------
-		instructions: Optional[ str ]
-			The primary instruction block (typically the system message content).
-
-		context: Optional[ str ]
+		content: Optional[ str ]
 			Optional background context provided to the model (policies, references, etc.).
 
-		output_indicator: Optional[ str ]
-			A short indicator describing the desired output style/format (e.g., "json", "table").
-
-		input_data: Optional[ str ]
-			Optional data payload embedded into the prompt (small inputs, examples, etc.).
-
-		id: Optional[ str ]
-			Optional identifier for tracking prompts (e.g., GUID, hash, or friendly name).
-
-		version: Optional[ str ]
-			Optional version string for prompt management and experimentation.
-
-		format: Optional[ str ]
-			Optional format label describing the prompt template type (e.g., "chat", "completion").
-
-		variables: Optional[ List[ str ] ]
-			Optional list of placeholder variables referenced by the prompt template.
-
-		question: Optional[ str ]
-			Optional question or user query associated with the prompt.
+		role: Optional[ str ]
+			Optional role associated with the message.
 
 	'''
-	instructions: Optional[ str ] = None
-	context: Optional[ str ] = None
-	output_indicator: Optional[ str ] = None
-	input_data: Optional[ str ] = None
-	id: Optional[ str ] = None
-	version: Optional[ str ] = None
-	format: Optional[ str ] = None
-	variables: Optional[ List[ str ] ] = None
-	question: Optional[ str ] = None
+	
+	def __init__(self, content: str, role: str='system' ):
+		super( ).__init__( content, role )
 
-	class Config:
-		arbitrary_types_allowed = True
-		extra = 'ignore'
+	def __dir__( self ) -> List[ str ]:
+		return [ 'role', 'content' ]
+	
 
-
-class Text( BaseModel ):
+class User( Message ):
 	'''
 
 		Purpose:
 		--------
-		Represents a simple text-bearing payload used in structured output. In OpenAI-style
-		responses, text can appear as a typed object rather than a raw string. Jeni uses this
-		model to normalize "text output" as a consistent shape.
+		Represents a structured “system prompt” or instruction bundle used to steer an LLM call.
+		This model is intended to capture the canonical components you pass into Jeni when you
+		want to track prompts as first-class objects (versioning, variables, and provenance).
 
 		Attributes:
 		----------
-		type: Optional[ str ]
-			Type discriminator when provided by the upstream API (commonly "text").
+		content: Optional[ str ]
+			Optional background context provided to the model (policies, references, etc.).
 
-		value: Optional[ str ]
-			The text content.
-
+		role: Optional[ str ]
+			Optional role associated with the message.
 	'''
-	type: Optional[ str ] = None
-	value: Optional[ str ] = None
+	
+	def __init__(self, content: str, role: str='user' ):
+		super( ).__init__( content, role )
 
-	class Config:
-		arbitrary_types_allowed = True
-		extra = 'ignore'
+	def __dir__( self ) -> List[ str ]:
+		return [ 'role', 'content' ]
+	
 
-
-class File( BaseModel ):
+class Prompt(  ):
 	'''
 
 		Purpose:
 		--------
-		Represents a file-like object returned by an API (uploaded artifacts, generated files,
-		or tool outputs). This is intentionally permissive: Jeni only needs the common metadata.
+		Represents a structured “system prompt” or instruction bundle used to steer an LLM call.
+		This model is intended to capture the canonical components you pass into Jeni when you
+		want to track prompts as first-class objects (versioning, variables, and provenance).
 
 		Attributes:
 		----------
-		filename: Optional[ str ]
-			The original or assigned filename.
+		content: Optional[ str ]
+			Optional background context provided to the model (policies, references, etc.).
 
-		bytes: Optional[ int ]
-			The size of the file in bytes, if provided.
-
-		created_at: Optional[ int ]
-			Unix timestamp of creation (seconds), if provided.
-
-		expires_at: Optional[ int ]
-			Unix timestamp when the file expires, if the upstream supports expiring artifacts.
-
-		id: Optional[ str ]
-			Unique file identifier in the upstream system.
-
-		object: Optional[ str ]
-			Object discriminator from the upstream API (e.g., "file").
-
-		purpose: Optional[ str ]
-			Intended purpose for the file in the upstream system (e.g., "assistants", "fine-tune").
-
+		role: Optional[ str ]
+			Optional role associated with the message.
 	'''
-	filename: Optional[ str ] = None
-	bytes: Optional[ int ] = None
-	created_at: Optional[ int ] = None
-	expires_at: Optional[ int ] = None
-	id: Optional[ str ] = None
-	object: Optional[ str ] = None
-	purpose: Optional[ str ] = None
+	system: Optional[ System ] = None
+	user: Optional[ User ] = None
+	
+	def __init__( self, sys: System, user: User ):
+		self.system = sys
+		self.user = user
 
-	class Config:
-		arbitrary_types_allowed = True
-		extra = 'ignore'
+	def __dir__( self ) -> List[ str ]:
+		return [ 'role', 'content' ]
+	
+	def build( self ) -> Dict[ str, str ]:
+		'''
 
+		Purpose:
+		--------
+		Method to creates a system/user prompt from Message objects
 
+		Return:
+			str - Optional background context provided to the model (policies, references, etc.).
+		
+		'''
+		
 class Error( BaseModel ):
 	'''
 
@@ -413,7 +406,7 @@ class ResponseFormat( BaseModel ):
 			JSON object format directive.
 
 	'''
-	text: Optional[ Text ] = None
+	text: Optional[ str ] = None
 	json_schema: Optional[ JsonSchema ] = None
 	json_object: Optional[ JsonObject ] = None
 
@@ -847,171 +840,6 @@ class SkyCoordinates( BaseModel ):
 	type: Optional[ str ] = None
 	declination: Optional[ float ] = None
 	right_ascension: Optional[ float ] = None
-
-	class Config:
-		arbitrary_types_allowed = True
-		extra = 'ignore'
-
-
-class Response( BaseModel ):
-	'''
-
-		Purpose:
-		--------
-		Represents a general-purpose “OpenAI-style” response envelope suitable for Jeni’s
-		structured output handling. This model intentionally supports both request parameters
-		(as echoed back) and response payload fields, while remaining permissive to vendor
-		evolution via `extra='ignore'`.
-
-		Attributes:
-		----------
-		id: Optional[ str ]
-			Response identifier produced by the upstream API.
-
-		object: Optional[ str ]
-			Object discriminator (e.g., "response"). Kept as string for typical API payloads.
-
-		created: Optional[ int ]
-			Unix timestamp (seconds) when the response was created.
-
-		model: Optional[ str ]
-			Model identifier used to produce the response.
-
-		status: Optional[ str ]
-			Status indicator (e.g., "completed", "in_progress", "failed") when provided.
-
-		error: Optional[ Error ]
-			Error details when the response failed.
-
-		input: Optional[ List[ Dict[ str, Any ] ] ]
-			The input items or messages sent to the upstream API, when returned/recorded.
-
-		output: Optional[ List[ Dict[ str, Any ] ] ]
-			The output items returned by the upstream API (messages, tool calls, etc.).
-			Kept generic because output item schemas can vary by provider and feature set.
-
-		usage: Optional[ Dict[ str, Any ] ]
-			Token usage or billing-related metadata when provided.
-
-		metadata: Optional[ Dict[ str, Any ] ]
-			Arbitrary metadata bag for Jeni or vendor-provided fields.
-
-		previous_response_id: Optional[ str ]
-			Identifier of the previous response in a conversation chain, if applicable.
-
-		reasoning: Optional[ Reasoning ]
-			Reasoning configuration/summary when supported.
-
-		response_format: Optional[ ResponseFormat ]
-			The response format settings used or returned by the upstream system.
-
-		temperature: Optional[ float ]
-			Sampling temperature used for generation.
-
-		top_p: Optional[ float ]
-			Nucleus sampling parameter.
-
-		max_output_tokens: Optional[ int ]
-			Max output tokens cap.
-
-		store: Optional[ bool ]
-			Whether the upstream should store the response (provider-specific).
-
-		stream: Optional[ bool ]
-			Whether streaming was requested.
-
-		parallel_tool_calls: Optional[ bool ]
-			Whether parallel tool calls were enabled.
-
-		tool_choice: Optional[ Any ]
-			Tool choice directive (string or structured object, depending on API).
-
-		tools: Optional[ List[ Function ] ]
-			Tool definitions available for tool calling.
-
-		instructions: Optional[ str ]
-			System instructions echoed or stored with the response.
-
-		include: Optional[ List[ str ] ]
-			Optional include directives (fields to expand/include in responses).
-
-		truncation: Optional[ str ]
-			Truncation strategy label when supported by the upstream.
-
-		role: Optional[ str ]
-			High-level role label if the provider surfaces it at the envelope level.
-
-		text: Optional[ Text ]
-			Convenience field used by Jeni when a response is reducible to a simple text object.
-
-		data: Optional[ Dict[ str, Any ] ]
-			Generic structured data payload when a tool/model emits a single JSON object.
-
-	'''
-	id: Optional[ str ] = None
-	object: Optional[ str ] = None
-	created: Optional[ int ] = None
-	model: Optional[ str ] = None
-	status: Optional[ str ] = None
-	error: Optional[ Error ] = None
-
-	input: Optional[ List[ Dict[ str, Any ] ] ] = None
-	output: Optional[ List[ Dict[ str, Any ] ] ] = None
-	usage: Optional[ Dict[ str, Any ] ] = None
-	metadata: Optional[ Dict[ str, Any ] ] = None
-
-	previous_response_id: Optional[ str ] = None
-	reasoning: Optional[ Reasoning ] = None
-	response_format: Optional[ ResponseFormat ] = None
-
-	temperature: Optional[ float ] = None
-	top_p: Optional[ float ] = None
-	max_output_tokens: Optional[ int ] = None
-
-	store: Optional[ bool ] = None
-	stream: Optional[ bool ] = None
-	parallel_tool_calls: Optional[ bool ] = None
-
-	tool_choice: Optional[ Any ] = None
-	tools: Optional[ List[ Function ] ] = None
-
-	instructions: Optional[ str ] = None
-	include: Optional[ List[ str ] ] = None
-	truncation: Optional[ str ] = None
-	role: Optional[ str ] = None
-
-	text: Optional[ Text ] = None
-	data: Optional[ Dict[ str, Any ] ] = None
-
-	class Config:
-		arbitrary_types_allowed = True
-		extra = 'ignore'
-
-class FunctionCall( BaseModel ):
-	'''
-		
-		Purpose:
-		--------
-		Class to model function calll schema
-		
-	'''
-	name: Optional[ str ]
-	args: Optional[ List[ Dict[ str, Any ] ] ]
-
-	class Config:
-		arbitrary_types_allowed = True
-		extra = 'ignore'
-
-class FunctionReponse( BaseModel ):
-	'''
-		
-		Purpose:
-		--------
-		Class to model function response schema
-		
-	'''
-	name: Optional[ str ]
-	response: Optional[ Response ]
 
 	class Config:
 		arbitrary_types_allowed = True

@@ -234,8 +234,17 @@ if 'audio_system_instructions' not in st.session_state:
 	st.session_state[ 'audio_system_instructions' ] = ''
 
 if 'docqna_system_instructions' not in st.session_state:
-	st.session_state[ 'docqna_systems_instructions' ] = ''
+	st.session_state[ 'docqna_system_instructions' ] = ''
 
+if 'files_system_instructions' not in st.session_state:
+	st.session_state[ 'files_system_instructions' ] = ''
+
+if 'stores_system_instructions' not in st.session_state:
+	st.session_state[ 'stores_system_instructions' ] = ''
+
+if 'bucket_system_instructions' not in st.session_state:
+	st.session_state[ 'bucket_system_instructions' ] = ''
+	
 # ----------MODEL PARAMETERS --------------------------------
 
 if 'text_model' not in st.session_state:
@@ -623,6 +632,7 @@ if 'docqna_chunk_count' not in st.session_state:
 
 if 'docqna_fallback_rows' not in st.session_state:
 	st.session_state[ 'docqna_fallback_rows' ] = [ ]
+	
 if 'files_purpose' not in st.session_state:
 	st.session_state[ 'files_purpose' ] = ''
 
@@ -2349,75 +2359,234 @@ def build_document_user_input( user_query: str, k: int = 6 ) -> str:
 # ----------  DATABASE UTILITIES ----------
 
 def initialize_database( ) -> None:
-	"""Initialize database.
-    
-    Purpose:
-        Creates or initializes database used by the application. The function prepares
-        persistent state, database structures, or UI resources required by later workflows.
-    """
-	Path( 'stores/sqlite' ).mkdir( parents=True, exist_ok=True )
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute(
-			"""
-            CREATE TABLE IF NOT EXISTS chat_history
-            (
-                id
-                INTEGER
-                PRIMARY
-                KEY
-                AUTOINCREMENT,
-                role
-                TEXT,
-                content
-                TEXT
-            )
-			"""
-		)
+	"""Initialize the application database.
+	
+	Purpose:
+	    Creates the application database tables and migrates the Prompts table to the
+	    authoritative ID, Title, Name, Category, and Text schema while preserving compatible
+	    legacy prompt records.
+	
+	Returns:
+	    None: This function creates or updates persistent SQLite database structures.
+	
+	Raises:
+	    Error: Raised when database initialization or Prompts-table migration fails.
+	"""
+	try:
+		Path( 'stores/sqlite' ).mkdir( parents=True, exist_ok=True )
 		
-		conn.execute(
-			"""
-            CREATE TABLE IF NOT EXISTS embeddings
-            (
-                id
-                INTEGER
-                PRIMARY
-                KEY
-                AUTOINCREMENT,
-                chunk
-                TEXT,
-                vector
-                BLOB
-            )
-			"""
-		)
-		
-		conn.execute(
-			"""
-            CREATE TABLE IF NOT EXISTS Prompts
-            (
-                ID
-                INTEGER
-                NOT
-                NULL
-                PRIMARY
-                KEY
-                AUTOINCREMENT,
-                Title
-                TEXT,
-                Name
-                TEXT( 80 ),
-                Text TEXT( 255 )
-            );
-			"""
-		)
-		
-		prompt_columns = [ row[ 1 ] for row in
-		                   conn.execute( 'PRAGMA table_info("Prompts");' ).fetchall( ) ]
-		
-		if 'Title' not in prompt_columns:
-			conn.execute( 'ALTER TABLE "Prompts" ADD COLUMN "Title" TEXT;' )
-		
-		conn.commit( )
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			# ------------------------------------------------------------------
+			# Chat History
+			# ------------------------------------------------------------------
+			conn.execute(
+				'''
+				CREATE TABLE IF NOT EXISTS "chat_history"
+				(
+					"id" INTEGER PRIMARY KEY AUTOINCREMENT,
+					"role" TEXT,
+					"content" TEXT
+				);
+				'''
+			)
+			
+			# ------------------------------------------------------------------
+			# Embeddings
+			# ------------------------------------------------------------------
+			conn.execute(
+				'''
+				CREATE TABLE IF NOT EXISTS "embeddings"
+				(
+					"id" INTEGER PRIMARY KEY AUTOINCREMENT,
+					"chunk" TEXT,
+					"vector" BLOB
+				);
+				'''
+			)
+			
+			# ------------------------------------------------------------------
+			# Prompts
+			# ------------------------------------------------------------------
+			prompt_table_exists = conn.execute(
+				'''
+				SELECT 1
+				FROM "sqlite_master"
+				WHERE "type" = 'table'
+					AND "name" = 'Prompts';
+				'''
+			).fetchone( ) is not None
+			
+			if not prompt_table_exists:
+				conn.execute(
+					'''
+					CREATE TABLE "Prompts"
+					(
+						"ID" INTEGER NOT NULL UNIQUE,
+						"Title" TEXT(80),
+						"Name" TEXT(80),
+						"Category" TEXT(80),
+						"Text" TEXT(2040),
+						PRIMARY KEY("ID" AUTOINCREMENT)
+					);
+					'''
+				)
+			else:
+				existing_schema = conn.execute(
+					'PRAGMA table_info("Prompts");'
+				).fetchall( )
+				
+				existing_columns = [
+					str( row[ 1 ] )
+					for row in existing_schema
+				]
+				
+				required_columns = [
+					'ID',
+					'Title',
+					'Name',
+					'Category',
+					'Text',
+				]
+				
+				schema_requires_migration = (
+					existing_columns != required_columns
+				)
+				
+				if schema_requires_migration:
+					# ----------------------------------------------------------
+					# Preserve Legacy Prompt Data
+					# ----------------------------------------------------------
+					legacy_rows = conn.execute(
+						'SELECT * FROM "Prompts";'
+					).fetchall( )
+					
+					legacy_column_names = [
+						str( description[ 0 ] )
+						for description in conn.execute(
+							'SELECT * FROM "Prompts" LIMIT 0;'
+						).description
+					]
+					
+					legacy_records = [
+						dict( zip( legacy_column_names, row ) )
+						for row in legacy_rows
+					]
+					
+					# ----------------------------------------------------------
+					# Rebuild Prompts Table
+					# ----------------------------------------------------------
+					conn.execute(
+						'DROP TABLE IF EXISTS "Prompts__Migration";'
+					)
+					
+					conn.execute(
+						'''
+						CREATE TABLE "Prompts__Migration"
+						(
+							"ID" INTEGER NOT NULL UNIQUE,
+							"Title" TEXT(80),
+							"Name" TEXT(80),
+							"Category" TEXT(80),
+							"Text" TEXT(2040),
+							PRIMARY KEY("ID" AUTOINCREMENT)
+						);
+						'''
+					)
+					
+					for record in legacy_records:
+						raw_id = record.get( 'ID' )
+						
+						try:
+							prompt_id = (
+								int( raw_id )
+								if raw_id is not None
+								and str( raw_id ).strip( )
+								else None
+							)
+						except (TypeError, ValueError):
+							prompt_id = None
+						
+						title = str(
+							record.get(
+								'Title',
+								record.get( 'Caption', '' )
+							)
+							or ''
+						).strip( )[ :80 ]
+						
+						name = str(
+							record.get( 'Name', '' )
+							or ''
+						).strip( )[ :80 ]
+						
+						category = str(
+							record.get( 'Category', '' )
+							or ''
+						).strip( )[ :80 ]
+						
+						text = str(
+							record.get( 'Text', '' )
+							or ''
+						).strip( )[ :2040 ]
+						
+						if prompt_id is None:
+							conn.execute(
+								'''
+								INSERT INTO "Prompts__Migration"
+									(
+										"Title",
+										"Name",
+										"Category",
+										"Text"
+									)
+								VALUES (?, ?, ?, ?);
+								''',
+								(
+									title,
+									name,
+									category,
+									text,
+								)
+							)
+						else:
+							conn.execute(
+								'''
+								INSERT OR REPLACE INTO "Prompts__Migration"
+									(
+										"ID",
+										"Title",
+										"Name",
+										"Category",
+										"Text"
+									)
+								VALUES (?, ?, ?, ?, ?);
+								''',
+								(
+									prompt_id,
+									title,
+									name,
+									category,
+									text,
+								)
+							)
+					
+					conn.execute( 'DROP TABLE "Prompts";' )
+					conn.execute(
+						'''
+						ALTER TABLE "Prompts__Migration"
+						RENAME TO "Prompts";
+						'''
+					)
+			
+			conn.commit( )
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'initialize_database'
+		exception.method = 'initialize_database( ) -> None'
+		Logger( ).write( exception )
+		raise exception
 
 def create_connection( ) -> sqlite3.Connection:
 	"""Create connection.
@@ -2939,6 +3108,7 @@ def insert_data( table_name: str, df: pd.DataFrame ):
     """
 	df = df.copy( )
 	df.columns = [ c.replace( ' ', '_' ) for c in df.columns ]
+	
 	placeholders = ', '.join( [ '?' ] * len( df.columns ) )
 	stmt = f'INSERT INTO {table_name} VALUES ({placeholders});'
 	
@@ -3518,181 +3688,871 @@ def rename_table( old_name: str, new_name: str ) -> None:
 
 # ---------- PROMPT ENGINEERING UTILITIES ---------------
 
-def fetch_prompt_names( db_path: str ) -> list[ str ]:
-	"""Fetch prompt names.
-    
-    Purpose:
-        Retrieves fetch prompt names data for the current workflow. The function isolates lookup
-        logic and returns normalized values that can be displayed, processed, or passed into
-        other helpers.
-    
-    Args:
-        db_path (str): Db path value used by this workflow.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
+def fetch_prompt_categories( db_path: str ) -> List[ str ]:
+	"""Retrieve available prompt categories.
+	
+	Purpose:
+	    Returns the distinct, nonempty prompt categories stored in the Prompts table for use
+	    by mode-specific System Prompt selectors and Prompt Engineering controls.
+	
+	Args:
+	    db_path (str): Path to the application SQLite database.
+	
+	Returns:
+	    List[str]: Alphabetically ordered prompt-category values.
+	
+	Raises:
+	    Error: Raised when prompt categories cannot be retrieved.
+	"""
 	try:
-		conn = sqlite3.connect( db_path )
-		cur = conn.cursor( )
-		cur.execute( "SELECT Title FROM Prompts ORDER BY ID;" )
-		rows = cur.fetchall( )
-		conn.close( )
-		return [ r[ 0 ] for r in rows if r and r[ 0 ] is not None ]
-	except Exception as _logged_exception:
-		try:
-			error = Error( _logged_exception )
-			error.module = 'app'
-			error.cause = 'fetch_prompt_names'
-			error.method = 'fetch_prompt_names( db_path: str )'
-			Logger( ).write( error )
-		except Exception:
-			pass
-		return [ ]
+		with sqlite3.connect( db_path ) as conn:
+			rows = conn.execute( '''
+                                 SELECT DISTINCT TRIM("Category")
+                                 FROM "Prompts"
+                                 WHERE "Category" IS NOT NULL
+                                   AND TRIM("Category") <> ''
+                                 ORDER BY TRIM("Category") COLLATE NOCASE;
+			                     ''' ).fetchall( )
+		
+		return [ str( row[ 0 ] ).strip( ) for row in rows if
+			row and row[ 0 ] is not None and str( row[ 0 ] ).strip( ) ]
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompt_categories'
+		exception.method = 'fetch_prompt_categories( db_path: str ) -> List[ str ]'
+		Logger( ).write( exception )
+		raise exception
 
-def fetch_prompt_text( db_path: str, name: str ) -> str | None:
-	"""Fetch prompt text.
-    
-    Purpose:
-        Retrieves fetch prompt text data for the current workflow. The function isolates lookup
-        logic and returns normalized values that can be displayed, processed, or passed into
-        other helpers.
-    
-    Args:
-        db_path (str): Db path value used by this workflow.
-        name (str): Name value used by this workflow.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
+def fetch_prompt_records( db_path: str,
+	categories: Optional[ List[ str ] ] = None ) -> List[ Dict[ str, Any ] ]:
+	"""Retrieve prompt records.
+	
+	Purpose:
+	    Returns normalized prompt records using the authoritative Prompts schema and optionally
+	    restricts results to one or more prompt categories.
+	
+	Args:
+	    db_path (str): Path to the application SQLite database.
+	    categories (Optional[List[str]]): Categories used to restrict the returned prompts.
+	
+	Returns:
+	    List[Dict[str, Any]]: Prompt records containing ID, Title, Name, Category, and Text.
+	
+	Raises:
+	    Error: Raised when prompt records cannot be retrieved.
+	"""
 	try:
-		conn = sqlite3.connect( db_path )
-		cur = conn.cursor( )
-		cur.execute( "SELECT Text FROM Prompts WHERE Title = ?;", (name,) )
-		row = cur.fetchone( )
-		conn.close( )
-		return str( row[ 0 ] ) if row and row[ 0 ] is not None else None
-	except Exception as _logged_exception:
-		try:
-			error = Error( _logged_exception )
-			error.module = 'app'
-			error.cause = 'fetch_prompt_text'
-			error.method = 'fetch_prompt_text( db_path: str, name: str )'
-			Logger( ).write( error )
-		except Exception:
-			pass
-		return None
+		normalized_categories = [ str( category ).strip( ) for category in (categories or [ ]) if
+			str( category ).strip( ) ]
+		
+		query = '''
+                SELECT "ID",
+                       "Title",
+                       "Name",
+                       "Category",
+                       "Text"
+                FROM "Prompts" \
+		        '''
+		
+		parameters: List[ Any ] = [ ]
+		
+		if normalized_categories:
+			placeholders = ', '.join( [ '?' ] * len( normalized_categories ) )
+			
+			query += (f' WHERE "Category" COLLATE NOCASE '
+			          f'IN ({placeholders})')
+			
+			parameters.extend( normalized_categories )
+		
+		query += '''
+			ORDER BY
+				COALESCE("Category", '') COLLATE NOCASE,
+				COALESCE("Title", '') COLLATE NOCASE,
+				"ID";
+		'''
+		
+		with sqlite3.connect( db_path ) as conn:
+			conn.row_factory = sqlite3.Row
+			rows = conn.execute( query, parameters ).fetchall( )
+		
+		return [ { 'ID': int( row[ 'ID' ] ), 'Title': str( row[ 'Title' ] or '' ),
+			'Name': str( row[ 'Name' ] or '' ), 'Category': str( row[ 'Category' ] or '' ),
+			'Text': str( row[ 'Text' ] or '' ), } for row in rows ]
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompt_records'
+		exception.method = ('fetch_prompt_records( db_path: str, '
+		                    'categories: Optional[ List[ str ] ] = None ) '
+		                    '-> List[ Dict[ str, Any ] ]')
+		Logger( ).write( exception )
+		raise exception
+
+def fetch_prompt_titles( db_path: str,
+	categories: Optional[ List[ str ] ] = None ) -> List[ Tuple[ int, str ] ]:
+	"""Retrieve prompt identifiers and titles.
+	
+	Purpose:
+	    Returns stable prompt identifiers paired with user-facing titles for use by System
+	    Prompt selectboxes.
+	
+	Args:
+	    db_path (str): Path to the application SQLite database.
+	    categories (Optional[List[str]]): Categories used to restrict the returned prompts.
+	
+	Returns:
+	    List[Tuple[int, str]]: Prompt ID and Title pairs.
+	
+	Raises:
+	    Error: Raised when prompt identifiers and titles cannot be retrieved.
+	"""
+	try:
+		records = fetch_prompt_records( db_path=db_path, categories=categories )
+		
+		return [
+			(int( record[ 'ID' ] ), str( record[ 'Title' ] or record[ 'Name' ] or record[ 'ID' ] ))
+			for record in records ]
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompt_titles'
+		exception.method = ('fetch_prompt_titles( db_path: str, '
+		                    'categories: Optional[ List[ str ] ] = None ) '
+		                    '-> List[ Tuple[ int, str ] ]')
+		Logger( ).write( exception )
+		raise exception
+
+def fetch_prompt_names( db_path: str, categories: Optional[ List[ str ] ] = None ) -> List[ str ]:
+	"""Retrieve user-facing prompt titles.
+	
+	Purpose:
+	    Preserves compatibility with the current System Prompt expanders while returning Title
+	    values from the authoritative Prompts schema. Optional category filtering supports the
+	    upcoming mode-specific selector replacements.
+	
+	Args:
+	    db_path (str): Path to the application SQLite database.
+	    categories (Optional[List[str]]): Categories used to restrict the returned prompts.
+	
+	Returns:
+	    List[str]: User-facing prompt titles.
+	
+	Raises:
+	    Error: Raised when prompt titles cannot be retrieved.
+	"""
+	try:
+		records = fetch_prompt_records( db_path=db_path, categories=categories )
+		
+		return [ str( record[ 'Title' ] ).strip( ) for record in records if
+			str( record[ 'Title' ] ).strip( ) ]
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompt_names'
+		exception.method = ('fetch_prompt_names( db_path: str, '
+		                    'categories: Optional[ List[ str ] ] = None ) '
+		                    '-> List[ str ]')
+		Logger( ).write( exception )
+		raise exception
+
+def fetch_prompt_text( db_path: str, prompt_reference: Any ) -> Optional[ str ]:
+	"""Retrieve prompt text.
+	
+	Purpose:
+	    Retrieves prompt text by stable integer ID while retaining temporary compatibility with
+	    existing System Prompt selectors that currently submit a Title string.
+	
+	Args:
+	    db_path (str): Path to the application SQLite database.
+	    prompt_reference (Any): Prompt ID or user-facing prompt Title.
+	
+	Returns:
+	    Optional[str]: Prompt text when a matching record exists; otherwise, None.
+	
+	Raises:
+	    Error: Raised when prompt text cannot be retrieved.
+	"""
+	try:
+		if prompt_reference is None:
+			return None
+		
+		with sqlite3.connect( db_path ) as conn:
+			if isinstance( prompt_reference, int ):
+				row = conn.execute( '''
+                                    SELECT "Text"
+                                    FROM "Prompts"
+                                    WHERE "ID" = ?;
+				                    ''', (prompt_reference,) ).fetchone( )
+			else:
+				reference_text = str( prompt_reference ).strip( )
+				
+				if not reference_text:
+					return None
+				
+				try:
+					prompt_id = int( reference_text )
+				except ValueError:
+					prompt_id = None
+				
+				if prompt_id is not None:
+					row = conn.execute( '''
+                                        SELECT "Text"
+                                        FROM "Prompts"
+                                        WHERE "ID" = ?;
+					                    ''', (prompt_id,) ).fetchone( )
+				else:
+					row = conn.execute( '''
+                                        SELECT "Text"
+                                        FROM "Prompts"
+                                        WHERE "Title" = ?
+                                        ORDER BY "ID" LIMIT 1;
+					                    ''', (reference_text,) ).fetchone( )
+		
+		if not row or row[ 0 ] is None:
+			return None
+		
+		return str( row[ 0 ] )
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompt_text'
+		exception.method = ('fetch_prompt_text( db_path: str, prompt_reference: Any ) '
+		                    '-> Optional[ str ]')
+		Logger( ).write( exception )
+		raise exception
 
 def fetch_prompts_df( ) -> pd.DataFrame:
-	"""Fetch prompts df.
-    
-    Purpose:
-        Retrieves fetch prompts df data for the current workflow. The function isolates lookup
-        logic and returns normalized values that can be displayed, processed, or passed into
-        other helpers.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		df = pd.read_sql_query(
-			"SELECT ID, Title, Name  FROM Prompts ORDER BY ID DESC",
-			conn )
-	df.insert( 0, "Selected", False )
-	return df
+	"""Retrieve prompts as a DataFrame.
+	
+	Purpose:
+	    Returns all prompt records using the authoritative Prompts schema and adds the selection
+	    column required by the Prompt Engineering interface.
+	
+	Returns:
+	    pd.DataFrame: Prompt records containing Selected, ID, Title, Name, Category, and Text.
+	
+	Raises:
+	    Error: Raised when the prompt DataFrame cannot be created.
+	"""
+	try:
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			prompt_df = pd.read_sql_query( '''
+                                           SELECT "ID",
+                                                  "Title",
+                                                  "Name",
+                                                  "Category",
+                                                  "Text"
+                                           FROM "Prompts"
+                                           ORDER BY "ID" DESC;
+			                               ''', conn )
+		
+		prompt_df.insert( 0, 'Selected', False )
+		return prompt_df
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompts_df'
+		exception.method = 'fetch_prompts_df( ) -> pd.DataFrame'
+		Logger( ).write( exception )
+		raise exception
 
-def fetch_prompt_by_id( pid: int ) -> Dict[ str, Any ] | None:
-	"""Fetch prompt by id.
-    
-    Purpose:
-        Retrieves fetch prompt by id data for the current workflow. The function isolates lookup
-        logic and returns normalized values that can be displayed, processed, or passed into
-        other helpers.
-    
-    Args:
-        pid (int): Pid value used by this workflow.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		cur = conn.execute(
-			"SELECT ID, Title, Name, Text FROM Prompts WHERE ID=?",
-			(pid,)
-		)
-		row = cur.fetchone( )
-		return dict( zip( [ c[ 0 ] for c in cur.description ], row ) ) if row else None
+def fetch_prompt_by_id( prompt_id: int ) -> Optional[ Dict[ str, Any ] ]:
+	"""Retrieve a prompt by ID.
+	
+	Purpose:
+	    Returns one normalized prompt record using the authoritative Prompts schema.
+	
+	Args:
+	    prompt_id (int): Primary-key identifier of the prompt to retrieve.
+	
+	Returns:
+	    Optional[Dict[str, Any]]: Matching prompt record or None when no record exists.
+	
+	Raises:
+	    Error: Raised when the prompt cannot be retrieved.
+	"""
+	try:
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			conn.row_factory = sqlite3.Row
+			row = conn.execute( '''
+                                SELECT "ID",
+                                       "Title",
+                                       "Name",
+                                       "Category",
+                                       "Text"
+                                FROM "Prompts"
+                                WHERE "ID" = ?;
+			                    ''', (prompt_id,) ).fetchone( )
+		
+		if row is None:
+			return None
+		
+		return { 'ID': int( row[ 'ID' ] ), 'Title': str( row[ 'Title' ] or '' ),
+			'Name': str( row[ 'Name' ] or '' ), 'Category': str( row[ 'Category' ] or '' ),
+			'Text': str( row[ 'Text' ] or '' ), }
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompt_by_id'
+		exception.method = ('fetch_prompt_by_id( prompt_id: int ) '
+		                    '-> Optional[ Dict[ str, Any ] ]')
+		Logger( ).write( exception )
+		raise exception
 
-def fetch_prompt_by_name( name: str ) -> Dict[ str, Any ] | None:
-	"""Fetch prompt by name.
-    
-    Purpose:
-        Retrieves fetch prompt by name data for the current workflow. The function isolates
-        lookup logic and returns normalized values that can be displayed, processed, or passed
-        into other helpers.
-    
-    Args:
-        name (str): Name value used by this workflow.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		cur = conn.execute(
-			"SELECT ID, Title, Name, Text FROM Prompts WHERE Title=?",
-			(name,)
-		)
-		row = cur.fetchone( )
-		return dict( zip( [ c[ 0 ] for c in cur.description ], row ) ) if row else None
+def fetch_prompt_by_name( name: str ) -> Optional[ Dict[ str, Any ] ]:
+	"""Retrieve a prompt by internal name.
+	
+	Purpose:
+	    Returns the first prompt matching the supplied internal Name value using a
+	    case-insensitive comparison.
+	
+	Args:
+	    name (str): Internal prompt name.
+	
+	Returns:
+	    Optional[Dict[str, Any]]: Matching prompt record or None when no record exists.
+	
+	Raises:
+	    Error: Raised when the prompt cannot be retrieved.
+	"""
+	try:
+		prompt_name = str( name or '' ).strip( )
+		
+		if not prompt_name:
+			return None
+		
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			conn.row_factory = sqlite3.Row
+			row = conn.execute( '''
+                                SELECT "ID",
+                                       "Title",
+                                       "Name",
+                                       "Category",
+                                       "Text"
+                                FROM "Prompts"
+                                WHERE "Name" = ? COLLATE NOCASE
+                                ORDER BY "ID" LIMIT 1;
+			                    ''', (prompt_name,) ).fetchone( )
+		
+		if row is None:
+			return None
+		
+		return { 'ID': int( row[ 'ID' ] ), 'Title': str( row[ 'Title' ] or '' ),
+			'Name': str( row[ 'Name' ] or '' ), 'Category': str( row[ 'Category' ] or '' ),
+			'Text': str( row[ 'Text' ] or '' ), }
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompt_by_name'
+		exception.method = ('fetch_prompt_by_name( name: str ) '
+		                    '-> Optional[ Dict[ str, Any ] ]')
+		Logger( ).write( exception )
+		raise exception
 
-def insert_prompt( data: Dict[ str, Any ] ) -> None:
-	"""Insert prompt.
-    
-    Purpose:
-        Updates application state or persistent storage for the insert prompt operation. The
-        function performs the requested mutation while keeping database and session-state
-        handling centralized.
-    
-    Args:
-        data (Dict[str, Any]): Data value used by this workflow.
-    """
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute( 'INSERT INTO Prompts (Title, Name, Text ) VALUES (?, ?, ?, ?)',
-			(data[ 'Title' ], data[ 'Name' ], data[ 'Text' ] ) )
+def insert_prompt( data: Dict[ str, Any ] ) -> int:
+	"""Insert a prompt.
+	
+	Purpose:
+	    Creates a new prompt using the authoritative Title, Name, Category, and Text fields and
+	    returns the generated primary-key identifier.
+	
+	Args:
+	    data (Dict[str, Any]): Prompt values to insert.
+	
+	Returns:
+	    int: Generated prompt ID.
+	
+	Raises:
+	    Error: Raised when prompt validation or insertion fails.
+	"""
+	try:
+		title = str( data.get( 'Title', '' ) or '' ).strip( )[ :80 ]
+		name = str( data.get( 'Name', '' ) or '' ).strip( )[ :80 ]
+		category = str( data.get( 'Category', '' ) or '' ).strip( )[ :80 ]
+		text = str( data.get( 'Text', '' ) or '' ).strip( )[ :2040 ]
+		
+		if not title:
+			raise ValueError( 'Prompt Title is required.' )
+		
+		if not name:
+			raise ValueError( 'Prompt Name is required.' )
+		
+		if not category:
+			raise ValueError( 'Prompt Category is required.' )
+		
+		if not text:
+			raise ValueError( 'Prompt Text is required.' )
+		
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			cursor = conn.execute( '''
+                                   INSERT INTO "Prompts"
+                                   ("Title",
+                                    "Name",
+                                    "Category",
+                                    "Text")
+                                   VALUES (?, ?, ?, ?);
+			                       ''', (title, name, category, text,) )
+			
+			conn.commit( )
+			prompt_id = int( cursor.lastrowid )
+		
+		return prompt_id
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'insert_prompt'
+		exception.method = ('insert_prompt( data: Dict[ str, Any ] ) -> int')
+		Logger( ).write( exception )
+		raise exception
 
-def update_prompt( pid: int, data: Dict[ str, Any ] ) -> None:
-	"""Update prompt.
-    
-    Purpose:
-        Updates application state or persistent storage for the update prompt operation. The
-        function performs the requested mutation while keeping database and session-state
-        handling centralized.
-    
-    Args:
-        pid (int): Pid value used by this workflow.
-        data (Dict[str, Any]): Data value used by this workflow.
-    """
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute(
-			"UPDATE Prompts SET Title=?, Name=?, Text=? WHERE ID=?",
-			(data[ 'Title' ], data[ 'Name' ], data[ 'Text' ],
-			 pid)
-		)
+def update_prompt( prompt_id: int, data: Dict[ str, Any ] ) -> None:
+	"""Update a prompt.
+	
+	Purpose:
+	    Updates the editable Title, Name, Category, and Text values for an existing prompt
+	    without modifying its primary-key identifier.
+	
+	Args:
+	    prompt_id (int): Primary-key identifier of the prompt to update.
+	    data (Dict[str, Any]): Replacement prompt values.
+	
+	Returns:
+	    None: This function updates the matching database record.
+	
+	Raises:
+	    Error: Raised when prompt validation or update fails.
+	"""
+	try:
+		title = str( data.get( 'Title', '' ) or '' ).strip( )[ :80 ]
+		name = str( data.get( 'Name', '' ) or '' ).strip( )[ :80 ]
+		category = str( data.get( 'Category', '' ) or '' ).strip( )[ :80 ]
+		text = str( data.get( 'Text', '' ) or '' ).strip( )[ :2040 ]
+		
+		if not title:
+			raise ValueError( 'Prompt Title is required.' )
+		
+		if not name:
+			raise ValueError( 'Prompt Name is required.' )
+		
+		if not category:
+			raise ValueError( 'Prompt Category is required.' )
+		
+		if not text:
+			raise ValueError( 'Prompt Text is required.' )
+		
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			cursor = conn.execute( '''
+                                   UPDATE "Prompts"
+                                   SET "Title"    = ?,
+                                       "Name"     = ?,
+                                       "Category" = ?,
+                                       "Text"     = ?
+                                   WHERE "ID" = ?;
+			                       ''', (title, name, category, text, prompt_id,) )
+			
+			if cursor.rowcount == 0:
+				raise ValueError( f'Prompt ID {prompt_id} was not found.' )
+			
+			conn.commit( )
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'update_prompt'
+		exception.method = ('update_prompt( prompt_id: int, '
+		                    'data: Dict[ str, Any ] ) -> None')
+		Logger( ).write( exception )
+		raise exception
 
-def delete_prompt( pid: int ) -> None:
-	"""Delete prompt.
-    
-    Purpose:
-        Updates application state or persistent storage for the delete prompt operation. The
-        function performs the requested mutation while keeping database and session-state
-        handling centralized.
-    
-    Args:
-        pid (int): Pid value used by this workflow.
-    """
-	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute( "DELETE FROM Prompts WHERE ID=?", (pid,) )
+def delete_prompt( prompt_id: int ) -> None:
+	"""Delete a prompt.
+	
+	Purpose:
+	    Deletes the prompt identified by the supplied primary-key value.
+	
+	Args:
+	    prompt_id (int): Primary-key identifier of the prompt to delete.
+	
+	Returns:
+	    None: This function deletes the matching database record.
+	
+	Raises:
+	    Error: Raised when the prompt cannot be deleted.
+	"""
+	try:
+		with sqlite3.connect( cfg.DB_PATH ) as conn:
+			cursor = conn.execute( '''
+                                   DELETE
+                                   FROM "Prompts"
+                                   WHERE "ID" = ?;
+			                       ''', (prompt_id,) )
+			
+			if cursor.rowcount == 0:
+				raise ValueError( f'Prompt ID {prompt_id} was not found.' )
+			
+			conn.commit( )
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'delete_prompt'
+		exception.method = 'delete_prompt( prompt_id: int ) -> None'
+		Logger( ).write( exception )
+		raise exception
 
+def fetch_prompts_by_category( db_path: str, category: str ) -> List[ Dict[ str, Any ] ]:
+	"""Retrieve prompts for one category.
+	
+	Purpose:
+	    Retrieves prompt records whose Category value matches the selected database
+	    category. Category comparison is case-insensitive and ignores surrounding
+	    whitespace.
+	
+	Args:
+	    db_path (str): Path to the application SQLite database.
+	    category (str): Prompt category selected by the user.
+	
+	Returns:
+	    List[Dict[str, Any]]: Matching prompt records ordered by Title and ID.
+	
+	Raises:
+	    Error: Raised when the prompt records cannot be retrieved.
+	"""
+	try:
+		selected_category = str( category or '' ).strip( )
+		if not selected_category:
+			return [ ]
+		
+		with sqlite3.connect( db_path ) as conn:
+			conn.row_factory = sqlite3.Row
+			rows = conn.execute( '''
+                                 SELECT "ID",
+                                        "Title",
+                                        "Name",
+                                        "Category",
+                                        "Text"
+                                 FROM "Prompts"
+                                 WHERE TRIM("Category") = ? COLLATE NOCASE
+                                 ORDER BY COALESCE(NULLIF(TRIM("Title"), ''), "Name")
+                                              COLLATE NOCASE,
+                                          "ID";
+			                     ''', (selected_category,) ).fetchall( )
+		
+		return [ { 'ID': int( row[ 'ID' ] ), 'Title': str( row[ 'Title' ] or '' ).strip( ),
+			'Name': str( row[ 'Name' ] or '' ).strip( ),
+			'Category': str( row[ 'Category' ] or '' ).strip( ),
+			'Text': str( row[ 'Text' ] or '' ), } for row in rows ]
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'fetch_prompts_by_category'
+		exception.method = ('fetch_prompts_by_category( '
+		                    'db_path: str, category: str ) '
+		                    '-> List[ Dict[ str, Any ] ]')
+		Logger( ).write( exception )
+		raise exception
+
+def format_prompt_option( prompt_id: int, prompt_lookup: Dict[ int, Dict[ str, Any ] ] ) -> str:
+	"""Format a prompt selector option.
+	
+	Purpose:
+	    Converts a stable prompt ID into the associated user-facing Title. Name and
+	    ID values are used as fallbacks when the Title is empty.
+	
+	Args:
+	    prompt_id (int): Prompt primary-key identifier.
+	    prompt_lookup (Dict[int, Dict[str, Any]]): Prompt records indexed by ID.
+	
+	Returns:
+	    str: User-facing prompt selector label.
+	"""
+	record = prompt_lookup.get( int( prompt_id ), { } )
+	title = str( record.get( 'Title', '' ) or '' ).strip( )
+	
+	if title:
+		return title
+	
+	name = str( record.get( 'Name', '' ) or '' ).strip( )
+	if name:
+		return name
+	
+	return f'Prompt {prompt_id}'
+
+def load_prompt_into_state( prompt_id_key: str, instruction_key: str ) -> None:
+	"""Load a selected prompt into session state.
+	
+	Purpose:
+	    Retrieves the prompt selected through a mode-specific prompt selector and
+	    copies its Text value into the corresponding system-instruction control.
+	
+	Args:
+	    prompt_id_key (str): Session-state key containing the selected prompt ID.
+	    instruction_key (str): Session-state key receiving the prompt text.
+	
+	Returns:
+	    None: This function updates Streamlit session state.
+	
+	Raises:
+	    Error: Raised when the selected prompt cannot be retrieved.
+	"""
+	try:
+		selected_prompt_id = st.session_state.get( prompt_id_key )
+		if selected_prompt_id in (None, ''):
+			return
+		
+		prompt_record = fetch_prompt_by_id( int( selected_prompt_id ) )
+		if prompt_record is None:
+			raise ValueError( f'Prompt ID {selected_prompt_id} was not found.' )
+		
+		st.session_state[ instruction_key ] = str( prompt_record.get( 'Text', '' ) or '' )
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'load_prompt_into_state'
+		exception.method = ('load_prompt_into_state( '
+		                    'prompt_id_key: str, instruction_key: str ) '
+		                    '-> None')
+		Logger( ).write( exception )
+		raise exception
+
+def clear_prompt_state( category_key: str, prompt_id_key: str, instruction_key: str ) -> None:
+	"""Clear a system-prompt selection.
+	
+	Purpose:
+	    Clears the selected category, prompt ID, and editable instruction text for
+	    one application mode without modifying database records.
+	
+	Args:
+	    category_key (str): Session-state key containing the selected category.
+	    prompt_id_key (str): Session-state key containing the selected prompt ID.
+	    instruction_key (str): Session-state key containing the instruction text.
+	
+	Returns:
+	    None: This function updates Streamlit session state.
+	
+	Raises:
+	    Error: Raised when session-state values cannot be cleared.
+	"""
+	try:
+		st.session_state[ category_key ] = None
+		st.session_state[ prompt_id_key ] = None
+		st.session_state[ instruction_key ] = ''
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'clear_prompt_state'
+		exception.method = ('clear_prompt_state( '
+		                    'category_key: str, prompt_id_key: str, '
+		                    'instruction_key: str ) -> None')
+		Logger( ).write( exception )
+		raise exception
+
+def convert_prompt_state( instruction_key: str ) -> None:
+	"""Convert mode-specific system instructions.
+	
+	Purpose:
+	    Converts the specified instruction value between the supported XML prompt
+	    blocks and Markdown heading notation.
+	
+	Args:
+	    instruction_key (str): Session-state key containing the instruction text.
+	
+	Returns:
+	    None: This function updates Streamlit session state.
+	
+	Raises:
+	    Error: Raised when the instruction text cannot be converted.
+	"""
+	try:
+		instruction_text = st.session_state.get( instruction_key, '' )
+		if not isinstance( instruction_text, str ):
+			return
+		
+		source_text = instruction_text.strip( )
+		if not source_text:
+			return
+		
+		if cfg.XML_BLOCK_PATTERN.search( source_text ):
+			converted_text = convert_xml( source_text )
+		else:
+			converted_text = convert_markdown( source_text )
+		
+		st.session_state[ instruction_key ] = converted_text
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'convert_prompt_state'
+		exception.method = ('convert_prompt_state( instruction_key: str ) -> None')
+		Logger( ).write( exception )
+		raise exception
+
+def render_system_prompt_expander( state_prefix: str, instruction_key: str,
+	label: str = 'System Instructions', height: int = 120 ) -> None:
+	"""Render a category-driven system-prompt expander.
+	
+	Purpose:
+	    Renders a reusable System Instructions expander containing an editable text
+	    area, a database-backed Category selector, and a Prompt selector filtered by
+	    the selected category. Selecting a prompt loads its Text into the editable
+	    instruction area.
+	
+	Args:
+	    state_prefix (str): Unique prefix used for mode-specific widget keys.
+	    instruction_key (str): Session-state key containing editable instructions.
+	    label (str): Expander label displayed in the interface.
+	    height (int): Height of the instruction text area in pixels.
+	
+	Returns:
+	    None: This function renders Streamlit controls and updates session state.
+	
+	Raises:
+	    Error: Raised when prompt data or selector state cannot be rendered.
+	"""
+	try:
+		category_key = f'{state_prefix}_prompt_category'
+		prompt_id_key = f'{state_prefix}_prompt_id'
+		clear_key = f'{state_prefix}_clear_instructions'
+		convert_key = f'{state_prefix}_convert_instructions'
+		st.session_state.setdefault( instruction_key, '' )
+		st.session_state.setdefault( category_key, None )
+		st.session_state.setdefault( prompt_id_key, None )
+		categories = fetch_prompt_categories( cfg.DB_PATH )
+		selected_category = st.session_state.get( category_key )
+		if (selected_category and selected_category not in categories):
+			st.session_state[ category_key ] = None
+			st.session_state[ prompt_id_key ] = None
+			selected_category = None
+		
+		prompt_records = fetch_prompts_by_category( db_path=cfg.DB_PATH,
+			category=str( selected_category or '' ) )
+		
+		prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record for
+			record in
+			prompt_records }
+		
+		prompt_ids = list( prompt_lookup.keys( ) )
+		current_prompt_id = st.session_state.get( prompt_id_key )
+		if (current_prompt_id is not None and current_prompt_id not in prompt_ids):
+			st.session_state[ prompt_id_key ] = None
+		
+		def on_category_change( ) -> None:
+			"""Reset the dependent prompt after a category change.
+			
+			Purpose:
+			    Clears the selected prompt ID and editable instruction text when the
+			    user selects a different category.
+			
+			Returns:
+			    None: This callback updates Streamlit session state.
+			"""
+			st.session_state[ prompt_id_key ] = None
+			st.session_state[ instruction_key ] = ''
+		
+		def on_prompt_change( ) -> None:
+			"""Load the selected prompt text.
+			
+			Purpose:
+			    Loads the selected prompt record into the mode-specific editable
+			    instruction control.
+			
+			Returns:
+			    None: This callback updates Streamlit session state.
+			"""
+			load_prompt_into_state( prompt_id_key=prompt_id_key, instruction_key=instruction_key )
+		
+		def on_clear( ) -> None:
+			"""Clear the complete prompt selection.
+			
+			Purpose:
+			    Clears the category, prompt, and editable instruction state associated
+			    with the current application mode.
+			
+			Returns:
+			    None: This callback updates Streamlit session state.
+			"""
+			clear_prompt_state( category_key=category_key, prompt_id_key=prompt_id_key,
+				instruction_key=instruction_key )
+		
+		def on_convert( ) -> None:
+			"""Convert the editable instruction text.
+			
+			Purpose:
+			    Converts the current instruction text between XML prompt blocks and
+			    Markdown heading notation.
+			
+			Returns:
+			    None: This callback updates Streamlit session state.
+			"""
+			convert_prompt_state( instruction_key=instruction_key )
+		
+		with st.expander( label=label, icon='🖥️', expanded=False, width='stretch' ):
+			instruction_column, selector_column = st.columns( [ 0.70, 0.30 ] )
+			
+			with selector_column:
+				st.selectbox( label='Category', options=categories, index=None, key=category_key,
+					on_change=on_category_change,
+					placeholder=('Select Category' if categories else 'No Categories Found'),
+					disabled=not categories,
+					help=('Select a prompt category from the Prompts table.') )
+				
+				active_category = st.session_state.get( category_key )
+				
+				active_records = fetch_prompts_by_category( db_path=cfg.DB_PATH,
+					category=str( active_category or '' ) )
+				
+				active_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record for
+					record in active_records }
+				
+				active_prompt_ids = list( active_lookup.keys( ) )
+				
+				st.selectbox( label='Prompt', options=active_prompt_ids,
+					format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+						prompt_lookup=active_lookup ), index=None, key=prompt_id_key,
+					on_change=on_prompt_change, placeholder=(
+						'Select Prompt' if active_category and active_prompt_ids else (
+							'No Prompts Found' if active_category else 'Select Category First')),
+					disabled=(not active_category or not active_prompt_ids),
+					help=('Select a prompt from the chosen category.') )
+			
+			with instruction_column:
+				st.text_area( label='Enter Text', height=height, width='stretch',
+					help=cfg.SYSTEM_INSTRUCTIONS, key=instruction_key )
+			
+			button_column, convert_column = st.columns( [ 0.80, 0.20 ] )
+			
+			with button_column:
+				st.button( label='Clear Instructions', key=clear_key, icon='🧹', width='stretch',
+					on_click=on_clear )
+			
+			with convert_column:
+				st.button( label='XML ↔️ Markdown', key=convert_key, width='stretch',
+					on_click=on_convert )
+	
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'render_system_prompt_expander'
+		exception.method = ('render_system_prompt_expander( '
+		                    'state_prefix: str, instruction_key: str, '
+		                    'label: str = "System Instructions", '
+		                    'height: int = 120 ) -> None')
+		Logger( ).write( exception )
+		raise exception
+	
 def build_prompt( user_input: str ) -> str:
 	"""Build prompt.
     
@@ -3788,7 +4648,7 @@ if 'system_instructions' not in st.session_state:
 st.set_page_config( page_title="Jeni", page_icon=cfg.FAVICON,
 	layout="wide", initial_sidebar_state='collapsed' )
 
-st.Title( cfg.APP_SUBTITLE )
+st.caption( cfg.APP_SUBTITLE )
 inject_response_css( )
 init_state( )
 
@@ -3905,45 +4765,27 @@ if mode == 'Text':
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			def reset_text_model_settings( ) -> None:
-				for key in [ 'text_model',
-				             'text_reasoning',
-				             'text_modalities',
-				             'text_media_resolution',
-				             'text_number',
-				             'thinking_level' ]:
+				for key in [ 'text_model', 'text_reasoning', 'text_modalities',
+					'text_media_resolution', 'text_number', 'thinking_level' ]:
 					if key in st.session_state:
 						del st.session_state[ key ]
 			
 			def reset_text_inference_settings( ) -> None:
-				for key in [ 'text_temperature',
-				             'text_top_percent',
-				             'text_top_k',
-				             'text_frequency_penalty',
-				             'text_presence_penalty' ]:
+				for key in [ 'text_temperature', 'text_top_percent', 'text_top_k',
+					'text_frequency_penalty', 'text_presence_penalty' ]:
 					if key in st.session_state:
 						del st.session_state[ key ]
 			
 			def reset_text_grounding_settings( ) -> None:
-				for key in [ 'text_google_grounding',
-				             'text_urls_input',
-				             'text_max_urls',
-				             'text_tools',
-				             'text_urls',
-				             'selected_filestore_id',
-				             'selected_filestore_label',
-				             'text_file_search_store_names',
-				             'text_file_search_store_select' ]:
+				for key in [ 'text_google_grounding', 'text_urls_input', 'text_max_urls',
+					'text_tools', 'text_urls', 'selected_filestore_id', 'selected_filestore_label',
+					'text_file_search_store_names', 'text_file_search_store_select' ]:
 					if key in st.session_state:
 						del st.session_state[ key ]
 			
 			def reset_text_response_settings( ) -> None:
-				for key in [ 'text_max_tokens',
-				             'text_response_format',
-				             'text_response_schema',
-				             'text_stops',
-				             'text_stops_input',
-				             'text_safety_profile',
-				             'text_stream' ]:
+				for key in [ 'text_max_tokens', 'text_response_format', 'text_response_schema',
+					'text_stops', 'text_stops_input', 'text_safety_profile', 'text_stream' ]:
 					if key in st.session_state:
 						del st.session_state[ key ]
 			
@@ -4033,9 +4875,9 @@ if mode == 'Text':
 						help='When enabled, Gemini grounds this Text response using Google Search.' )
 					
 					if text_google_grounding:
-						st.Title( 'Google Search grounding is enabled.' )
+						st.caption( 'Google Search grounding is enabled.' )
 					else:
-						st.Title( 'Google Search grounding is disabled.' )
+						st.caption( 'Google Search grounding is disabled.' )
 				
 				# ---------- Max URLs ------------
 				with ground_c2:
@@ -4107,52 +4949,8 @@ if mode == 'Text':
 		# ------------------------------------------------------------------
 		# Expander — Text System Instructions
 		# ------------------------------------------------------------------
-		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
-			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-			
-			prompt_names = fetch_prompt_names( cfg.DB_PATH )
-			if not prompt_names:
-				prompt_names = [ '' ]
-			
-			with in_left:
-				st.text_area( label='Enter Text', height=50, width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS, key='text_system_instructions' )
-			
-			def _on_template_change( ) -> None:
-				name = st.session_state.get( 'instructions' )
-				if name and name != 'No Templates Found':
-					text = fetch_prompt_text( cfg.DB_PATH, name )
-					if text is not None:
-						st.session_state[ 'text_system_instructions' ] = text
-			
-			with in_right:
-				st.selectbox( label='Use Template', options=prompt_names, index=None,
-					key='instructions', on_change=_on_template_change )
-			
-			def _on_clear( ) -> None:
-				st.session_state[ 'text_system_instructions' ] = ''
-				st.session_state[ 'instructions' ] = ''
-			
-			def _on_convert_system_instructions( ) -> None:
-				text = st.session_state.get( 'text_system_instructions', '' )
-				if not isinstance( text, str ) or not text.strip( ):
-					return
-				
-				src = text.strip( )
-				if cfg.XML_BLOCK_PATTERN.search( src ):
-					converted = convert_xml( src )
-				else:
-					converted = convert_markdown( src )
-				
-				st.session_state[ 'text_system_instructions' ] = converted
-			
-			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
-			with btn_c1:
-				st.button( label='Clear Instructions', width='stretch', on_click=_on_clear )
-			
-			with btn_c2:
-				st.button( label='XML <-> Markdown', width='stretch',
-					on_click=_on_convert_system_instructions )
+		render_system_prompt_expander( state_prefix='text',
+			instruction_key='text_system_instructions', label='System Instructions', height=140 )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
@@ -4169,11 +4967,7 @@ if mode == 'Text':
 		if prompt is not None and str( prompt ).strip( ):
 			prompt = str( prompt ).strip( )
 			apply_gemini_runtime_config( )
-			
-			st.session_state.text_messages.append( {
-					'role': 'user',
-					'content': prompt,
-			} )
+			st.session_state.text_messages.append( { 'role': 'user', 'content': prompt, } )
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
@@ -4511,7 +5305,7 @@ elif mode == "Images":
 						disabled=not supports_grounding )
 					
 					if not supports_grounding:
-						st.Title( 'Not supported by selected model.' )
+						st.caption( 'Not supported by selected model.' )
 					
 					image_grounded = st.session_state.get( 'image_grounded', False )
 				
@@ -4534,51 +5328,88 @@ elif mode == "Images":
 							del st.session_state[ key ]
 					st.rerun( )
 		
+		# ------------------------------------------------------------------
+		# Expander — Images System Instructions
+		# ------------------------------------------------------------------
 		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
+			image_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
+				mode_name='Images' )
+			
+			image_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+				for
+				record in image_prompt_records }
+			
+			image_prompt_ids = list( image_prompt_lookup.keys( ) )
+			
+			# ----------------------------------------------------------
+			# Images Prompt Callbacks
+			# ----------------------------------------------------------
+			def on_image_prompt_change( ) -> None:
+				"""Load the selected Images Mode prompt.
+				
+				Purpose:
+				    Retrieves the selected Images Mode prompt by stable ID and copies its Text
+				    value into the Images Mode system-instruction control.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				load_prompt_into_state( prompt_id_key='image_prompt_id',
+					instruction_key='image_system_instructions' )
+			
+			def clear_image_prompt( ) -> None:
+				"""Clear the Images Mode prompt.
+				
+				Purpose:
+				    Clears the selected Images Mode prompt ID and system-instruction text
+				    without modifying any prompt record in the database.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				clear_prompt_state( prompt_id_key='image_prompt_id',
+					instruction_key='image_system_instructions' )
+			
+			def convert_image_prompt( ) -> None:
+				"""Convert the Images Mode prompt.
+				
+				Purpose:
+				    Converts the current Images Mode system instructions between supported XML
+				    prompt blocks and Markdown headings.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				convert_prompt_state( instruction_key='image_system_instructions' )
+			
+			# ----------------------------------------------------------
+			# Images Prompt Controls
+			# ----------------------------------------------------------
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-			prompt_names = fetch_prompt_names( cfg.DB_PATH )
-			if not prompt_names:
-				prompt_names = [ '' ]
 			
 			with in_left:
 				st.text_area( label='Enter Text', height=50, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
 			
-			def _on_image_template_change( ) -> None:
-				name = st.session_state.get( 'image_instructions_template' )
-				if name and name != 'No Templates Found':
-					text = fetch_prompt_text( cfg.DB_PATH, name )
-					if text is not None:
-						st.session_state[ 'image_system_instructions' ] = text
 			with in_right:
-				st.selectbox( label='Use Template', options=prompt_names, index=None,
-					key='image_instructions_template', on_change=_on_image_template_change )
-			
-			def _on_clear_image_instructions( ) -> None:
-				st.session_state[ 'image_system_instructions' ] = ''
-				st.session_state[ 'image_instructions_template' ] = ''
-			
-			def _on_convert_image_system_instructions( ) -> None:
-				text = st.session_state.get( 'image_system_instructions', '' )
-				if not isinstance( text, str ) or not text.strip( ):
-					return
-				
-				src = text.strip( )
-				if cfg.XML_BLOCK_PATTERN.search( src ):
-					converted = convert_xml( src )
+				if image_prompt_ids:
+					st.selectbox( label='Use Template', options=image_prompt_ids,
+						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+							prompt_lookup=image_prompt_lookup ), index=None, key='image_prompt_id',
+						on_change=on_image_prompt_change, placeholder='Options' )
 				else:
-					converted = convert_markdown( src )
-				
-				st.session_state[ 'image_system_instructions' ] = converted
+					st.selectbox( label='Use Template', options=[ ], index=None,
+						key='image_prompt_id', placeholder='No Images prompts', disabled=True )
 			
 			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+			
 			with btn_c1:
-				st.button( label='Clear Instructions', width='stretch',
-					on_click=_on_clear_image_instructions )
+				st.button( label='Clear Instructions', key='image_clear_instructions',
+					width='stretch', on_click=clear_image_prompt )
 			
 			with btn_c2:
-				st.button( label='XML <-> Markdown', width='stretch',
-					on_click=_on_convert_image_system_instructions )
+				st.button( label='XML <-> Markdown', key='image_convert_instructions',
+					width='stretch', on_click=convert_image_prompt )
 		
 		def _append_image_message( role: str, content: str ) -> None:
 			try:
@@ -4656,7 +5487,7 @@ elif mode == "Images":
 			tmp_path = None
 			if uploaded_img:
 				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, Title='Uploaded image preview', width=250 )
+				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
 			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
@@ -4715,7 +5546,7 @@ elif mode == "Images":
 			tmp_path = None
 			if uploaded_img:
 				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, Title='Uploaded image preview', width=250 )
+				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
 			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
@@ -5210,87 +6041,87 @@ elif mode == 'Audio':
 					on_click=reset_audio_response_settings )
 		
 		# ------------------------------------------------------------------
-		# System Prompt
+		# Expander — Audio System Instructions
 		# ------------------------------------------------------------------
 		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
-			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			audio_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
+				mode_name='Audio' )
 			
-			prompt_names = fetch_prompt_names( cfg.DB_PATH )
-			if not prompt_names:
-				prompt_names = [ '' ]
+			audio_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+				for
+				record in audio_prompt_records }
+			
+			audio_prompt_ids = list( audio_prompt_lookup.keys( ) )
+			
+			# ----------------------------------------------------------
+			# Audio Prompt Callbacks
+			# ----------------------------------------------------------
+			def on_audio_prompt_change( ) -> None:
+				"""Load the selected Audio Mode prompt.
+				
+				Purpose:
+				    Retrieves the selected Audio Mode prompt by stable ID and copies its Text
+				    value into the Audio Mode system-instruction control.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				load_prompt_into_state( prompt_id_key='audio_prompt_id',
+					instruction_key='audio_system_instructions' )
+			
+			def clear_audio_prompt( ) -> None:
+				"""Clear the Audio Mode prompt.
+				
+				Purpose:
+				    Clears the selected Audio Mode prompt ID and system-instruction text
+				    without modifying any prompt record in the database.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				clear_prompt_state( prompt_id_key='audio_prompt_id',
+					instruction_key='audio_system_instructions' )
+			
+			def convert_audio_prompt( ) -> None:
+				"""Convert the Audio Mode prompt.
+				
+				Purpose:
+				    Converts the current Audio Mode system instructions between supported XML
+				    prompt blocks and Markdown headings.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				convert_prompt_state( instruction_key='audio_system_instructions' )
+			
+			# ----------------------------------------------------------
+			# Audio Prompt Controls
+			# ----------------------------------------------------------
+			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			
 			with in_left:
 				st.text_area( label='Enter Text', height=50, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
 			
-			def on_audio_template_change( ) -> None:
-				"""Load the selected Audio Mode system-prompt template.
-				
-				Purpose:
-				    Retrieves the selected prompt text from the application database and
-				    writes it to the Audio Mode instruction control.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				name = st.session_state.get( 'audio_instructions_template' )
-				
-				if name and name != 'No Templates Found':
-					template_text = fetch_prompt_text( cfg.DB_PATH, name )
-					if template_text is not None:
-						st.session_state[ 'audio_system_instructions' ] = template_text
-			
 			with in_right:
-				st.selectbox( label='Use Template', options=prompt_names, index=None,
-					key='audio_instructions_template', on_change=on_audio_template_change )
-			
-			def clear_audio_instructions( ) -> None:
-				"""Clear Audio Mode system instructions.
-				
-				Purpose:
-				    Removes the active Audio Mode instruction text and selected prompt
-				    template.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				st.session_state[ 'audio_system_instructions' ] = ''
-				st.session_state[ 'audio_instructions_template' ] = ''
-			
-			def convert_audio_system_instructions( ) -> None:
-				"""Convert Audio Mode system instructions.
-				
-				Purpose:
-				    Converts the active Audio Mode instruction text between supported XML
-				    blocks and Markdown headings.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				instruction_text = st.session_state.get( 'audio_system_instructions', '' )
-				
-				if not isinstance( instruction_text, str ) or not instruction_text.strip( ):
-					return
-				
-				source_text = instruction_text.strip( )
-				
-				if cfg.XML_BLOCK_PATTERN.search( source_text ):
-					converted_text = convert_xml( source_text )
+				if audio_prompt_ids:
+					st.selectbox( label='Use Template', options=audio_prompt_ids,
+						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+							prompt_lookup=audio_prompt_lookup ), index=None, key='audio_prompt_id',
+						on_change=on_audio_prompt_change, placeholder='Options' )
 				else:
-					converted_text = convert_markdown( source_text )
-				
-				st.session_state[ 'audio_system_instructions' ] = converted_text
+					st.selectbox( label='Use Template', options=[ ], index=None,
+						key='audio_prompt_id', placeholder='No Audio prompts', disabled=True )
 			
 			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+			
 			with btn_c1:
-				st.button( label='Clear Instructions', width='stretch',
-					on_click=clear_audio_instructions )
+				st.button( label='Clear Instructions', key='audio_clear_instructions',
+					width='stretch', on_click=clear_audio_prompt )
 			
 			with btn_c2:
-				st.button( label='XML <-> Markdown', width='stretch',
-					on_click=convert_audio_system_instructions )
-		
-		st.divider( )
+				st.button( label='XML <-> Markdown', key='audio_convert_instructions',
+					width='stretch', on_click=convert_audio_prompt )
 		
 		# ------------------------------------------------------------------
 		# Audio Workspace
@@ -5447,15 +6278,15 @@ elif mode == 'Audio':
 							except Exception as e:
 								st.error( f'Recorded {audio_task.lower( )} failed: {e}' )
 				elif audio_task == 'Text-to-Speech':
-					st.Title( 'Recorded audio is not used by the Text-to-Speech workflow.' )
+					st.caption( 'Recorded audio is not used by the Text-to-Speech workflow.' )
 				else:
-					st.Title( 'Select Transcribe or Translate to process the recording.' )
+					st.caption( 'Select Transcribe or Translate to process the recording.' )
 		
 		# ------------------------------------------------------------------
 		# Audio Output
 		# ------------------------------------------------------------------
 		with right_audio:
-			st.Title( 'Audio Output' )
+			st.caption( 'Audio Output' )
 			if st.session_state.get( 'audio_output_bytes' ) is not None:
 				st.audio( st.session_state[ 'audio_output_bytes' ], format='audio/wav',
 					start_time=audio_start, end_time=audio_end, loop=audio_loop,
@@ -5845,6 +6676,8 @@ elif mode == 'Document Q&A':
 		st.divider( )
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
+			# -------- LLM Settings ----------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
@@ -5906,6 +6739,7 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
+			# -------- Inference Settings ----------
 			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
 					width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
@@ -5965,6 +6799,7 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
+			# -------- Tool Settings ----------
 			with st.expander( label='Tool Settings', icon='🛠️', expanded=False, width='stretch' ):
 				tool_c1, tool_c2, tool_c3, tool_c4, tool_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
@@ -6029,6 +6864,7 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
+			# -------- Respose Settings ----------
 			with st.expander( label='Response Settings', icon='↔️', expanded=False,
 					width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
@@ -6085,56 +6921,87 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 		
-		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
+		# ------------------------------------------------------------------
+		# Expander — Document Q&A System Instructions
+		# ------------------------------------------------------------------
+		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+			docqna_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
+				mode_name='Document Q&A' )
+			
+			docqna_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+				for record in docqna_prompt_records }
+			
+			docqna_prompt_ids = list( docqna_prompt_lookup.keys( ) )
+			
+			# ----------------------------------------------------------
+			# Document Q&A Prompt Callbacks
+			# ----------------------------------------------------------
+			def on_docqna_prompt_change( ) -> None:
+				"""Load the selected Document Q&A prompt.
+				
+				Purpose:
+				    Retrieves the selected Document Q&A prompt by stable ID and copies its
+				    Text value into the Document Q&A system-instruction control.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				load_prompt_into_state( prompt_id_key='docqna_prompt_id',
+					instruction_key='docqna_system_instructions' )
+			
+			def clear_docqna_prompt( ) -> None:
+				"""Clear the Document Q&A prompt.
+				
+				Purpose:
+				    Clears the selected Document Q&A prompt ID and system-instruction text
+				    without modifying any prompt record in the database.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				clear_prompt_state( prompt_id_key='docqna_prompt_id',
+					instruction_key='docqna_system_instructions' )
+			
+			def convert_docqna_prompt( ) -> None:
+				"""Convert the Document Q&A prompt.
+				
+				Purpose:
+				    Converts the current Document Q&A system instructions between supported
+				    XML prompt blocks and Markdown headings.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				convert_prompt_state( instruction_key='docqna_system_instructions' )
+			
+			# ----------------------------------------------------------
+			# Document Q&A Prompt Controls
+			# ----------------------------------------------------------
 			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-			
-			prompt_names = fetch_prompt_names( cfg.DB_PATH )
-			if not prompt_names:
-				prompt_names = [ '' ]
-			
 			with in_left:
-				st.text_area( label='Enter Text', height=50, width='stretch',
+				st.text_area( label='Enter Text', height=120, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='docqna_system_instructions' )
 			
-			def _on_template_change( ) -> None:
-				name = st.session_state.get( 'instructions' )
-				if name and name != 'No Templates Found':
-					text = fetch_prompt_text( cfg.DB_PATH, name )
-					if text is not None:
-						st.session_state[ 'docqna_system_instructions' ] = text
-			
 			with in_right:
-				st.selectbox( label='Use Template', options=prompt_names, index=None,
-					key='instructions', on_change=_on_template_change )
-			
-			def _on_clear( ) -> None:
-				st.session_state[ 'docqna_system_instructions' ] = ''
-				st.session_state[ 'instructions' ] = ''
-			
-			def _on_convert_system_instructions( ) -> None:
-				text = st.session_state.get( 'docqna_system_instructions', '' )
-				if not isinstance( text, str ) or not text.strip( ):
-					return
-				
-				src = text.strip( )
-				
-				# XML-delimited prompt blocks -> Markdown headings
-				if cfg.XML_BLOCK_PATTERN.search( src ):
-					converted = convert_xml( src )
-				
-				# Markdown headings <-> simple <hN> tags handled by existing helper
+				if docqna_prompt_ids:
+					st.selectbox( label='Use Template', options=docqna_prompt_ids,
+						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+							prompt_lookup=docqna_prompt_lookup ), index=None,
+						key='docqna_prompt_id', on_change=on_docqna_prompt_change,
+						placeholder='Options' )
 				else:
-					converted = convert_markdown( src )
-				
-				st.session_state[ 'docqna_system_instructions' ] = converted
+					st.selectbox( label='Use Template', options=[ ], index=None,
+						key='docqna_prompt_id', placeholder='No Document Q&A prompts',
+						disabled=True )
 			
 			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
 			with btn_c1:
-				st.button( label='Clear Instructions', width='stretch', on_click=_on_clear )
+				st.button( label='Clear Instructions', key='docqna_clear_instructions',
+					width='stretch', on_click=clear_docqna_prompt )
 			
 			with btn_c2:
-				st.button( label='XML <-> Markdown', width='stretch',
-					on_click=_on_convert_system_instructions )
+				st.button( label='XML <-> Markdown', key='docqna_convert_instructions',
+					width='stretch', on_click=convert_docqna_prompt )
 		
 		with st.expander( label='Document Loading', icon='📥', expanded=False, width='stretch' ):
 			doc_left, doc_right = st.columns( [ 0.2, 0.8 ], border=True )
@@ -6184,7 +7051,6 @@ elif mode == 'Document Q&A':
 		# Document Q&A Input
 		# ------------------------------------------------------------------
 		prompt = st.chat_input( 'Ask a question about the document', key='docqna_chat_input' )
-		
 		if prompt is not None and str( prompt ).strip( ):
 			prompt = str( prompt ).strip( )
 			st.session_state[ 'docqna_messages' ].append( { 'role': 'user', 'content': prompt, } )
@@ -6443,56 +7309,87 @@ elif mode == 'Files':
 					
 					st.rerun( )
 		
-		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
-			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+		# ------------------------------------------------------------------
+		# Expander — Files System Instructions
+		# ------------------------------------------------------------------
+		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
+			files_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
+				mode_name='Document Q&A' )
 			
-			prompt_names = fetch_prompt_names( cfg.DB_PATH )
-			if not prompt_names:
-				prompt_names = [ '' ]
+			files_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+				for
+				record in files_prompt_records }
+			
+			files_prompt_ids = list( files_prompt_lookup.keys( ) )
+			
+			# ----------------------------------------------------------
+			# Files Prompt Callbacks
+			# ----------------------------------------------------------
+			def on_files_prompt_change( ) -> None:
+				"""Load the selected Files Mode prompt.
+				
+				Purpose:
+				    Retrieves the selected Files Mode prompt by stable ID and copies its Text
+				    value into the Files Mode system-instruction control.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				load_prompt_into_state( prompt_id_key='files_prompt_id',
+					instruction_key='files_system_instructions' )
+			
+			def clear_files_prompt( ) -> None:
+				"""Clear the Files Mode prompt.
+				
+				Purpose:
+				    Clears the selected Files Mode prompt ID and system-instruction text without
+				    modifying any prompt record in the database.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				clear_prompt_state( prompt_id_key='files_prompt_id',
+					instruction_key='files_system_instructions' )
+			
+			def convert_files_prompt( ) -> None:
+				"""Convert the Files Mode prompt.
+				
+				Purpose:
+				    Converts the current Files Mode system instructions between supported XML
+				    prompt blocks and Markdown headings.
+				
+				Returns:
+				    None: This function updates Streamlit session state through side effects.
+				"""
+				convert_prompt_state( instruction_key='files_system_instructions' )
+			
+			# ----------------------------------------------------------
+			# Files Prompt Controls
+			# ----------------------------------------------------------
+			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
 			
 			with in_left:
 				st.text_area( label='Enter Text', height=50, width='stretch',
 					help=cfg.SYSTEM_INSTRUCTIONS, key='files_system_instructions' )
 			
-			def _on_template_change( ) -> None:
-				name = st.session_state.get( 'instructions' )
-				if name and name != 'No Templates Found':
-					text = fetch_prompt_text( cfg.DB_PATH, name )
-					if text is not None:
-						st.session_state[ 'files_system_instructions' ] = text
-			
 			with in_right:
-				st.selectbox( label='Use Template', options=prompt_names, index=None,
-					key='instructions', on_change=_on_template_change )
-			
-			def _on_clear( ) -> None:
-				st.session_state[ 'files_system_instructions' ] = ''
-				st.session_state[ 'instructions' ] = ''
-			
-			def _on_convert_system_instructions( ) -> None:
-				text = st.session_state.get( 'files_system_instructions', '' )
-				if not isinstance( text, str ) or not text.strip( ):
-					return
-				
-				src = text.strip( )
-				
-				# XML-delimited prompt blocks -> Markdown headings
-				if cfg.XML_BLOCK_PATTERN.search( src ):
-					converted = convert_xml( src )
-				
-				# Markdown headings <-> simple <hN> tags handled by existing helper
+				if files_prompt_ids:
+					st.selectbox( label='Use Template', options=files_prompt_ids,
+						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+							prompt_lookup=files_prompt_lookup ), index=None, key='files_prompt_id',
+						on_change=on_files_prompt_change, placeholder='Options' )
 				else:
-					converted = convert_markdown( src )
-				
-				st.session_state[ 'files_system_instructions' ] = converted
+					st.selectbox( label='Use Template', options=[ ], index=None,
+						key='files_prompt_id', placeholder='No Files prompts', disabled=True )
 			
 			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
 			with btn_c1:
-				st.button( label='Clear Instructions', width='stretch', on_click=_on_clear )
+				st.button( label='Clear Instructions', key='files_clear_instructions',
+					width='stretch', on_click=clear_files_prompt )
 			
 			with btn_c2:
-				st.button( label='XML <-> Markdown', width='stretch',
-					on_click=_on_convert_system_instructions )
+				st.button( label='XML <-> Markdown', key='files_convert_instructions',
+					width='stretch', on_click=convert_files_prompt )
 		
 		fls_c1, fls_c2 = st.columns( [ 0.4, 0.6 ], border=True )
 		with fls_c1:
@@ -6624,139 +7521,660 @@ elif mode == 'Files':
 # FILE SEARCH STORES MODE
 # ======================================================================================
 elif mode == 'File Search Stores':
-	stores_model = st.session_state.get( 'stores_model', None )
-	stores_format = st.session_state.get( 'stores_response_format', None )
-	stores_top_percent = st.session_state.get( 'stores_top_percent', None )
-	stores_frequency = st.session_state.get( 'stores_frequency_penalty', None )
-	stores_presence = st.session_state.get( 'stores_presence_penalty', None )
-	stores_number = st.session_state.get( 'stores_number', None )
-	stores_temperature = st.session_state.get( 'stores_temperature', None )
-	stores_stream = st.session_state.get( 'stores_stream', None )
-	stores_store = st.session_state.get( 'stores_store', None )
-	stores_input = st.session_state.get( 'stores_input', None )
-	stores_reasoning = st.session_state.get( 'stores_reasoning', None )
-	stores_tool_choice = st.session_state.get( 'stores_tool_choice', None )
-	stores_messages = st.session_state.get( 'stores_messages', None )
-	stores_background = st.session_state.get( 'stores_background', None )
-	searcher = None
-	
-	# ------------------------------------------------------------------
-	# Main Chat UI
-	# ------------------------------------------------------------------
+	stores_model = st.session_state.get( 'stores_model', '' )
+	stores_format = st.session_state.get( 'stores_response_format', '' )
+	stores_top_percent = st.session_state.get( 'stores_top_percent', 0.0 )
+	stores_frequency = st.session_state.get( 'stores_frequency_penalty', 0.0 )
+	stores_presence = st.session_state.get( 'stores_presence_penalty', 0.0 )
+	stores_number = st.session_state.get( 'stores_number', 1 )
+	stores_temperature = st.session_state.get( 'stores_temperature', 0.0 )
+	stores_stream = st.session_state.get( 'stores_stream', False )
+	stores_store = st.session_state.get( 'stores_store', False )
+	stores_input = st.session_state.get( 'stores_input', [ ] )
+	stores_reasoning = st.session_state.get( 'stores_reasoning', '' )
+	stores_tool_choice = st.session_state.get( 'stores_tool_choice', '' )
+	stores_messages = st.session_state.get( 'stores_messages', [ ] )
+	stores_background = st.session_state.get( 'stores_background', False )
+	stores_max_tokens = st.session_state.get( 'stores_max_tokens', 0 )
+	stores_id = st.session_state.get( 'stores_id', '' )
+	stores_system_instructions = st.session_state.get( 'stores_system_instructions', '' )
 	searcher = FileSearch( )
+	chat = Chat( )
 	
+	# ------------------------------------------------------------------
+	# File Search Stores State Guards
+	# ------------------------------------------------------------------
+	if not isinstance( st.session_state.get( 'stores_messages' ), list ):
+		st.session_state[ 'stores_messages' ] = [ ]
+	
+	if not isinstance( st.session_state.get( 'stores_input' ), list ):
+		st.session_state[ 'stores_input' ] = [ ]
+	
+	if 'stores_system_instructions' not in st.session_state:
+		st.session_state[ 'stores_system_instructions' ] = ''
+	
+	if 'stores_prompt_id' not in st.session_state:
+		st.session_state[ 'stores_prompt_id' ] = None
+	
+	if 'stores_selected_label' not in st.session_state:
+		st.session_state[ 'stores_selected_label' ] = ''
+	
+	# ------------------------------------------------------------------
+	# File Search Stores Helpers
+	# ------------------------------------------------------------------
+	def reset_stores_model_settings( ) -> None:
+		"""Reset File Search Stores model settings.
+		
+		Purpose:
+		    Removes the File Search Stores model, reasoning, and candidate controls so
+		    Streamlit restores their initial values during the subsequent rerun.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			for key in [ 'stores_model', 'stores_reasoning', 'stores_number' ]:
+				st.session_state.pop( key, None )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'reset_stores_model_settings'
+			exception.method = 'reset_stores_model_settings( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def reset_stores_inference_settings( ) -> None:
+		"""Reset File Search Stores inference settings.
+		
+		Purpose:
+		    Removes the File Search Stores sampling and penalty controls so Streamlit
+		    restores their initial values during the subsequent rerun.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			for key in [ 'stores_temperature', 'stores_top_percent', 'stores_frequency_penalty',
+				'stores_presence_penalty' ]:
+				st.session_state.pop( key, None )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'reset_stores_inference_settings'
+			exception.method = 'reset_stores_inference_settings( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def reset_stores_response_settings( ) -> None:
+		"""Reset File Search Stores response settings.
+		
+		Purpose:
+		    Removes the File Search Stores output-token, response-format, and streaming
+		    controls so Streamlit restores their initial values during the subsequent rerun.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			for key in [ 'stores_max_tokens', 'stores_response_format', 'stores_stream' ]:
+				st.session_state.pop( key, None )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'reset_stores_response_settings'
+			exception.method = 'reset_stores_response_settings( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def clear_stores_messages( ) -> None:
+		"""Clear File Search Stores conversation history.
+		
+		Purpose:
+		    Removes File Search Stores user and assistant messages while preserving the
+		    selected store, uploaded files, model controls, and system instructions.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			st.session_state[ 'stores_messages' ] = [ ]
+			st.session_state[ 'stores_input' ] = [ ]
+			st.session_state[ 'last_answer' ] = ''
+			st.session_state[ 'last_sources' ] = [ ]
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'clear_stores_messages'
+			exception.method = 'clear_stores_messages( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def on_stores_prompt_change( ) -> None:
+		"""Load the selected File Search Stores prompt.
+		
+		Purpose:
+		    Retrieves the selected prompt by its stable database ID and copies its Text value
+		    into the File Search Stores system-instruction control.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			load_prompt_into_state( prompt_id_key='stores_prompt_id',
+				instruction_key='stores_system_instructions' )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'on_stores_prompt_change'
+			exception.method = 'on_stores_prompt_change( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def clear_stores_prompt( ) -> None:
+		"""Clear the File Search Stores prompt.
+		
+		Purpose:
+		    Clears the selected prompt ID and File Search Stores system-instruction text
+		    without modifying any prompt record in the database.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			clear_prompt_state( prompt_id_key='stores_prompt_id',
+				instruction_key='stores_system_instructions' )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'clear_stores_prompt'
+			exception.method = 'clear_stores_prompt( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def convert_stores_prompt( ) -> None:
+		"""Convert the File Search Stores prompt.
+		
+		Purpose:
+		    Converts the File Search Stores system instructions between supported XML prompt
+		    blocks and Markdown headings.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			convert_prompt_state( instruction_key='stores_system_instructions' )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'convert_stores_prompt'
+			exception.method = 'convert_stores_prompt( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def run_file_search_store_query( prompt: str, store_name: str ) -> str:
+		"""Run a File Search Stores query.
+		
+		Purpose:
+		    Sends a user prompt to the configured Gemini text-generation model and enables
+		    Gemini file-search grounding against the selected File Search Store.
+		
+		Args:
+		    prompt (str): User question submitted through the chat input.
+		    store_name (str): Selected File Search Store resource identifier.
+		
+		Returns:
+		    str: Generated answer grounded in the selected File Search Store.
+		
+		Raises:
+		    Error: Raised when validation or Gemini execution fails.
+		"""
+		try:
+			prompt_text = str( prompt or '' ).strip( )
+			selected_store = str( store_name or '' ).strip( )
+			selected_model = str( st.session_state.get( 'stores_model', '' ) or '' ).strip( )
+			
+			if not prompt_text:
+				raise ValueError( 'Enter a question before running File Search.' )
+			
+			if not selected_store:
+				raise ValueError( 'Select a File Search Store before submitting a question.' )
+			
+			if not selected_model:
+				raise ValueError( 'Select a model before submitting a File Search question.' )
+			
+			context = st.session_state.get( 'stores_messages', [ ] )
+			
+			if not isinstance( context, list ):
+				context = [ ]
+			
+			if context:
+				context = context[ :-1 ]
+			
+			apply_gemini_runtime_config( )
+			
+			response = chat.generate_text( prompt=prompt_text, model=selected_model,
+				number=int( st.session_state.get( 'stores_number', 1 ) or 1 ),
+				temperature=float( st.session_state.get( 'stores_temperature', 0.0 ) or 0.0 ),
+				top_p=float( st.session_state.get( 'stores_top_percent', 0.0 ) or 0.0 ), top_k=0,
+				frequency=float( st.session_state.get( 'stores_frequency_penalty', 0.0 ) or 0.0 ),
+				presence=float( st.session_state.get( 'stores_presence_penalty', 0.0 ) or 0.0 ),
+				max_tokens=int( st.session_state.get( 'stores_max_tokens', 0 ) or 0 ), stops=[ ],
+				instruct=str( st.session_state.get( 'stores_system_instructions', '' ) or '' ),
+				response_format=st.session_state.get( 'stores_response_format', '' ), tools=[ ],
+				tool_choice=None, reasoning=st.session_state.get( 'stores_reasoning', '' ),
+				modalities=[ ], media_resolution='', context=context, content='', urls=[ ],
+				max_urls=0, response_schema='', safety_profile='',
+				file_search_store_names=[ selected_store ],
+				stream=bool( st.session_state.get( 'stores_stream', False ) ),
+				stream_handler=None )
+			
+			if response is None:
+				raise ValueError( 'Gemini returned no File Search response.' )
+			
+			response_text = str( response ).strip( )
+			
+			if not response_text:
+				raise ValueError( 'Gemini returned an empty File Search response.' )
+			
+			try:
+				update_counters( getattr( chat, 'response', None ) )
+			except Exception:
+				pass
+			
+			return response_text
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'run_file_search_store_query'
+			exception.method = ('run_file_search_store_query( '
+			                    'prompt: str, store_name: str ) -> str')
+			Logger( ).write( exception )
+			raise exception
+	
+	# ------------------------------------------------------------------
+	# Global Instruction Clearing Contract
+	# ------------------------------------------------------------------
+	if st.session_state.get( 'clear_instructions' ):
+		st.session_state[ 'stores_system_instructions' ] = ''
+		st.session_state[ 'stores_prompt_id' ] = None
+		st.session_state[ 'clear_instructions' ] = False
+	
+	# ------------------------------------------------------------------
+	# Main File Search Stores Interface
+	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
 		st.subheader( '📦 File Search Stores', help=cfg.VECTORSTORES_API )
+		
 		st.divider( )
-		st.Title( 'File Search Store Management' )
+		
+		# ------------------------------------------------------------------
+		# Mind Controls
+		# ------------------------------------------------------------------
+		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
+			# --------- LLM Settings ---------
+			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
+				model_c1, model_c2, model_c3 = st.columns( [ 0.40, 0.35, 0.25 ], border=True,
+					gap='xxsmall' )
+				
+				with model_c1:
+					stores_model = st.selectbox( label='Model', options=list( chat.model_options ),
+						key='stores_model', index=None, placeholder='Options',
+						help=('REQUIRED. Gemini model used to answer questions '
+						      'against the selected File Search Store.') )
+				
+				with model_c2:
+					stores_reasoning = st.selectbox( label='Thinking Level',
+						options=list( chat.reasoning_options ), key='stores_reasoning', index=None,
+						placeholder='Options', help=cfg.REASONING )
+				
+				with model_c3:
+					stores_number = st.slider( label='Candidates', min_value=1, max_value=8,
+						value=max( 1, int( st.session_state.get( 'stores_number', 1 ) or 1 ) ),
+						step=1, key='stores_number',
+						help=('Maximum number of candidate responses requested '
+						      'from the model.') )
+				
+				st.button( label='Reset', key='stores_model_reset', icon='🔄', width='stretch',
+					on_click=reset_stores_model_settings )
+			
+			# --------- Inference Settings ---------
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
+					width='stretch' ):
+				inference_c1, inference_c2, inference_c3, inference_c4 = (
+					st.columns( [ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' ))
+				
+				with inference_c1:
+					stores_temperature = st.slider( label='Temperature', min_value=-2.0,
+						max_value=2.0, step=0.01, key='stores_temperature', help=cfg.TEMPERATURE )
+				
+				with inference_c2:
+					stores_top_percent = st.slider( label='Top-P', min_value=0.0, max_value=1.0,
+						step=0.01, key='stores_top_percent', help=cfg.TOP_P )
+				
+				with inference_c3:
+					stores_frequency = st.slider( label='Frequency Penalty', min_value=-2.0,
+						max_value=2.0, step=0.01, key='stores_frequency_penalty',
+						help=cfg.FREQUENCY_PENALTY )
+				
+				with inference_c4:
+					stores_presence = st.slider( label='Presence Penalty', min_value=-2.0,
+						max_value=2.0, step=0.01, key='stores_presence_penalty',
+						help=cfg.PRESENCE_PENALTY )
+				
+				st.button( label='Reset', key='stores_inference_reset', icon='🔄', width='stretch',
+					on_click=reset_stores_inference_settings )
+			
+			# --------- Response Settings ---------
+			with st.expander( label='Response Settings', icon='↔️', expanded=False,
+					width='stretch' ):
+				response_c1, response_c2, response_c3 = st.columns( [ 0.40, 0.35, 0.25 ],
+					border=True, gap='xxsmall' )
+				
+				with response_c1:
+					stores_max_tokens = st.slider( label='Max Output Tokens', min_value=0,
+						max_value=100000, step=500, key='stores_max_tokens',
+						help=cfg.MAX_OUTPUT_TOKENS )
+				
+				with response_c2:
+					stores_format = st.selectbox( label='Response Format',
+						options=list( chat.format_options ), key='stores_response_format',
+						index=None, placeholder='Options',
+						help='Optional Gemini response MIME type.' )
+				
+				with response_c3:
+					stores_stream = st.toggle( label='Stream', key='stores_stream',
+						help=cfg.STREAM )
+				
+				st.button( label='Reset', key='stores_response_reset', icon='🔄', width='stretch',
+					on_click=reset_stores_response_settings )
+		
+		# ------------------------------------------------------------------
+		# File Search Stores System Prompt
+		# ------------------------------------------------------------------
+		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+			stores_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
+				mode_name='Document Q&A' )
+			
+			stores_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+				for record in stores_prompt_records }
+			
+			stores_prompt_ids = list( stores_prompt_lookup.keys( ) )
+			prompt_c1, prompt_c2 = st.columns( [ 0.80, 0.20 ] )
+			with prompt_c1:
+				st.text_area( label='Enter Text', height=50, width='stretch',
+					help=cfg.SYSTEM_INSTRUCTIONS, key='stores_system_instructions' )
+			
+			with prompt_c2:
+				if stores_prompt_ids:
+					st.selectbox( label='Use Template', options=stores_prompt_ids,
+						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+							prompt_lookup=stores_prompt_lookup ), index=None,
+						key='stores_prompt_id', on_change=on_stores_prompt_change,
+						placeholder='Options' )
+				else:
+					st.selectbox( label='Use Template', options=[ ], index=None,
+						key='stores_prompt_id', placeholder='No File Search prompts',
+						disabled=True )
+			
+			prompt_button_c1, prompt_button_c2 = st.columns( [ 0.80, 0.20 ] )
+			with prompt_button_c1:
+				st.button( label='Clear Instructions', key='stores_clear_instructions',
+					width='stretch', on_click=clear_stores_prompt, icon='🧹' )
+			
+			with prompt_button_c2:
+				st.button( label='XML ↔️ Markdown', key='stores_convert_instructions',
+					width='stretch', on_click=convert_stores_prompt )
+		
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ------------------------------------------------------------------
+		# File Search Store Management
+		# ------------------------------------------------------------------
+		st.caption( 'File Search Store Management' )
+		
+		# ------------------------------------------------------------------
+		# Store Creation, Retrieval, and Deletion
+		# ------------------------------------------------------------------
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
 		with stores_left:
-			# --------------------------------------------------------------
-			# Expander - Create File Search Store
-			# --------------------------------------------------------------
-			with st.expander( 'Create:', expanded=True ):
-				new_store_name = st.text_input( 'New File Search Store name' )
-				if st.button( '➕ Create' ):
-					if not new_store_name:
+			with st.expander( label='Create', expanded=True ):
+				new_store_name = st.text_input( label='New File Search Store name',
+					key='stores_new_store_name' )
+				
+				if st.button( label='Create', icon='➕', key='stores_create_store',
+						width='stretch' ):
+					if not str( new_store_name or '' ).strip( ):
 						st.warning( 'Enter a File Search Store Name.' )
 					else:
 						try:
-							res = searcher.create( new_store_name )
-							created_name = getattr( res, 'name', None ) or new_store_name
-							st.success( f"Created File Search Store: {created_name}" )
-						except Exception as exc:
-							st.error( f'Create store failed: {exc}' )
-			vs_map = getattr( searcher, 'collections', None )
+							result = searcher.create( str( new_store_name ).strip( ) )
+							created_name = (getattr( result, 'name', None ) or str(
+								new_store_name ).strip( ))
+							
+							st.success( f'Created File Search Store: {created_name}' )
+						except Exception as e:
+							exception = Error( e )
+							exception.module = 'app'
+							exception.cause = 'File Search Store creation'
+							exception.method = ('searcher.create( new_store_name )')
+							Logger( ).write( exception )
+							st.error( f'Create store failed: {exception.info}' )
 			
-			# --------------------------------------------------------------
-			# Expander - Retreive Files
-			# --------------------------------------------------------------
-			with st.expander( 'Retreive:', expanded=True ):
-				options = [ ]
-				if vs_map and isinstance( vs_map, dict ):
-					options = list( vs_map.items( ) )
-				
-				# --------------------------------------------------------------
-				# Select / Retrieve / Delete
-				# --------------------------------------------------------------
-				if options:
-					names = [ f'{n} — {i}' for n, i in options ]
-					sel = st.selectbox( 'Select  File Search Store', options=names,
-						key='select_stores' )
+			store_map = getattr( searcher, 'collections', None )
+			store_options: List[ Tuple[ str, str ] ] = [ ]
+			if isinstance( store_map, dict ):
+				store_options = [ (str( name ), str( identifier )) for name, identifier in
+					store_map.items( ) if str( identifier or '' ).strip( ) ]
+			
+			store_lookup = { identifier: name for name, identifier in store_options }
+			store_ids = list( store_lookup.keys( ) )
+			with st.expander( label='Retrieve', expanded=True ):
+				if store_ids:
+					selected_store_id = st.selectbox( label='Select File Search Store',
+						options=store_ids, format_func=lambda identifier: (
+							f'{store_lookup.get( identifier, identifier )} '
+							f'— {identifier}'), index=(store_ids.index(
+							st.session_state.get( 'stores_id' ) ) if st.session_state.get(
+							'stores_id' ) in store_ids else None), key='stores_store_selector',
+						placeholder='Options' )
 					
-					sel_id = ''
-					for n, i in options:
-						if f'{n} — {i}' == sel:
-							sel_id = i
-							break
+					if selected_store_id:
+						st.session_state[ 'stores_id' ] = (selected_store_id)
+						st.session_state[ 'stores_selected_label' ] = (
+							store_lookup.get( selected_store_id, selected_store_id ))
 					
-					opt_c1, opt_c2 = st.columns( [ 0.5, 0.5 ] )
-					with opt_c1:
-						if st.button( '📥  File Search Store', key='retrieve_filestore' ):
-							if not sel_id:
-								st.warning( 'No Vector Store Selected!' )
+					store_action_c1, store_action_c2 = st.columns( [ 0.50, 0.50 ] )
+					with store_action_c1:
+						if st.button( label='File Search Store', icon='📥',
+								key='retrieve_filestore',
+								width='stretch' ):
+							active_store_id = str(
+								st.session_state.get( 'stores_id', '' ) or '' ).strip( )
+							
+							if not active_store_id:
+								st.warning( 'No File Search Store Selected.' )
 							else:
 								try:
-									vs = searcher.retrieve( store_id=sel_id )
-									st.write( 'Name:', vs.name )
-									st.write( 'Files:', vs.file_counts )
-									st.write( 'Size (MB):', round( vs.usage_bytes / 1_048_576, 2 ) )
-								except Exception as exc:
-									st.error( f'retrieve() failed: {exc}' )
+									store_result = searcher.retrieve( store_id=active_store_id )
+									st.write( 'Name:', getattr( store_result, 'name', '—' ) )
+									st.write( 'Files:',
+										getattr( store_result, 'file_counts', '—' ) )
+									
+									usage_bytes = getattr( store_result, 'usage_bytes', 0 )
+									st.write( 'Size (MB):',
+										round( float( usage_bytes or 0 ) / 1_048_576, 2 ) )
+								
+								except Exception as e:
+									exception = Error( e )
+									exception.module = 'app'
+									exception.cause = ('File Search Store retrieval')
+									exception.method = ('searcher.retrieve( '
+									                    'store_id: str )')
+									Logger( ).write( exception )
+									st.error( 'retrieve() failed: '
+									          f'{exception.info}' )
 					
-					with opt_c2:
-						if st.button( '❌ Delete File Search Store', key='delete_store' ):
-							if not sel_id:
-								st.warning( 'No Vector Store Selected.' )
+					with store_action_c2:
+						if st.button( label='Delete File Search Store', icon='❌',
+								key='delete_store', width='stretch' ):
+							active_store_id = str(
+								st.session_state.get( 'stores_id', '' ) or '' ).strip( )
+							
+							if not active_store_id:
+								st.warning( 'No File Search Store Selected.' )
 							else:
 								try:
-									vs = searcher.delete( store_id=sel_id )
-								except Exception as exc:
-									st.error( f'Delete failed: {exc}' )
-			
-			# --------- Uploader
-			with stores_right:
-				uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
-					type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], )
+									searcher.delete( store_id=active_store_id )
+									st.session_state[ 'stores_id' ] = ''
+									st.session_state[ 'stores_selected_label' ] = ''
+									st.success( 'File Search Store deleted.' )
+									st.rerun( )
+								
+								except Exception as e:
+									exception = Error( e )
+									exception.module = 'app'
+									exception.cause = ('File Search Store deletion')
+									exception.method = ('searcher.delete( store_id: str )')
+									Logger( ).write( exception )
+									st.error( f'Delete failed: {exception.info}' )
 				
-				if uploaded_file:
-					tmp_path = save_temp( uploaded_file )
-					upload_fn = None
-					for name in ('upload_file', 'upload', 'files_upload'):
-						if hasattr( searcher, name ):
-							upload_fn = getattr( searcher, name )
-							break
-					
-					if not upload_fn:
-						st.warning( 'No upload function found on chat object.' )
-					else:
-						with st.spinner( 'Uploading to Files API...' ):
+				else:
+					st.info( 'No File Search Stores are currently available.' )
+		
+		# ------------------------------------------------------------------
+		# File Upload
+		# ------------------------------------------------------------------
+		with stores_right:
+			st.caption( 'Upload File' )
+			uploaded_file = st.file_uploader( label='Upload file (server-side via Files API)',
+				type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ],
+				key='stores_file_uploader' )
+			if uploaded_file is not None:
+				tmp_path = save_temp( uploaded_file )
+				upload_function = None
+				for method_name in ('upload_file', 'upload', 'files_upload'):
+					if hasattr( searcher, method_name ):
+						upload_function = getattr( searcher, method_name )
+						break
+				
+				if upload_function is None:
+					st.warning( 'No upload function was found on FileSearch.' )
+				
+				elif not tmp_path:
+					st.warning( 'The uploaded file could not be prepared.' )
+				
+				else:
+					if st.button( label='Upload File', icon='📤', key='stores_upload_file',
+							width='stretch' ):
+						with st.spinner( 'Uploading to the Files API…' ):
 							try:
-								fid = upload_fn( tmp_path )
-								st.success( f'Uploaded; file id: {fid}' )
-							except Exception as exc:
-								st.error( f"Upload failed: {exc}" )
+								file_identifier = upload_function( tmp_path )
+								st.success( f'Uploaded file:  {file_identifier}' )
+							except Exception as e:
+								exception = Error( e )
+								exception.module = 'app'
+								exception.cause = ('File Search Store file upload')
+								exception.method = ('FileSearch upload method')
+								Logger( ).write( exception )
+								st.error( f'Upload failed: {exception.info}' )
+			
+			active_store_label = str(
+				st.session_state.get( 'stores_selected_label', '' ) or '' ).strip( )
+			
+			active_store_id = str( st.session_state.get( 'stores_id', '' ) or '' ).strip( )
+			
+			if active_store_id:
+				st.info( f'Active File Search Store: {active_store_label or active_store_id}' )
+			else:
+				st.info( 'Select a File Search Store to enable grounded chat.' )
+		
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ------------------------------------------------------------------
+		# File Search Stores Conversation History
+		# ------------------------------------------------------------------
+		for message in st.session_state.get( 'stores_messages', [ ] ):
+			if not isinstance( message, dict ):
+				continue
+			
+			message_role = str( message.get( 'role', 'assistant' ) or 'assistant' ).strip( )
+			message_content = str( message.get( 'content', '' ) or '' ).strip( )
+			if not message_content:
+				continue
+			
+			message_avatar = (cfg.JENI if message_role == 'assistant' else '')
+			with st.chat_message( message_role, avatar=message_avatar ):
+				st.markdown( message_content )
+		
+		# ------------------------------------------------------------------
+		# File Search Stores Chat Input
+		# ------------------------------------------------------------------
+		stores_prompt = st.chat_input( 'Ask a question about the selected File Search Store …',
+			key='stores_chat_input' )
+		
+		if (stores_prompt is not None and str( stores_prompt ).strip( )):
+			stores_prompt = str( stores_prompt ).strip( )
+			active_store_id = str( st.session_state.get( 'stores_id', '' ) or '' ).strip( )
+			st.session_state[ 'stores_messages' ].append(
+				{ 'role': 'user', 'content': stores_prompt, } )
+			
+			with st.chat_message( 'assistant', avatar=cfg.JENI ):
+				with st.spinner( 'Searching the selected File Search Store…' ):
+					try:
+						response_text = run_file_search_store_query( prompt=stores_prompt,
+							store_name=active_store_id )
+						
+						st.markdown( response_text )
+						st.session_state[ 'stores_messages' ].append(
+							{ 'role': 'assistant', 'content': response_text, } )
+						
+						st.session_state[ 'stores_input' ] = [
+							{ 'role': 'user', 'content': stores_prompt, } ]
+						
+						st.session_state[ 'last_answer' ] = response_text
+					except Exception as e:
+						exception = (e if isinstance( e, Error ) else Error( e ))
+						st.error( f'File Search query failed: {exception.info}' )
+		
+		# ------------------------------------------------------------------
+		# Clear Messages
+		# ------------------------------------------------------------------
+		st.button( label='Clear Messages', key='stores_clear_messages', icon='🧹', width='stretch',
+			on_click=clear_stores_messages )
 
 # ======================================================================================
 # CLOUD BUCKET MODE
 # ======================================================================================
 elif mode == 'Google Cloud Buckets':
-	bucket_model = st.session_state.get( 'bucket_model', None )
-	bucket_format = st.session_state.get( 'bucket_response_format', None )
-	bucket_top_percent = st.session_state.get( 'bucket_top_percent', None )
-	bucket_frequency = st.session_state.get( 'bucket_frequency_penalty', None )
-	bucket_presence = st.session_state.get( 'bucket_presence_penalty', None )
-	bucket_number = st.session_state.get( 'bucket_number', None )
-	bucket_temperature = st.session_state.get( 'bucket_temperature', None )
-	bucket_stream = st.session_state.get( 'bucket_stream', None )
-	bucket_store = st.session_state.get( 'bucket_store', None )
-	bucket_input = st.session_state.get( 'bucket_input', None )
-	bucket_reasoning = st.session_state.get( 'bucket_reasoning', None )
-	bucket_tool_choice = st.session_state.get( 'bucket_tool_choice', None )
-	bucket_messages = st.session_state.get( 'bucket_messages', None )
-	bucket_background = st.session_state.get( 'bucket_background', None )
-	searcher = None
+	bucket_model = st.session_state.get( 'bucket_model', '' )
+	bucket_format = st.session_state.get( 'bucket_response_format', '' )
+	bucket_top_percent = st.session_state.get( 'bucket_top_percent', 0.0 )
+	bucket_frequency = st.session_state.get( 'bucket_frequency_penalty', 0.0 )
+	bucket_presence = st.session_state.get( 'bucket_presence_penalty', 0.0 )
+	bucket_number = st.session_state.get( 'bucket_number', 1 )
+	bucket_temperature = st.session_state.get( 'bucket_temperature', 0.0 )
+	bucket_stream = st.session_state.get( 'bucket_stream', False )
+	bucket_store = st.session_state.get( 'bucket_store', False )
+	bucket_input = st.session_state.get( 'bucket_input', [ ] )
+	bucket_reasoning = st.session_state.get( 'bucket_reasoning', '' )
+	bucket_tool_choice = st.session_state.get( 'bucket_tool_choice', '' )
+	bucket_messages = st.session_state.get( 'bucket_messages', [ ] )
+	bucket_background = st.session_state.get( 'bucket_background', False )
+	bucket_max_tokens = st.session_state.get( 'bucket_max_tokens', 0 )
+	bucket_id = st.session_state.get( 'bucket_id', '' )
+	bucket_system_instructions = st.session_state.get( 'bucket_system_instructions', '' )
+	searcher = CloudBuckets( )
+	chat = Chat( )
 	
 	# ------------------------------------------------------------------
 	# Session-State Guards
@@ -6764,15 +8182,94 @@ elif mode == 'Google Cloud Buckets':
 	if not isinstance( st.session_state.get( 'bucket_messages' ), list ):
 		st.session_state[ 'bucket_messages' ] = [ ]
 	
+	if not isinstance( st.session_state.get( 'bucket_input' ), list ):
+		st.session_state[ 'bucket_input' ] = [ ]
+	
+	if 'bucket_prompt_id' not in st.session_state:
+		st.session_state[ 'bucket_prompt_id' ] = None
+	
+	if 'bucket_selected_label' not in st.session_state:
+		st.session_state[ 'bucket_selected_label' ] = ''
+	
 	# ------------------------------------------------------------------
-	# Clear Bucket Messages
+	# Reset Callbacks
 	# ------------------------------------------------------------------
-	def clear_bucket_messages( ) -> None:
-		"""Clear Google Cloud Buckets messages.
+	def reset_bucket_model_settings( ) -> None:
+		"""Reset Google Cloud Buckets model settings.
 		
 		Purpose:
-		    Removes the Google Cloud Buckets conversation history without changing selected
-		    buckets, uploaded files, or bucket-management state.
+		    Removes the model, reasoning, and candidate controls so Streamlit restores
+		    their initial values during the subsequent rerun.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			for key in [ 'bucket_model', 'bucket_reasoning', 'bucket_number' ]:
+				st.session_state.pop( key, None )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'reset_bucket_model_settings'
+			exception.method = 'reset_bucket_model_settings( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def reset_bucket_inference_settings( ) -> None:
+		"""Reset Google Cloud Buckets inference settings.
+		
+		Purpose:
+		    Removes the sampling and penalty controls so Streamlit restores their initial
+		    values during the subsequent rerun.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			for key in [ 'bucket_temperature', 'bucket_top_percent', 'bucket_frequency_penalty',
+				'bucket_presence_penalty' ]:
+				st.session_state.pop( key, None )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'reset_bucket_inference_settings'
+			exception.method = 'reset_bucket_inference_settings( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def reset_bucket_response_settings( ) -> None:
+		"""Reset Google Cloud Buckets response settings.
+		
+		Purpose:
+		    Removes the output-token, response-format, and streaming controls so Streamlit
+		    restores their initial values during the subsequent rerun.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			for key in [ 'bucket_max_tokens', 'bucket_response_format', 'bucket_stream' ]:
+				st.session_state.pop( key, None )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'reset_bucket_response_settings'
+			exception.method = 'reset_bucket_response_settings( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	# ------------------------------------------------------------------
+	# Message and Prompt Callbacks
+	# ------------------------------------------------------------------
+	def clear_bucket_messages( ) -> None:
+		"""Clear Google Cloud Buckets conversation history.
+		
+		Purpose:
+		    Removes user and assistant messages while preserving the selected bucket,
+		    uploaded files, model controls, and system instructions.
 		
 		Returns:
 		    None: This function updates Streamlit session state through side effects.
@@ -6780,6 +8277,9 @@ elif mode == 'Google Cloud Buckets':
 		try:
 			st.session_state[ 'bucket_messages' ] = [ ]
 			st.session_state[ 'bucket_input' ] = [ ]
+			st.session_state[ 'last_answer' ] = ''
+			st.session_state[ 'last_sources' ] = [ ]
+		
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'app'
@@ -6788,145 +8288,495 @@ elif mode == 'Google Cloud Buckets':
 			Logger( ).write( exception )
 			raise exception
 	
-	# ------------------------------------------------------------------
-	# Main Chat UI
-	# ------------------------------------------------------------------
-	searcher = CloudBuckets( )
+	def on_bucket_prompt_change( ) -> None:
+		"""Load the selected Google Cloud Buckets prompt.
+		
+		Purpose:
+		    Retrieves the selected prompt by its stable database ID and copies its Text
+		    value into the mode-specific system-instruction control.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			load_prompt_into_state( prompt_id_key='bucket_prompt_id',
+				instruction_key='bucket_system_instructions' )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'on_bucket_prompt_change'
+			exception.method = 'on_bucket_prompt_change( ) -> None'
+			Logger( ).write( exception )
+			raise exception
 	
+	def clear_bucket_prompt( ) -> None:
+		"""Clear the Google Cloud Buckets prompt.
+		
+		Purpose:
+		    Clears the selected prompt ID and system-instruction text without modifying
+		    any prompt record in the database.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			clear_prompt_state( prompt_id_key='bucket_prompt_id',
+				instruction_key='bucket_system_instructions' )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'clear_bucket_prompt'
+			exception.method = 'clear_bucket_prompt( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def convert_bucket_prompt( ) -> None:
+		"""Convert the Google Cloud Buckets prompt.
+		
+		Purpose:
+		    Converts the system instructions between supported XML prompt blocks and
+		    Markdown headings.
+		
+		Returns:
+		    None: This function updates Streamlit session state through side effects.
+		"""
+		try:
+			convert_prompt_state( instruction_key='bucket_system_instructions' )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'convert_bucket_prompt'
+			exception.method = 'convert_bucket_prompt( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	# ------------------------------------------------------------------
+	# Chat Execution
+	# ------------------------------------------------------------------
+	def run_bucket_chat_query( prompt: str, selected_bucket_id: str,
+		selected_bucket_label: str ) -> str:
+		"""Run a Google Cloud Buckets chat query.
+		
+		Purpose:
+		    Sends a conversational request through the existing Gemini text-generation
+		    wrapper while supplying the selected bucket identifier as operational context.
+		    This function does not claim that Gemini has retrieved or searched bucket-object
+		    content.
+		
+		Args:
+		    prompt (str): User request submitted through the chat input.
+		    selected_bucket_id (str): Selected Google Cloud bucket identifier.
+		    selected_bucket_label (str): User-facing selected bucket name.
+		
+		Returns:
+		    str: Generated conversational response.
+		
+		Raises:
+		    Error: Raised when validation or Gemini execution fails.
+		"""
+		try:
+			prompt_text = str( prompt or '' ).strip( )
+			active_bucket_id = str( selected_bucket_id or '' ).strip( )
+			active_bucket_label = str( selected_bucket_label or '' ).strip( )
+			selected_model = str( st.session_state.get( 'bucket_model', '' ) or '' ).strip( )
+			
+			if not prompt_text:
+				raise ValueError( 'Enter a Google Cloud Buckets request.' )
+			
+			if not selected_model:
+				raise ValueError( 'Select a model before submitting a bucket request.' )
+			
+			context = st.session_state.get( 'bucket_messages', [ ] )
+			if not isinstance( context, list ):
+				context = [ ]
+			
+			if context:
+				context = context[ :-1 ]
+			
+			bucket_context = ('Google Cloud Storage operational context:\n'
+			                  f'Bucket Name: {active_bucket_label or "Not selected"}\n'
+			                  f'Bucket ID: {active_bucket_id or "Not selected"}\n\n'
+			                  'Do not claim to have inspected bucket-object contents unless those '
+			                  'contents are explicitly included in the user request.')
+			
+			system_instructions = str(
+				st.session_state.get( 'bucket_system_instructions', '' ) or '' ).strip( )
+			
+			combined_instructions = '\n\n'.join(
+				part for part in [ system_instructions, bucket_context, ] if part )
+			
+			apply_gemini_runtime_config( )
+			response = chat.generate_text( prompt=prompt_text, model=selected_model,
+				number=max( 1, int( st.session_state.get( 'bucket_number', 1 ) or 1 ) ),
+				temperature=float( st.session_state.get( 'bucket_temperature', 0.0 ) or 0.0 ),
+				top_p=float( st.session_state.get( 'bucket_top_percent', 0.0 ) or 0.0 ), top_k=0,
+				frequency=float( st.session_state.get( 'bucket_frequency_penalty', 0.0 ) or 0.0 ),
+				presence=float( st.session_state.get( 'bucket_presence_penalty', 0.0 ) or 0.0 ),
+				max_tokens=int( st.session_state.get( 'bucket_max_tokens', 0 ) or 0 ), stops=[ ],
+				instruct=combined_instructions,
+				response_format=st.session_state.get( 'bucket_response_format', '' ), tools=[ ],
+				tool_choice=None, reasoning=st.session_state.get( 'bucket_reasoning', '' ),
+				modalities=[ ], media_resolution='', context=context, content='', urls=[ ],
+				max_urls=0, response_schema='', safety_profile='', file_search_store_names=[ ],
+				stream=bool( st.session_state.get( 'bucket_stream', False ) ),
+				stream_handler=None )
+			
+			if response is None:
+				raise ValueError( 'Gemini returned no Google Cloud Buckets response.' )
+			
+			response_text = str( response ).strip( )
+			if not response_text:
+				raise ValueError( 'Gemini returned an empty Google Cloud Buckets response.' )
+			
+			try:
+				update_counters( getattr( chat, 'response', None ) )
+			except Exception:
+				pass
+			
+			return response_text
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'run_bucket_chat_query'
+			exception.method = ('run_bucket_chat_query( prompt: str, '
+			                    'selected_bucket_id: str, '
+			                    'selected_bucket_label: str ) -> str')
+			Logger( ).write( exception )
+			raise exception
+	
+	# ------------------------------------------------------------------
+	# Global Instruction Clearing Contract
+	# ------------------------------------------------------------------
+	if st.session_state.get( 'clear_instructions' ):
+		st.session_state[ 'bucket_system_instructions' ] = ''
+		st.session_state[ 'bucket_prompt_id' ] = None
+		st.session_state[ 'clear_instructions' ] = False
+	
+	# ------------------------------------------------------------------
+	# Main Google Cloud Buckets Interface
+	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
+	
 	with center:
-		st.subheader( '🧊 GCP Buckets', help=cfg.VECTORSTORES_API )
+		st.subheader( '🧊 Google Cloud Buckets', help=cfg.VECTORSTORES_API )
+		
 		st.divider( )
-		st.Title( 'Cloud Bucket Management' )
 		
-		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
+		# ------------------------------------------------------------------
+		# Mind Controls
+		# ------------------------------------------------------------------
+		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			# ----------------------------------------------------------
+			# LLM Settings
+			# ----------------------------------------------------------
+			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
+				model_c1, model_c2, model_c3 = st.columns( [ 0.40, 0.35, 0.25 ], border=True,
+					gap='xxsmall' )
+				
+				with model_c1:
+					bucket_model = st.selectbox( label='Model', options=list( chat.model_options ),
+						key='bucket_model', index=None, placeholder='Options',
+						help=('REQUIRED. Gemini model used by the Google Cloud '
+						      'Buckets conversational assistant.') )
+				
+				with model_c2:
+					bucket_reasoning = st.selectbox( label='Thinking Level',
+						options=list( chat.reasoning_options ), key='bucket_reasoning', index=None,
+						placeholder='Options', help=cfg.REASONING )
+				
+				with model_c3:
+					bucket_number = st.slider( label='Candidates', min_value=1, max_value=8,
+						value=max( 1, int( st.session_state.get( 'bucket_number', 1 ) or 1 ) ),
+						step=1, key='bucket_number', help='Maximum number of candidate '
+						                                  'responses.' )
+				
+				st.button( label='Reset', key='bucket_model_reset', icon='🔄', width='stretch',
+					on_click=reset_bucket_model_settings )
+			
+			# ----------------------------------------------------------
+			# Inference Settings
+			# ----------------------------------------------------------
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
+					width='stretch' ):
+				inference_c1, inference_c2, inference_c3, inference_c4 = (
+					st.columns( [ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' ))
+				
+				with inference_c1:
+					bucket_temperature = st.slider( label='Temperature', min_value=-2.0,
+						max_value=2.0, step=0.01, key='bucket_temperature', help=cfg.TEMPERATURE )
+				
+				with inference_c2:
+					bucket_top_percent = st.slider( label='Top-P', min_value=0.0, max_value=1.0,
+						step=0.01, key='bucket_top_percent', help=cfg.TOP_P )
+				
+				with inference_c3:
+					bucket_frequency = st.slider( label='Frequency Penalty', min_value=-2.0,
+						max_value=2.0, step=0.01, key='bucket_frequency_penalty',
+						help=cfg.FREQUENCY_PENALTY )
+				
+				with inference_c4:
+					bucket_presence = st.slider( label='Presence Penalty', min_value=-2.0,
+						max_value=2.0, step=0.01, key='bucket_presence_penalty',
+						help=cfg.PRESENCE_PENALTY )
+				
+				st.button( label='Reset', key='bucket_inference_reset', icon='🔄', width='stretch',
+					on_click=reset_bucket_inference_settings )
+			
+			# ----------------------------------------------------------
+			# Response Settings
+			# ----------------------------------------------------------
+			with st.expander( label='Response Settings', icon='↔️', expanded=False,
+					width='stretch' ):
+				response_c1, response_c2, response_c3 = st.columns( [ 0.40, 0.35, 0.25 ],
+					border=True, gap='xxsmall' )
+				
+				with response_c1:
+					bucket_max_tokens = st.slider( label='Max Output Tokens', min_value=0,
+						max_value=100000, step=500, key='bucket_max_tokens',
+						help=cfg.MAX_OUTPUT_TOKENS )
+				
+				with response_c2:
+					bucket_format = st.selectbox( label='Response Format',
+						options=list( chat.format_options ), key='bucket_response_format',
+						index=None, placeholder='Options',
+						help='Optional Gemini response MIME type.' )
+				
+				with response_c3:
+					bucket_stream = st.toggle( label='Stream', key='bucket_stream',
+						help=cfg.STREAM )
+				
+				st.button( label='Reset', key='bucket_response_reset', icon='🔄', width='stretch',
+					on_click=reset_bucket_response_settings )
 		
-		with stores_left:
-			# --------------------------------------------------------------
-			# Expander - Create File Search Store
-			# --------------------------------------------------------------
-			with st.expander( 'Create:', expanded=True ):
-				new_store_name = st.text_input( 'New Cloud Bucket name' )
-				
-				if st.button( '➕ Create' ):
-					if not new_store_name:
-						st.warning( 'Enter a Cloud Bucket Name.' )
-					else:
-						try:
-							res = searcher.create( new_store_name )
-							created_name = (getattr( res, 'name', None ) or new_store_name)
-							
-							st.success( f'Created Cloud Bucket: {created_name}' )
-						except Exception as exc:
-							st.error( f'Create bucket failed: {exc}' )
+		# ------------------------------------------------------------------
+		# Google Cloud Buckets System Prompt
+		# ------------------------------------------------------------------
+		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
+			bucket_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
+				mode_name='Document Q&A' )
 			
-			vs_map = getattr( searcher, 'collections', None )
+			bucket_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+				for record in bucket_prompt_records }
 			
-			# --------------------------------------------------------------
-			# Expander - Retrieve Files
-			# --------------------------------------------------------------
-			with st.expander( 'Retreive:', expanded=True ):
-				options = [ ]
-				
-				if vs_map and isinstance( vs_map, dict ):
-					options = list( vs_map.items( ) )
-				
-				# ----------------------------------------------------------
-				# Select / Retrieve / Delete
-				# ----------------------------------------------------------
-				if options:
-					names = [ f'{name} — {identifier}' for name, identifier in options ]
-					
-					sel = st.selectbox( 'Select Cloud Bucket', options=names,
-						key='select_buckets' )
-					
-					sel_id = ''
-					
-					for name, identifier in options:
-						if f'{name} — {identifier}' == sel:
-							sel_id = identifier
-							break
-					
-					opt_c1, opt_c2 = st.columns( [ 0.5, 0.5 ] )
-					with opt_c1:
-						if st.button( '📥  Cloud Bucket', key='retrieve_bucket', width='stretch' ):
-							if not sel_id:
-								st.warning( 'No Cloud Bucket Selected!' )
-							else:
-								try:
-									vs = searcher.retrieve( store_id=sel_id )
-									
-									st.write( 'Name:', vs.name )
-									
-									st.write( 'Files:', vs.file_counts )
-									
-									st.write( 'Size (MB):', round( vs.usage_bytes / 1_048_576,
-										2 ) )
-								except Exception as exc:
-									st.error( f'retrieve() failed: {exc}' )
-					
-					with opt_c2:
-						if st.button( '❌ Delete Cloud Bucket', key='delete_bucket',
-								width='stretch' ):
-							if not sel_id:
-								st.warning( 'No Cloud Bucket Selected.' )
-							else:
-								try:
-									searcher.delete( store_id=sel_id )
-									
-									st.success( 'Cloud Bucket deleted.' )
-								except Exception as exc:
-									st.error( f'Delete failed: {exc}' )
+			bucket_prompt_ids = list( bucket_prompt_lookup.keys( ) )
+			prompt_c1, prompt_c2 = st.columns( [ 0.80, 0.20 ] )
+			with prompt_c1:
+				st.text_area( label='Enter Text', height=120, width='stretch',
+					help=cfg.SYSTEM_INSTRUCTIONS, key='bucket_system_instructions' )
+			
+			with prompt_c2:
+				if bucket_prompt_ids:
+					st.selectbox( label='Use Template', options=bucket_prompt_ids,
+						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+							prompt_lookup=bucket_prompt_lookup ), index=None,
+						key='bucket_prompt_id', on_change=on_bucket_prompt_change,
+						placeholder='Options' )
 				else:
-					st.info( 'No Cloud Buckets are currently available.' )
-		
-		with stores_right:
-			# --------------------------------------------------------------
-			# Uploader
-			# --------------------------------------------------------------
-			uploaded_file = st.file_uploader( 'Upload file (server-side via Files API)',
-				type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ],
-				key='bucket_file_uploader' )
+					st.selectbox( label='Use Template', options=[ ], index=None,
+						key='bucket_prompt_id', placeholder='No Cloud Bucket prompts',
+						disabled=True )
 			
-			if uploaded_file:
-				tmp_path = save_temp( uploaded_file )
-				upload_fn = None
-				
-				for name in ('upload_file', 'upload', 'files_upload'):
-					if hasattr( searcher, name ):
-						upload_fn = getattr( searcher, name )
-						break
-				
-				if not upload_fn:
-					st.warning( 'No upload function found on CloudBuckets.' )
-				elif not tmp_path:
-					st.warning( 'The uploaded file could not be prepared.' )
-				else:
-					with st.spinner( 'Uploading to Files API...' ):
-						try:
-							fid = upload_fn( tmp_path )
-							st.success( f'Uploaded; file id: {fid}' )
-						except Exception as exc:
-							st.error( f'Upload failed: {exc}' )
+			prompt_button_c1, prompt_button_c2 = st.columns( [ 0.80, 0.20 ] )
+			with prompt_button_c1:
+				st.button( label='Clear Instructions', key='bucket_clear_instructions',
+					width='stretch', on_click=clear_bucket_prompt, icon='🧹' )
+			
+			with prompt_button_c2:
+				st.button( label='XML ↔️ Markdown', key='bucket_convert_instructions',
+					width='stretch', on_click=convert_bucket_prompt )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		# ------------------------------------------------------------------
-		# Bucket Message History
+		# Cloud Bucket Management
+		# ------------------------------------------------------------------
+		st.caption( 'Cloud Bucket Management' )
+		
+		buckets_left, buckets_right = st.columns( [ 0.50, 0.50 ], border=True )
+		with buckets_left:
+			# ----------------------------------------------------------
+			# Create Bucket
+			# ----------------------------------------------------------
+			with st.expander( label='Create', expanded=False ):
+				new_bucket_name = st.text_input( label='New Cloud Bucket name',
+					key='bucket_new_name' )
+				
+				if st.button( label='Create', icon='➕', key='bucket_create', width='stretch' ):
+					if not str( new_bucket_name or '' ).strip( ):
+						st.warning( 'Enter a Cloud Bucket Name.' )
+					else:
+						try:
+							result = searcher.create( str( new_bucket_name ).strip( ) )
+							created_name = (getattr( result, 'name', None ) or str(
+								new_bucket_name ).strip( ))
+							
+							st.success( f'Created Cloud Bucket: {created_name}' )
+						
+						except Exception as e:
+							exception = Error( e )
+							exception.module = 'app'
+							exception.cause = 'Cloud Bucket creation'
+							exception.method = ('searcher.create( new_bucket_name: str )')
+							Logger( ).write( exception )
+							st.error( f'Create bucket failed: {exception.info}' )
+			
+			# ----------------------------------------------------------
+			# Retrieve and Delete Bucket
+			# ----------------------------------------------------------
+			bucket_map = getattr( searcher, 'collections', None )
+			bucket_options: List[ Tuple[ str, str ] ] = [ ]
+			if isinstance( bucket_map, dict ):
+				bucket_options = [ (str( name ), str( identifier )) for name, identifier in
+					bucket_map.items( ) if str( identifier or '' ).strip( ) ]
+			
+			bucket_lookup = { identifier: name for name, identifier in bucket_options }
+			bucket_ids = list( bucket_lookup.keys( ) )
+			with st.expander( label='Retrieve', expanded=True ):
+				if bucket_ids:
+					selected_bucket_id = st.selectbox( label='Select Cloud Bucket',
+						options=bucket_ids, format_func=lambda identifier: (
+							f'{bucket_lookup.get( identifier, identifier )} '
+							f'— {identifier}'), index=(bucket_ids.index(
+							st.session_state.get( 'bucket_id' ) ) if st.session_state.get(
+							'bucket_id' ) in bucket_ids else None), key='bucket_selector',
+						placeholder='Options' )
+					
+					if selected_bucket_id:
+						st.session_state[ 'bucket_id' ] = (selected_bucket_id)
+						st.session_state[ 'bucket_selected_label' ] = bucket_lookup.get(
+							selected_bucket_id, selected_bucket_id )
+					
+					action_c1, action_c2 = st.columns( [ 0.50, 0.50 ] )
+					with action_c1:
+						if st.button( label='Cloud Bucket', icon='📥', key='bucket_retrieve',
+								width='stretch' ):
+							active_bucket_id = str(
+								st.session_state.get( 'bucket_id', '' ) or '' ).strip( )
+							
+							if not active_bucket_id:
+								st.warning( 'No Cloud Bucket Selected.' )
+							else:
+								try:
+									bucket_result = searcher.retrieve( store_id=active_bucket_id )
+									st.write( 'Name:', getattr( bucket_result, 'name', '—' ) )
+									st.write( 'Files:', getattr( bucket_result, 'file_counts', '—' ) )
+									usage_bytes = getattr( bucket_result, 'usage_bytes', 0 )
+									
+									st.write( 'Size (MB):',
+										round( float( usage_bytes or 0 ) / 1_048_576, 2 ) )
+								
+								except Exception as e:
+									exception = Error( e )
+									exception.module = 'app'
+									exception.cause = ('Cloud Bucket retrieval')
+									exception.method = 'searcher.retrieve( store_id: str )'
+									Logger( ).write( exception )
+									st.error( 'retrieve() failed: '
+									          f'{exception.info}' )
+					
+					with action_c2:
+						if st.button( label='Delete Cloud Bucket', icon='❌', key='bucket_delete',
+								width='stretch' ):
+							active_bucket_id = str(
+								st.session_state.get( 'bucket_id', '' ) or '' ).strip( )
+							
+							if not active_bucket_id:
+								st.warning( 'No Cloud Bucket Selected.' )
+							else:
+								try:
+									searcher.delete( store_id=active_bucket_id )
+									
+									st.session_state[ 'bucket_id' ] = ''
+									
+									st.session_state[ 'bucket_selected_label' ] = ''
+									
+									st.success( 'Cloud Bucket deleted.' )
+									
+									st.rerun( )
+								
+								except Exception as e:
+									exception = Error( e )
+									exception.module = 'app'
+									exception.cause = ('Cloud Bucket deletion')
+									exception.method = ('searcher.delete( '
+									                    'store_id: str )')
+									Logger( ).write( exception )
+									st.error( f'Delete failed: {exception.info}' )
+				
+				else:
+					st.info( 'No Cloud Buckets are currently available.' )
+		
+		# ------------------------------------------------------------------
+		# Bucket Upload
+		# ------------------------------------------------------------------
+		with buckets_right:
+			st.caption( 'Upload File' )
+			uploaded_file = st.file_uploader( label='Upload file',
+				type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ],
+				key='bucket_file_uploader' )
+			
+			if uploaded_file is not None:
+				tmp_path = save_temp( uploaded_file )
+				upload_function = None
+				for method_name in ('upload_file', 'upload', 'files_upload'):
+					if hasattr( searcher, method_name ):
+						upload_function = getattr( searcher, method_name )
+						break
+				
+				if upload_function is None:
+					st.warning( 'No upload function was found on CloudBuckets.' )
+				
+				elif not tmp_path:
+					st.warning( 'The uploaded file could not be prepared.' )
+				
+				else:
+					if st.button( label='Upload File', icon='📤', key='bucket_upload',
+							width='stretch' ):
+						with st.spinner( 'Uploading to Google Cloud Storage…' ):
+							try:
+								file_identifier = upload_function( tmp_path )
+								st.success( f'Uploaded file: {file_identifier}' )
+							
+							except Exception as e:
+								exception = Error( e )
+								exception.module = 'app'
+								exception.cause = 'Cloud Bucket upload'
+								exception.method = ('CloudBuckets upload method')
+								Logger( ).write( exception )
+								st.error( f'Upload failed: {exception.info}' )
+			
+			active_bucket_label = str(
+				st.session_state.get( 'bucket_selected_label', '' ) or '' ).strip( )
+			
+			active_bucket_id = str( st.session_state.get( 'bucket_id', '' ) or '' ).strip( )
+			if active_bucket_id:
+				st.info( 'Active Cloud Bucket: '
+				         f'{active_bucket_label or active_bucket_id}' )
+			else:
+				st.info( 'Select a Cloud Bucket to provide bucket context '
+				         'to the conversational assistant.' )
+		
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		
+		# ------------------------------------------------------------------
+		# Bucket Conversation History
 		# ------------------------------------------------------------------
 		for message in st.session_state.get( 'bucket_messages', [ ] ):
 			if not isinstance( message, dict ):
 				continue
 			
-			role = str( message.get( 'role', 'user' ) or 'user' ).strip( )
-			content = str( message.get( 'content', '' ) or '' ).strip( )
-			
-			if not content:
+			message_role = str( message.get( 'role', 'assistant' ) or 'assistant' ).strip( )
+			message_content = str( message.get( 'content', '' ) or '' ).strip( )
+			if not message_content:
 				continue
 			
-			avatar = cfg.JENI if role == 'assistant' else ''
-			with st.chat_message( role, avatar=avatar ):
-				st.markdown( content )
+			message_avatar = (cfg.JENI if message_role == 'assistant' else '')
+			with st.chat_message( message_role, avatar=message_avatar ):
+				st.markdown( message_content )
 		
 		# ------------------------------------------------------------------
 		# Bucket Chat Input
@@ -6934,21 +8784,41 @@ elif mode == 'Google Cloud Buckets':
 		bucket_prompt = st.chat_input( 'Enter a Google Cloud Buckets request …',
 			key='bucket_chat_input' )
 		
-		if bucket_prompt is not None and str( bucket_prompt ).strip( ):
+		if (bucket_prompt is not None and str( bucket_prompt ).strip( )):
 			bucket_prompt = str( bucket_prompt ).strip( )
+			active_bucket_id = str( st.session_state.get( 'bucket_id', '' ) or '' ).strip( )
+			active_bucket_label = str(
+				st.session_state.get( 'bucket_selected_label', '' ) or '' ).strip( )
 			
 			st.session_state[ 'bucket_messages' ].append(
 				{ 'role': 'user', 'content': bucket_prompt, } )
 			
-			st.session_state[ 'bucket_input' ] = [ { 'role': 'user', 'content': bucket_prompt, } ]
-			
-			st.rerun( )
+			with st.chat_message( 'assistant', avatar=cfg.JENI ):
+				with st.spinner( 'Processing Google Cloud Buckets request…' ):
+					try:
+						response_text = run_bucket_chat_query( prompt=bucket_prompt,
+							selected_bucket_id=active_bucket_id,
+							selected_bucket_label=active_bucket_label )
+						
+						st.markdown( response_text )
+						st.session_state[ 'bucket_messages' ].append(
+							{ 'role': 'assistant', 'content': response_text, } )
+						
+						st.session_state[ 'bucket_input' ] = [
+							{ 'role': 'user', 'content': bucket_prompt, } ]
+						
+						st.session_state[ 'last_answer' ] = response_text
+					
+					except Exception as e:
+						exception = (e if isinstance( e, Error ) else Error( e ))
+						st.error( 'Google Cloud Buckets request failed: '
+						          f'{exception.info}' )
 		
 		# ------------------------------------------------------------------
 		# Clear Messages
 		# ------------------------------------------------------------------
-		st.button( label='Clear Messages', key='bucket_clear_messages', width='content',
-			on_click=clear_bucket_messages, icon = '🧹' )
+		st.button( label='Clear Messages', key='bucket_clear_messages', icon='🧹', width='content',
+			on_click=clear_bucket_messages )
 
 # ======================================================================================
 # PROMPT ENGINEERING MODE
@@ -6974,7 +8844,7 @@ elif mode == 'Prompt Engineering':
 		st.session_state.setdefault( 'pe_sort_col', 'ID' )
 		st.session_state.setdefault( 'pe_sort_dir', 'ASC' )
 		st.session_state.setdefault( 'pe_selected_id', None )
-		st.session_state.setdefault( 'pe_Title', '' )
+		st.session_state.setdefault( 'pe_title', '' )
 		st.session_state.setdefault( 'pe_name', '' )
 		st.session_state.setdefault( 'pe_text', '' )
 		st.session_state.setdefault( 'pe_id', 0 )
@@ -6987,7 +8857,7 @@ elif mode == 'Prompt Engineering':
 		
 		def reset_selection( ):
 			st.session_state.pe_selected_id = None
-			st.session_state.pe_Title = ''
+			st.session_state.pe_title = ''
 			st.session_state.pe_name = ''
 			st.session_state.pe_text = ''
 			st.session_state.pe_id = 0
@@ -6999,7 +8869,7 @@ elif mode == 'Prompt Engineering':
 				row = cur.fetchone( )
 				if not row:
 					return
-				st.session_state.pe_Title = row[ 0 ]
+				st.session_state.pe_title = row[ 0 ]
 				st.session_state.pe_name = row[ 1 ]
 				st.session_state.pe_text = row[ 2 ]
 		
@@ -7132,11 +9002,11 @@ elif mode == 'Prompt Engineering':
 							conn.execute(
 								f"""
                                 UPDATE {TABLE}
-                                SET Title=?, Name=?, Text=?
+                                SET Caption=?, Name=?, Text=?
                                 WHERE ID=?
                                 """,
 								(
-										st.session_state.pe_Title,
+										st.session_state.pe_title,
 										st.session_state.pe_name,
 									st.session_state.pe_text,
 										st.session_state.pe_selected_id
@@ -7144,11 +9014,11 @@ elif mode == 'Prompt Engineering':
 						else:
 							conn.execute(
 								f"""
-                                INSERT INTO {TABLE} (Title, Name, Text )
+                                INSERT INTO {TABLE} (Caption, Name, Text )
                                 VALUES (?, ?, ?, ? , ?)
                                 """,
 								(
-										st.session_state.pe_Title,
+										st.session_state.pe_title,
 										st.session_state.pe_name,
 										st.session_state.pe_text,
 								),
@@ -7182,7 +9052,7 @@ elif mode == 'Data Export':
 		
 		# -----------------------------------
 		# Prompt export (System Instructions)
-		st.Title( 'System Prompt' )
+		st.caption( 'System Prompt' )
 		export_format = st.radio( 'Export Format', options=[ 'XML-Delimited', 'Markdown' ],
 			horizontal=True, help='Choose how system instructions should be exported.' )
 		prompt_text: str = st.session_state.get( 'system_prompt', '' )

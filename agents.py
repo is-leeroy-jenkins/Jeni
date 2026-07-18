@@ -45,9 +45,8 @@ import os
 from pathlib import Path
 from typing import Any, List, Optional, Dict
 import tiktoken
-from openai import OpenAI
-from llm import Prompt, Reasoning, Text, Format
-from .boogr import ErrorDialog, Error
+from .models import Prompt, Reasoning 
+from .boogr import Logger, Error
 
 
 def throw_if( name: str, value: object ):
@@ -62,25 +61,13 @@ class Agent(  ):
 		Base class for all agent prompts/requests/responses.
 	
 	'''
-	client: Optional[ OpenAI ]
 	model: Optional[ str ]
+	instructions: Optional[ str ]
 	prompt: Optional[ str ]
 	reasoning: Optional[ Reasoning ]
-	text: Optional[ str ]
-	format: Optional[ Format ]
-	max_output_tokens: Optional[ int ]
-	input: Optional[ List ]
-	temperature: Optional[ float ]
-	top_p: Optional[ float ]
-	store: Optional[ bool ]
-	tools: Optional[ List[ Dict[ str, str ] ] ]
-	include: Optional[ List ]
-	question: Optional[ str ]
-	variables: Optional[ List[ str ] ]
-	version: Optional[ str ]
-	vector_store_ids: Optional[ List[ str ] ]
-	file_ids: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
+	tools: Optional[ List[ str ] ]
+	files: Optional[ Dict[ str, str ] ]
+	stores: Optional[ Dict[ str, str ] ]
 	
 	def __init__( self ):
 		''''
@@ -106,45 +93,25 @@ class ApportionmentAnalyst( Agent ):
 		--------
 
 	'''
-	client: Optional[ OpenAI ]
 	model: Optional[ str ]
+	instructions: Optional[ str ]
 	prompt: Optional[ str ]
-	text: Optional[ str ]
-	format: Optional[ str ]
-	max_output_tokens: Optional[ int ]
-	input: Optional[ List ]
-	store: Optional[ bool ]
-	temperature: Optional[ float ]
-	top_p: Optional[ float ]
-	tools: Optional[ List[ Dict[ str, str ] ] ]
-	include: Optional[ List ]
-	question: Optional[ str ]
 	reasoning: Optional[ Dict[ str, str ] ]
-	variables: Optional[ List[ str ] ]
-	vector_store_ids: Optional[ List[ str ] ]
-	file_ids: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	version: Optional[ str ]
+	tools: Optional[ List[ str ] ]
+	files: Optional[ Dict[ str, str ] ]
+	stores: Optional[ Dict[ str, str ] ]
+	include: Optional[ List[ str ] ]
 	
 	def __init__( self ):
 		super( ).__init__( )
-		self.client = OpenAI( )
-		self.client.api_key = os.getenv( 'OPENAI_API_KEY' )
 		self.model = 'gpt-5-nano-2025-08-07'
-		self.tool_choice = 'auto'
-		self.id = 'pmpt_68a34b1eb99481969acf77a71b51ff25018476307b10d0b5'
-		self.version = '15'
-		self.format = 'text'
-		self.tools = [ ]
+		self.instructions = None
+		self.prompt = None
+		self.tools = None
 		self.reasoning = { 'effort': 'medium' }
-		self.include = [ 'code_interpreter_call.outputs', 'reasoning.encrypted_content', 'web_search_call.action.sources' ]
-		self.vector_store_ids = [ 'vs_68a34aaff93481918c3b3fef8c4e8fea' ]
-		self.file_ids = [ 'file-XfTDeZNv7M1toGMsZcnP24',
-		                  'file-8wQZAAZpdHAjVrUdE45TiL',
-		                  'file-N5QJtZHnU6vFdHSszwvAZn',
-		                  'file-AukoekscMxBsxfgyoXLb5z',
-		                  'file-7oRCvxc3W4VNaXhTQpsNFq',
-		                  'file-BKUENFQD67naMN3kx6PrHe' ]
+		self.include = [ ]
+		self.stores = { }
+		self.files = { }
 	
 	def ask( self, question: str ) -> str | None:
 		'''
@@ -165,28 +132,15 @@ class ApportionmentAnalyst( Agent ):
 		'''
 		try:
 			throw_if( 'question', question )
-			self.question = question
-			search_tool = { 'type': 'file_search', 'vector_store_ids': self.vector_store_ids }
-			files = { 'type': 'auto', 'file_ids': self.file_ids }
-			code_tool = { 'type': 'code_interpreter', 'container': files }
-			self.tools.append( search_tool )
-			self.tools.append( code_tool )
-			variable = { 'question': self.question }
-			meta = { 'id': self.id, 'version': self.version, 'variables': variable }
-			search_tool = { 'type': 'file_search', 'vector_store_ids': self.vector_store_ids }
-			container = { 'type': 'auto', 'file_ids': self.file_ids }
-			code_tool = { 'type': 'code_interpreter', 'container': container }
-			response = self.client.responses.create( model=self.model, prompt=meta, tools=self.tools,
-				max_output_tokens=self.max_output_tokens, store=self.store, include=self.include,
-				tool_choice=self.tool_choice, reasoning=self.reasoning )
-			return _response.output_text
+			self.prompt = question
+			return self.prompt
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'agents'
 			exception.cause = 'ApportionmentAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			Logger( ).write( exception )
+			raise exception
 
 class DataAnalyst( Agent ):
 	'''
@@ -196,46 +150,34 @@ class DataAnalyst( Agent ):
 		--------
 		
 	'''
-	client: Optional[ OpenAI ]
+	'''
+
+
+		Purpose:
+		--------
+
+	'''
 	model: Optional[ str ]
+	instructions: Optional[ str ]
 	prompt: Optional[ str ]
 	reasoning: Optional[ Dict[ str, str ] ]
-	text: Optional[ str ]
-	format: Optional[ str ]
-	max_output_tokens: Optional[ int ]
-	input: Optional[ List ]
-	store: Optional[ bool ]
-	include: Optional[ List ]
-	temperature: Optional[ float ]
-	top_p: Optional[ float ]
-	tools: Optional[ List[ Dict[ str, str ] ] ]
-	include: Optional[ List ]
-	question: Optional[ str ]
-	variables: Optional[ List[ str ] ]
+	tools: Optional[ List[ str ] ]
+	files: Optional[ Dict[ str, str ] ]
+	stores: Optional[ Dict[ str, str ] ]
 	include: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	vector_store_ids: Optional[ List[ str ] ]
-	file_ids: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	version: Optional[ str ]
 	
 	def __init__( self ):
 		super( ).__init__( )
-		self.client = OpenAI( )
-		self.client.api_key = os.getenv( 'OPENAI_API_KEY' )
 		self.model = 'gpt-5-nano-2025-08-07'
-		self.tool_choice = 'auto'
-		self.id = 'pmpt_68913db1bddc8194931a6c743d6fe2cd03a4dc1797022fcc'
-		self.version = '8'
-		self.format = 'text'
+		self.instructions = None
+		self.prompt = None
+		self.tools = None
 		self.reasoning = { 'effort': 'medium' }
-		self.include = [ 'reasoning.encrypted_content',
-		                 'web_search_call.action.sources' ]
-		self.tools = [ ]
-		self.file_ids = [ ]
-		self.vector_store_ids = [ ]
+		self.include = [ ]
+		self.stores = { }
+		self.files = { }
 	
-	def ask( self, question: str  ) -> str | None:
+	def ask( self, question: str ) -> str | None:
 		'''
 
 			Purpose:
@@ -254,21 +196,15 @@ class DataAnalyst( Agent ):
 		'''
 		try:
 			throw_if( 'question', question )
-			self.question = question
-			self.client = OpenAI( )
-			self.client.api_key = os.getenv( 'OPENAI_API_KEY' )
-			_prompt = { 'id': self.id, 'version': self.version,
-			            'variables': { 'question': self.question } }
-			_response = self.client.responses.create( model=self.model, prompt=_prompt,
-				temperature=self.temperature, store=self.store, tool_choice=self.tool_choice, include=self.include )
-			return _response.output_text
+			self.prompt = question
+			return self.prompt
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'agents'
 			exception.cause = 'DataAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			Logger( ).write( exception )
+			raise exception
 
 class PythonAnalyst( Agent ):
 	'''
@@ -278,42 +214,32 @@ class PythonAnalyst( Agent ):
 		--------
 
 	'''
-	client: Optional[ OpenAI ]
+	'''
+
+
+		Purpose:
+		--------
+
+	'''
 	model: Optional[ str ]
+	instructions: Optional[ str ]
 	prompt: Optional[ str ]
 	reasoning: Optional[ Dict[ str, str ] ]
-	text: Optional[ str ]
-	format: Optional[ str ]
-	max_output_tokens: Optional[ int ]
-	input: Optional[ List ]
-	store: Optional[ bool ]
-	temperature: Optional[ float ]
-	top_p: Optional[ float ]
-	tools: Optional[ List[ Dict[ str, str ] ] ]
-	include: Optional[ List ]
-	question: Optional[ str ]
-	variables: Optional[ List[ str ] ]
+	tools: Optional[ List[ str ] ]
+	files: Optional[ Dict[ str, str ] ]
+	stores: Optional[ Dict[ str, str ] ]
 	include: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	vector_store_ids: Optional[ List[ str ] ]
-	file_ids: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	version: Optional[ str ]
 	
 	def __init__( self ):
-		self.client = OpenAI( )
-		self.client.api_key = os.getenv( 'OPENAI_API_KEY' )
+		super( ).__init__( )
 		self.model = 'gpt-5-nano-2025-08-07'
-		self.tool_choice = 'auto'
-		self.id = 'pmpt_68a0fb2b65408194a68164a99b0e104a06fddb113af66a94'
-		self.version = '5'
-		self.format = 'text'
+		self.instructions = None
+		self.prompt = None
+		self.tools = None
 		self.reasoning = { 'effort': 'medium' }
-		self.include = [ 'web_search_call.action.sources' ]
-		self.input = [ ]
-		self.tools = [ ]
-		self.file_ids = [ ]
-		self.vector_store_ids = [ 'vs_6900bd53b400819182cca77ee4fbc143' ]
+		self.include = [ ]
+		self.stores = { }
+		self.files = { }
 	
 	def ask( self, question: str ) -> str | None:
 		'''
@@ -334,22 +260,15 @@ class PythonAnalyst( Agent ):
 		'''
 		try:
 			throw_if( 'question', question )
-			self.question = question
-			search_tool = { 'type': 'file_search', 'vector_store_ids': self.vector_store_ids }
-			self.tools.append( search_tool )
-			variable = { 'question': self.question }
-			meta = { 'id': self.id, 'version': self.version, 'variables': variable }
-			response = self.client.responses.create( model=self.model, prompt=meta, tools=self.tools,
-				max_output_tokens=self.max_output_tokens, store=self.store, include=self.include,
-				reasoning=self.reasoning, tool_choice=self.tool_choice )
-			return _response.output_text
+			self.prompt = question
+			return self.prompt
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'agents'
 			exception.cause = 'PythonAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			Logger( ).write( exception )
+			raise exception
 
 class AppropriationsAnalyst( Agent ):
 	'''
@@ -359,53 +278,32 @@ class AppropriationsAnalyst( Agent ):
 		--------
 
 	'''
-	client: Optional[ OpenAI ]
+	'''
+
+
+		Purpose:
+		--------
+
+	'''
 	model: Optional[ str ]
+	instructions: Optional[ str ]
 	prompt: Optional[ str ]
 	reasoning: Optional[ Dict[ str, str ] ]
-	text: Optional[ str ]
-	format: Optional[ str ]
-	max_output_tokens: Optional[ int ]
-	input: Optional[ List ]
-	store: Optional[ bool ]
-	temperature: Optional[ float ]
-	top_p: Optional[ float ]
-	tools: Optional[ List[ Dict[ str, str ] ] ]
-	include: Optional[ List ]
-	question: Optional[ str ]
-	variables: Optional[ List[ str ] ]
+	tools: Optional[ List[ str ] ]
+	files: Optional[ Dict[ str, str ] ]
+	stores: Optional[ Dict[ str, str ] ]
 	include: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	vector_store_ids: Optional[ List[ str ] ]
-	file_ids: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	version: Optional[ str ]
 	
 	def __init__( self ):
-		'''
-		
-			Purpose:
-			-------
-			Contructor for class objects
-		
-		'''
-		self.client = OpenAI( )
-		self.client.api_key = os.getenv( 'OPENAI_API_KEY' )
+		super( ).__init__( )
 		self.model = 'gpt-5-nano-2025-08-07'
-		self.tool_choice = 'auto'
-		self.id = 'pmpt_68c5b8dd376c8190a2090cb28cefa2b000113be4688382f5'
-		self.version = 5
-		self.format = 'text'
-		self.reasoning = { 'effort': 'medium' },
-		self.tools = [ ]
-		self.include = [ 'code_interpreter_call.outputs', 'web_search_call.action.sources', 'reasoning.encrypted_content' ]
-		self.input = [ ]
-		self.vector_store_ids = ['vs_712r5W5833G6aLxIYIbuvVcK' ]
-		self.file_ids = [ 'file-B4bKRt3Sfg1opRcNL1DRdk',
-          'file-21MLeKkao1x3J4u19sYofq',
-          'file-SEPUd6zDZ9Kku19pFdguxR',
-          'file-Dmd8C3aFALXK7zgify3YKm',
-          'file-RvPTUjEyXfN77c9qbh5TBg' ]
+		self.instructions = None
+		self.prompt = None
+		self.tools = None
+		self.reasoning = { 'effort': 'medium' }
+		self.include = [ ]
+		self.stores = { }
+		self.files = { }
 	
 	def ask( self, question: str ) -> str | None:
 		'''
@@ -426,28 +324,15 @@ class AppropriationsAnalyst( Agent ):
 		'''
 		try:
 			throw_if( 'question', question )
-			self.question = question
-			search_tool = { 'type': 'file_search', 'vector_store_ids': self.vector_store_ids }
-			files = { 'type': 'auto', 'file_ids': self.file_ids }
-			code_tool = { 'type': 'code_interpreter', 'container': files }
-			self.tools.append( search_tool )
-			self.tools.append( code_tool )
-			variable = { 'question': self.question }
-			meta = { 'id': self.id, 'version': self.version, 'variables': variable }
-			search_tool = { 'type': 'file_search', 'vector_store_ids': self.vector_store_ids }
-			container = { 'type': 'auto', 'file_ids': self.file_ids }
-			code_tool = { 'type': 'code_interpreter', 'container': container }
-			response = self.client.responses.create( model=self.model, prompt=meta, tools=self.tools,
-				max_output_tokens=self.max_output_tokens, store=self.store, include=self.include,
-				tool_choice=self.tool_choice, reasoning=self.reasoning  )
-			return _response.output_text
+			self.prompt = question
+			return self.prompt
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'agents'
 			exception.cause = 'AppropriationsAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ScheduleXAnalyst( Agent ):
 	'''
@@ -457,52 +342,25 @@ class ScheduleXAnalyst( Agent ):
 		--------
 
 	'''
-	client: Optional[ OpenAI ]
 	model: Optional[ str ]
+	instructions: Optional[ str ]
 	prompt: Optional[ str ]
 	reasoning: Optional[ Dict[ str, str ] ]
-	text: Optional[ str ]
-	format: Optional[ str ]
-	max_output_tokens: Optional[ int ]
-	input: Optional[ List ]
-	store: Optional[ bool ]
-	temperature: Optional[ float ]
-	top_p: Optional[ float ]
-	tools: Optional[ List[ Dict[ str, str ] ] ]
-	include: Optional[ List ]
-	question: Optional[ str ]
-	variables: Optional[ List[ str ] ]
+	tools: Optional[ List[ str ] ]
+	files: Optional[ Dict[ str, str ] ]
+	stores: Optional[ Dict[ str, str ] ]
 	include: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	vector_store_ids: Optional[ List[ str ] ]
-	file_ids: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	version: Optional[ str ]
 	
 	def __init__( self ):
-		'''
-
-			Purpose:
-			-------
-			Contructor for class objects
-
-		'''
-		self.client = OpenAI( )
-		self.client.api_key = os.getenv( 'OPENAI_API_KEY' )
+		super( ).__init__( )
 		self.model = 'gpt-5-nano-2025-08-07'
-		self.tool_choice = 'auto'
-		self.id = 'pmpt_68c58f4e6c0c8190907ebd7e5dd85fd8028ee0257b6020e0'
-		self.version = 3
-		self.format = 'text'
-		self.reasoning = { }
-		self.include =[ 'code_interpreter_call.outputs',
-		                'reasoning.encrypted_content',
-		                'web_search_call.action.sources' ]
-
-		self.input = [ ]
-		self.tools = [ ]
-		self.file_ids = [ ]
-		self.vector_store_ids = [ ]
+		self.instructions = None
+		self.prompt = None
+		self.tools = None
+		self.reasoning = { 'effort': 'medium' }
+		self.include = [ ]
+		self.stores = { }
+		self.files = { }
 	
 	def ask( self, question: str ) -> str | None:
 		'''
@@ -523,78 +381,36 @@ class ScheduleXAnalyst( Agent ):
 		'''
 		try:
 			throw_if( 'question', question )
-			self.question = question
-			variable = { 'question': self.question }
-			meta = { 'id': self.id, 'version': self.version, 'variables': variable }
-			response = self.client.responses.create( model=self.model, prompt=meta,
-				max_output_tokens=self.max_output_tokens, store=self.store, include=self.include  )
-			return response.output_text
+			self.prompt = question
+			return self.prompt
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'agents'
 			exception.cause = 'ScheduleXAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class BudgetGandolf( Agent ):
-	'''
-
-
-		Purpose:
-		--------
-
-	'''
-	client: Optional[ OpenAI ]
 	model: Optional[ str ]
+	instructions: Optional[ str ]
 	prompt: Optional[ str ]
 	reasoning: Optional[ Dict[ str, str ] ]
-	text: Optional[ str ]
-	format: Optional[ str ]
-	max_output_tokens: Optional[ int ]
-	input: Optional[ List ]
-	store: Optional[ bool ]
-	temperature: Optional[ float ]
-	top_p: Optional[ float ]
-	tools: Optional[ List[ Dict[ str, str ] ] ]
-	include: Optional[ List ]
-	question: Optional[ str ]
-	variables: Optional[ List[ str ] ]
+	tools: Optional[ List[ str ] ]
+	files: Optional[ Dict[ str, str ] ]
+	stores: Optional[ Dict[ str, str ] ]
 	include: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	vector_store_ids: Optional[ List[ str ] ]
-	file_ids: Optional[ List[ str ] ]
-	tool_choice: Optional[ str ]
-	version: Optional[ str ]
 	
 	def __init__( self ):
-		'''
-
-			Purpose:
-			-------
-			Contructor for class objects
-
-		'''
-		self.client = OpenAI( )
-		self.client.api_key = os.getenv( 'OPENAI_API_KEY' )
+		super( ).__init__( )
 		self.model = 'gpt-5-nano-2025-08-07'
-		self.tool_choice = 'auto'
-		self.id = 'pmpt_68bac6f657f08194b230e580a82e15e50006cdfe61dc331d'
-		self.version = '4'
-		self.format = 'text'
+		self.instructions = None
+		self.prompt = None
+		self.tools = None
 		self.reasoning = { 'effort': 'medium' }
-		self.include =[ 'code_interpreter_call.outputs',
-		                'reasoning.encrypted_content',
-		                'web_search_call.action.sources' ]
-		self.input = [ ]
-		self.tools = [ ]
-		self.file_ids = [ 'file-XfTDeZNv7M1toGMsZcnP24',
-          'file-8wQZAAZpdHAjVrUdE45TiL',
-          'file-N5QJtZHnU6vFdHSszwvAZn',
-          'file-AukoekscMxBsxfgyoXLb5z',
-          'file-7oRCvxc3W4VNaXhTQpsNFq',
-          'file-BKUENFQD67naMN3kx6PrHe', ]
-		self.vector_store_ids = [ 'vs_68a34aaff93481918c3b3fef8c4e8fea', ]
+		self.include = [ ]
+		self.stores = { }
+		self.files = { }
 	
 	def ask( self, question: str ) -> str | None:
 		'''
@@ -615,25 +431,15 @@ class BudgetGandolf( Agent ):
 		'''
 		try:
 			throw_if( 'question', question )
-			self.question = question
-			search_tool = { 'type': 'file_search', 'vector_store_ids': self.vector_store_ids }
-			files = { 'type': 'auto', 'file_ids': self.file_ids }
-			code_tool = { 'type': 'code_interpreter', 'container': files }
-			self.tools.append( search_tool )
-			self.tools.append( code_tool )
-			meta = { 'id': self.id, 'version': self.version, 'variables': { 'question': self.question } }
-			response = self.client.responses.create( model=self.model, prompt=meta, tools=self.tools,
-				max_output_tokens=self.max_output_tokens, store=self.store, include=self.include,
-				temperature=self.temperature, top_p=self.top_p, tool_choice=self.tool_choice,
-				reasoning=self.reasoning  )
-			return response.output_text
+			self.prompt = question
+			return self.prompt
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'agents'
 			exception.cause = 'BudgetGandolf'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class OutlookAnalyst( Agent ):
 	'''
@@ -717,8 +523,8 @@ class OutlookAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'OutlookAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ProcurementAnalyst( Agent ):
 	'''
@@ -806,8 +612,8 @@ class ProcurementAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ProcurementAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class WhatIfAnalyst( Agent ):
 	'''
@@ -896,8 +702,8 @@ class WhatIfAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'WhatIfAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class InnovationAnalyst( Agent ):
 	'''
@@ -990,8 +796,8 @@ class InnovationAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'InnovationAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class StatisticsAnalyst( Agent ):
 	'''
@@ -1085,8 +891,8 @@ class StatisticsAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'StatisticsAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PbiExpert( Agent ):
 	'''
@@ -1181,8 +987,8 @@ class PbiExpert( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PbiExpert'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ExcelNinja( Agent ):
 	'''
@@ -1269,8 +1075,8 @@ class ExcelNinja( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ExcelNinja'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ResearchAnalyst( Agent ):
 	'''
@@ -1355,8 +1161,8 @@ class ResearchAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ResearchAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class BrainStormer( Agent ):
 	'''
@@ -1439,8 +1245,8 @@ class BrainStormer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'BrainStormer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PbiAnalyst( Agent ):
 	'''
@@ -1515,8 +1321,8 @@ class PbiAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PbiAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class AutomationAnalyst( Agent ):
 	'''
@@ -1588,8 +1394,8 @@ class AutomationAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'AutomationAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class AgendaMaker( Agent ):
 	'''
@@ -1672,8 +1478,8 @@ class AgendaMaker( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'AgendaMaker'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ExcelAnalyst( Agent ):
 	'''
@@ -1749,8 +1555,8 @@ class ExcelAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ExcelAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class FinancialAdvisor( Agent ):
 	'''
@@ -1823,8 +1629,8 @@ class FinancialAdvisor( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'FinancialAdvisor'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class SpeechWriter( Agent ):
 	'''
@@ -1901,8 +1707,8 @@ class SpeechWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'SpeechWriter'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DashboardAnalyst( Agent ):
 	'''
@@ -1978,8 +1784,8 @@ class DashboardAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DashboardAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class WealthAnalyst( Agent ):
 	'''
@@ -2055,8 +1861,8 @@ class WealthAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'WealthAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class RandomWriter( Agent ):
 	'''
@@ -2132,8 +1938,8 @@ class RandomWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'RandomWriter'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ExploratoryDataAnalyst( Agent ):
 	'''
@@ -2211,8 +2017,8 @@ class ExploratoryDataAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ExploratoryDataAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ComplexProblemAnalyst( Agent ):
 	'''
@@ -2292,8 +2098,8 @@ class ComplexProblemAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ComplexProblemAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class EmailAnalyst( Agent ):
 	'''
@@ -2377,8 +2183,8 @@ class EmailAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ResearchEvaluator( Agent ):
 	'''
@@ -2465,8 +2271,8 @@ class ResearchEvaluator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'EssayWriter'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ExecutiveAssistant( Agent ):
 	'''
@@ -2547,8 +2353,8 @@ class ExecutiveAssistant( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ExecutiveAssistant'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class EvaluationExpert( Agent ):
 	'''
@@ -2634,8 +2440,8 @@ class EvaluationExpert( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'EvaluationExpert'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ExpertProgrammer( Agent ):
 	'''
@@ -2716,8 +2522,8 @@ class ExpertProgrammer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ExpertProgrammer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class FeatureExtractor( Agent ):
 	'''
@@ -2798,8 +2604,8 @@ class FeatureExtractor( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'FeatureExtractor'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class FinancialAnalyst( Agent ):
 	'''
@@ -2880,8 +2686,8 @@ class FinancialAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'FinancialAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class FinancialPlanner( Agent ):
 	'''
@@ -2962,8 +2768,8 @@ class FinancialPlanner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'FinancialPlanner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class FormBuilder( Agent ):
 	'''
@@ -3044,8 +2850,8 @@ class FormBuilder( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'FormBuilder'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class LegalAnalyst( Agent ):
 	'''
@@ -3132,8 +2938,8 @@ class LegalAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'LegalAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PromptEngineer( Agent ):
 	'''
@@ -3221,8 +3027,8 @@ class PromptEngineer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PromptEngineer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ProjectArchitect( Agent ):
 	'''
@@ -3303,8 +3109,8 @@ class ProjectArchitect( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ProjectArchitect'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ProjectPlanner( Agent ):
 	'''
@@ -3385,8 +3191,8 @@ class ProjectPlanner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ProjectPlanner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TrainingWheels( Agent ):
 	'''
@@ -3473,8 +3279,8 @@ class TrainingWheels( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'TrainingWheels'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class RedTeamAnalyst( Agent ):
 	'''
@@ -3554,8 +3360,8 @@ class RedTeamAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'RedTeamAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class SentimentAnalyst( Agent ):
 	'''
@@ -3640,8 +3446,8 @@ class SentimentAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'SentimentAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TrainingPlanner( Agent ):
 	'''
@@ -3721,8 +3527,8 @@ class TrainingPlanner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'TrainingPlanner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class WebSearchOptimizer( Agent ):
 	'''
@@ -3812,8 +3618,8 @@ class WebSearchOptimizer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'WebSearchOptimizer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class BudgetAnalyst( Agent ):
 	'''
@@ -3907,8 +3713,8 @@ class BudgetAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class YoutubeSummarizer( Agent ):
 	'''
@@ -3991,8 +3797,8 @@ class YoutubeSummarizer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'YoutubeSummarizer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class YoutubeScribe( Agent ):
 	'''
@@ -4075,8 +3881,8 @@ class YoutubeScribe( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'YoutubeScribe'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class WritingEditor( Agent ):
 	'''
@@ -4165,8 +3971,8 @@ class WritingEditor( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'WritingEditor'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class WebDesigner( Agent ):
 	'''
@@ -4246,8 +4052,8 @@ class WebDesigner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'WebDesigner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class Guardrails( Agent ):
 	'''
@@ -4334,8 +4140,8 @@ class Guardrails( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'Guardrails'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TrainingProgramDesigner( Agent ):
 	'''
@@ -4415,8 +4221,8 @@ class TrainingProgramDesigner( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TrainingContentDesigner( Agent ):
 	'''
@@ -4496,8 +4302,8 @@ class TrainingContentDesigner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'TrainingContentDesigner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TopicResearcher( Agent ):
 	'''
@@ -4577,8 +4383,8 @@ class TopicResearcher( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'TopicResearcher'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TechSupportAnalyst( Agent ):
 	'''
@@ -4659,8 +4465,8 @@ class TechSupportAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'TechSupportAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TaskPlanner( Agent ):
 	'''
@@ -4749,8 +4555,8 @@ class TaskPlanner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'TaskPlanner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class TeachingAssistant( Agent ):
 	'''
@@ -4830,8 +4636,8 @@ class TeachingAssistant( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'TeachingAssistant'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class SustainabilityPlanner( Agent ):
 	'''
@@ -4919,8 +4725,8 @@ class SustainabilityPlanner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'SustainabilityPlanner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class StructuredProblemSolver( Agent ):
 	'''
@@ -5000,8 +4806,8 @@ class StructuredProblemSolver( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'StructuredProblemSolver'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class StrategicThinker( Agent ):
 	'''
@@ -5084,8 +4890,8 @@ class StrategicThinker( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'StrategicThinker'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class SqlAnalyst( Agent ):
 	'''
@@ -5165,8 +4971,8 @@ class SqlAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'SqlAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class SearchOptimizer( Agent ):
 	'''
@@ -5257,8 +5063,8 @@ class SearchOptimizer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'SearchOptimizer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class SearchOptimizedWriter( Agent ):
 	'''
@@ -5341,8 +5147,8 @@ class SearchOptimizedWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'SearchOptimizedWriter'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class RootCauseAnalyzer( Agent ):
 	'''
@@ -5423,8 +5229,8 @@ class RootCauseAnalyzer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'RootCauseAnalyzer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class RevenueProjector( Agent ):
 	'''
@@ -5504,8 +5310,8 @@ class RevenueProjector( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'RevenueProjector'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ResumeWriter( Agent ):
 	'''
@@ -5586,8 +5392,8 @@ class ResumeWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ResumeWriter'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ResumeBuilder( Agent ):
 	'''
@@ -5684,8 +5490,8 @@ class ResumeBuilder( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ResumeBuilder'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ResultsCreator( Agent ):
 	'''
@@ -5766,8 +5572,8 @@ class ResultsCreator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ResultsCreator'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class RequirementsGenerator( Agent ):
 	'''
@@ -5865,8 +5671,8 @@ class RequirementsGenerator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'RequirementsGenerator'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ResearchExpert( Agent ):
 	'''
@@ -5947,8 +5753,8 @@ class ResearchExpert( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ResearchExpert'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ReasoningAnalyst( Agent ):
 	'''
@@ -6029,8 +5835,8 @@ class ReasoningAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ReasoningAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 
 class ProofReader( Agent ):
@@ -6112,8 +5918,8 @@ class ProofReader( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ProofReader'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class QuickProblemSolver( Agent ):
 	'''
@@ -6194,8 +6000,8 @@ class QuickProblemSolver( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'QuickProblemSolver'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PowerPointAnalyst( Agent ):
 	'''
@@ -6276,8 +6082,8 @@ class PowerPointAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PowerPointAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PortraitGenerator( Agent ):
 	'''
@@ -6358,8 +6164,8 @@ class PortraitGenerator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PortraitGenerator'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PersonalAssistant( Agent ):
 	'''
@@ -6440,8 +6246,8 @@ class PersonalAssistant( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PersonalAssistant'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PdfParser( Agent ):
 	'''
@@ -6528,8 +6334,8 @@ class PdfParser( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PdfParser'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class NicheResearcher( Agent ):
 	'''
@@ -6623,8 +6429,8 @@ class NicheResearcher( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'NicheResearcher'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class NewsLetterWriter( Agent ):
 	'''
@@ -6717,8 +6523,8 @@ class NewsLetterWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class MultiProfessor( Agent ):
 	'''
@@ -6799,8 +6605,8 @@ class MultiProfessor( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'MultiProfessor'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class MeetingSummarizer( Agent ):
 	'''
@@ -6881,8 +6687,8 @@ class MeetingSummarizer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'MeetingSummarizer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class MeetingOptimizer( Agent ):
 	'''
@@ -6975,8 +6781,8 @@ class MeetingOptimizer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'MeetingOptimizer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class MathyMagician( Agent ):
 	'''
@@ -7057,8 +6863,8 @@ class MathyMagician( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'MathyMagician'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class MarketResearcher( Agent ):
 	'''
@@ -7160,8 +6966,8 @@ class MarketResearcher( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'MarketResearcher'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class MarketPlanner( Agent ):
 	'''
@@ -7244,8 +7050,8 @@ class MarketPlanner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'MarketingPlanner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class MarketForecaster( Agent ):
 	'''
@@ -7340,8 +7146,8 @@ class MarketForecaster( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'MarketForecaster'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ManagementConsultant( Agent ):
 	'''
@@ -7422,8 +7228,8 @@ class ManagementConsultant( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ManagementConsultant'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class KeywordGenerator( Agent ):
 	'''
@@ -7504,8 +7310,8 @@ class KeywordGenerator( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class JackOfAllTrades( Agent ):
 	'''
@@ -7586,8 +7392,8 @@ class JackOfAllTrades( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'JackOfAllTrades'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class InterviewCoach( Agent ):
 	'''
@@ -7680,8 +7486,8 @@ class InterviewCoach( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class InvestmentAnalyst( Agent ):
 	'''
@@ -7762,8 +7568,8 @@ class InvestmentAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'InvestmentAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class EducationalWriter( Agent ):
 	'''
@@ -7844,8 +7650,8 @@ class EducationalWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class HowToBuilder( Agent ):
 	'''
@@ -7933,8 +7739,8 @@ class HowToBuilder( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'HowToBuilder'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class EssayWriter( Agent ):
 	'''
@@ -8017,8 +7823,8 @@ class EssayWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'EssayWriter'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class EmailAssistant( Agent ):
 	'''
@@ -8099,8 +7905,8 @@ class EmailAssistant( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DocumentSummarizer( Agent ):
 	'''
@@ -8181,8 +7987,8 @@ class DocumentSummarizer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DocumentSummarizer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DocumentInterrogator( Agent ):
 	'''
@@ -8266,8 +8072,8 @@ class DocumentInterrogator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DocumentInterrogator'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DependencyIndentifier( Agent ):
 	'''
@@ -8348,8 +8154,8 @@ class DependencyIndentifier( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DependencyIdentifier'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DecisionMaker( Agent ):
 	'''
@@ -8428,8 +8234,8 @@ class DecisionMaker( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DecisionMaker'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DecisionMaker( Agent ):
 	'''
@@ -8514,8 +8320,8 @@ class DecisionMaker( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DecisionMaker'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DataScientist( Agent ):
 	'''
@@ -8596,8 +8402,8 @@ class DataScientist( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DataScientist'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DatasetAnalyzer( Agent ):
 	'''
@@ -8678,8 +8484,8 @@ class DatasetAnalyzer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DatasetAnalyzer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DataPlumber( Agent ):
 	'''
@@ -8760,8 +8566,8 @@ class DataPlumber( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DataPlumber'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DataFarmer( Agent ):
 	'''
@@ -8842,8 +8648,8 @@ class DataFarmer( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DataCleaner( Agent ):
 	'''
@@ -8922,8 +8728,8 @@ class DataCleaner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DataCleaner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DataCleaner( Agent ):
 	'''
@@ -9004,8 +8810,8 @@ class DataCleaner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DataCleaner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DataBro( Agent ):
 	'''
@@ -9086,8 +8892,8 @@ class DataBro( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DataBro'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class DatabaseSpecialist( Agent ):
 	'''
@@ -9168,8 +8974,8 @@ class DatabaseSpecialist( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'DatabaseSpecialist'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class CriticalThinker( Agent ):
 	'''
@@ -9250,8 +9056,8 @@ class CriticalThinker( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'CriticalThinker'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class CriticalReasoningAnalyst( Agent ):
 	'''
@@ -9332,8 +9138,8 @@ class CriticalReasoningAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'CriticalReasoningAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class CourseCreator( Agent ):
 	'''
@@ -9433,8 +9239,8 @@ class CourseCreator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'CourseCreator'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class CompanyResearcher( Agent ):
 	'''
@@ -9515,8 +9321,8 @@ class CompanyResearcher( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'CompanyResearcher'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class CognitiveProfiler( Agent ):
 	'''
@@ -9597,8 +9403,8 @@ class CognitiveProfiler( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'CognitiveProfiler'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class CodeReviewer( Agent ):
 	'''
@@ -9679,8 +9485,8 @@ class CodeReviewer( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'CodeReviewer'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ChecklistCreator( Agent ):
 	'''
@@ -9761,8 +9567,8 @@ class ChecklistCreator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ChecklistCreator'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ChainOfDensity( Agent ):
 	'''
@@ -9846,8 +9652,8 @@ class ChainOfDensity( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ChainOfDensity'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class BusinessResearcher( Agent ):
 	'''
@@ -9940,8 +9746,8 @@ class BusinessResearcher( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'BusinessResearcher'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class BusinessPlanner( Agent ):
 	'''
@@ -10022,8 +9828,8 @@ class BusinessPlanner( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'BusinessPlanner'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class BusinessAnalyst( Agent ):
 	'''
@@ -10113,8 +9919,8 @@ class BusinessAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'BusinessAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class PowerQueryAnalyst( Agent ):
 	'''
@@ -10195,8 +10001,8 @@ class PowerQueryAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'PowerQueryAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class BookSummarizer( Agent ):
 	'''
@@ -10278,8 +10084,8 @@ class BookSummarizer( Agent ):
 			exception.module = 'agents'
 			exception.cause = ''
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class AuthorEmulator( Agent ):
 	'''
@@ -10360,8 +10166,8 @@ class AuthorEmulator( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'AuthorEmulator'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class AsciiArtist( Agent ):
 	'''
@@ -10442,8 +10248,8 @@ class AsciiArtist( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'AsciiArtist'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class ArtsyFartsy( Agent ):
 	'''
@@ -10524,8 +10330,8 @@ class ArtsyFartsy( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'ArtsyFartsy'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class AdaptiveAnalyst( Agent ):
 	'''
@@ -10606,8 +10412,8 @@ class AdaptiveAnalyst( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'AdaptiveAnalyst'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
 
 class AcademicWriter( Agent ):
 	'''
@@ -10688,5 +10494,5 @@ class AcademicWriter( Agent ):
 			exception.module = 'agents'
 			exception.cause = 'AcademicWriter'
 			exception.method = 'ask( self, question: str ) -> str | None'
-			error = ErrorDialog( exception )
-			error.show( )
+			error = Error( exception )
+			raise exception
