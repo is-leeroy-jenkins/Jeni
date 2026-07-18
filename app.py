@@ -2402,31 +2402,20 @@ def initialize_database( ) -> None:
                 PRIMARY
                 KEY
                 AUTOINCREMENT,
-                Caption
+                Title
                 TEXT,
                 Name
-                TEXT
-            (
-                80
-            ),
-                Text TEXT,
-                Version TEXT
-            (
-                80
-            ),
-                ID TEXT
-            (
-                80
-            )
-                )
+                TEXT( 80 ),
+                Text TEXT( 255 )
+            );
 			"""
 		)
 		
 		prompt_columns = [ row[ 1 ] for row in
 		                   conn.execute( 'PRAGMA table_info("Prompts");' ).fetchall( ) ]
 		
-		if 'Caption' not in prompt_columns:
-			conn.execute( 'ALTER TABLE "Prompts" ADD COLUMN "Caption" TEXT;' )
+		if 'Title' not in prompt_columns:
+			conn.execute( 'ALTER TABLE "Prompts" ADD COLUMN "Title" TEXT;' )
 		
 		conn.commit( )
 
@@ -2950,7 +2939,6 @@ def insert_data( table_name: str, df: pd.DataFrame ):
     """
 	df = df.copy( )
 	df.columns = [ c.replace( ' ', '_' ) for c in df.columns ]
-	
 	placeholders = ', '.join( [ '?' ] * len( df.columns ) )
 	stmt = f'INSERT INTO {table_name} VALUES ({placeholders});'
 	
@@ -3547,7 +3535,7 @@ def fetch_prompt_names( db_path: str ) -> list[ str ]:
 	try:
 		conn = sqlite3.connect( db_path )
 		cur = conn.cursor( )
-		cur.execute( "SELECT Caption FROM Prompts ORDER BY ID;" )
+		cur.execute( "SELECT Title FROM Prompts ORDER BY ID;" )
 		rows = cur.fetchall( )
 		conn.close( )
 		return [ r[ 0 ] for r in rows if r and r[ 0 ] is not None ]
@@ -3580,7 +3568,7 @@ def fetch_prompt_text( db_path: str, name: str ) -> str | None:
 	try:
 		conn = sqlite3.connect( db_path )
 		cur = conn.cursor( )
-		cur.execute( "SELECT Text FROM Prompts WHERE Caption = ?;", (name,) )
+		cur.execute( "SELECT Text FROM Prompts WHERE Title = ?;", (name,) )
 		row = cur.fetchone( )
 		conn.close( )
 		return str( row[ 0 ] ) if row and row[ 0 ] is not None else None
@@ -3608,7 +3596,7 @@ def fetch_prompts_df( ) -> pd.DataFrame:
     """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		df = pd.read_sql_query(
-			"SELECT ID, Caption,  Name, Version, ID FROM Prompts ORDER BY ID DESC",
+			"SELECT ID, Title, Name  FROM Prompts ORDER BY ID DESC",
 			conn )
 	df.insert( 0, "Selected", False )
 	return df
@@ -3629,7 +3617,7 @@ def fetch_prompt_by_id( pid: int ) -> Dict[ str, Any ] | None:
     """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		cur = conn.execute(
-			"SELECT ID, Caption, Name, Text, Version, ID FROM Prompts WHERE ID=?",
+			"SELECT ID, Title, Name, Text FROM Prompts WHERE ID=?",
 			(pid,)
 		)
 		row = cur.fetchone( )
@@ -3651,7 +3639,7 @@ def fetch_prompt_by_name( name: str ) -> Dict[ str, Any ] | None:
     """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		cur = conn.execute(
-			"SELECT ID, Caption, Name, Text, Version, ID FROM Prompts WHERE Caption=?",
+			"SELECT ID, Title, Name, Text FROM Prompts WHERE Title=?",
 			(name,)
 		)
 		row = cur.fetchone( )
@@ -3669,8 +3657,8 @@ def insert_prompt( data: Dict[ str, Any ] ) -> None:
         data (Dict[str, Any]): Data value used by this workflow.
     """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
-		conn.execute( 'INSERT INTO Prompts (Caption, Name, Text, Version, ID) VALUES (?, ?, ?, ?)',
-			(data[ 'Caption' ], data[ 'Name' ], data[ 'Text' ], data[ 'Version' ], data[ 'ID' ]) )
+		conn.execute( 'INSERT INTO Prompts (Title, Name, Text ) VALUES (?, ?, ?, ?)',
+			(data[ 'Title' ], data[ 'Name' ], data[ 'Text' ] ) )
 
 def update_prompt( pid: int, data: Dict[ str, Any ] ) -> None:
 	"""Update prompt.
@@ -3686,8 +3674,8 @@ def update_prompt( pid: int, data: Dict[ str, Any ] ) -> None:
     """
 	with sqlite3.connect( cfg.DB_PATH ) as conn:
 		conn.execute(
-			"UPDATE Prompts SET Caption=?, Name=?, Text=?, Version=?, ID=? WHERE ID=?",
-			(data[ 'Caption' ], data[ 'Name' ], data[ 'Text' ], data[ 'Version' ], data[ 'ID' ],
+			"UPDATE Prompts SET Title=?, Name=?, Text=? WHERE ID=?",
+			(data[ 'Title' ], data[ 'Name' ], data[ 'Text' ],
 			 pid)
 		)
 
@@ -3800,7 +3788,7 @@ if 'system_instructions' not in st.session_state:
 st.set_page_config( page_title="Jeni", page_icon=cfg.FAVICON,
 	layout="wide", initial_sidebar_state='collapsed' )
 
-st.caption( cfg.APP_SUBTITLE )
+st.Title( cfg.APP_SUBTITLE )
 inject_response_css( )
 init_state( )
 
@@ -4045,9 +4033,9 @@ if mode == 'Text':
 						help='When enabled, Gemini grounds this Text response using Google Search.' )
 					
 					if text_google_grounding:
-						st.caption( 'Google Search grounding is enabled.' )
+						st.Title( 'Google Search grounding is enabled.' )
 					else:
-						st.caption( 'Google Search grounding is disabled.' )
+						st.Title( 'Google Search grounding is disabled.' )
 				
 				# ---------- Max URLs ------------
 				with ground_c2:
@@ -4523,7 +4511,7 @@ elif mode == "Images":
 						disabled=not supports_grounding )
 					
 					if not supports_grounding:
-						st.caption( 'Not supported by selected model.' )
+						st.Title( 'Not supported by selected model.' )
 					
 					image_grounded = st.session_state.get( 'image_grounded', False )
 				
@@ -4668,7 +4656,7 @@ elif mode == "Images":
 			tmp_path = None
 			if uploaded_img:
 				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
+				st.image( uploaded_img, Title='Uploaded image preview', width=250 )
 			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
@@ -4727,7 +4715,7 @@ elif mode == "Images":
 			tmp_path = None
 			if uploaded_img:
 				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
+				st.image( uploaded_img, Title='Uploaded image preview', width=250 )
 			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
@@ -5459,15 +5447,15 @@ elif mode == 'Audio':
 							except Exception as e:
 								st.error( f'Recorded {audio_task.lower( )} failed: {e}' )
 				elif audio_task == 'Text-to-Speech':
-					st.caption( 'Recorded audio is not used by the Text-to-Speech workflow.' )
+					st.Title( 'Recorded audio is not used by the Text-to-Speech workflow.' )
 				else:
-					st.caption( 'Select Transcribe or Translate to process the recording.' )
+					st.Title( 'Select Transcribe or Translate to process the recording.' )
 		
 		# ------------------------------------------------------------------
 		# Audio Output
 		# ------------------------------------------------------------------
 		with right_audio:
-			st.caption( 'Audio Output' )
+			st.Title( 'Audio Output' )
 			if st.session_state.get( 'audio_output_bytes' ) is not None:
 				st.audio( st.session_state[ 'audio_output_bytes' ], format='audio/wav',
 					start_time=audio_start, end_time=audio_end, loop=audio_loop,
@@ -6661,7 +6649,7 @@ elif mode == 'File Search Stores':
 	with center:
 		st.subheader( '📦 File Search Stores', help=cfg.VECTORSTORES_API )
 		st.divider( )
-		st.caption( 'File Search Store Management' )
+		st.Title( 'File Search Store Management' )
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
 		with stores_left:
 			# --------------------------------------------------------------
@@ -6809,7 +6797,7 @@ elif mode == 'Google Cloud Buckets':
 	with center:
 		st.subheader( '🧊 GCP Buckets', help=cfg.VECTORSTORES_API )
 		st.divider( )
-		st.caption( 'Cloud Bucket Management' )
+		st.Title( 'Cloud Bucket Management' )
 		
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
 		
@@ -6986,10 +6974,9 @@ elif mode == 'Prompt Engineering':
 		st.session_state.setdefault( 'pe_sort_col', 'ID' )
 		st.session_state.setdefault( 'pe_sort_dir', 'ASC' )
 		st.session_state.setdefault( 'pe_selected_id', None )
-		st.session_state.setdefault( 'pe_caption', '' )
+		st.session_state.setdefault( 'pe_Title', '' )
 		st.session_state.setdefault( 'pe_name', '' )
 		st.session_state.setdefault( 'pe_text', '' )
-		st.session_state.setdefault( 'pe_version', '' )
 		st.session_state.setdefault( 'pe_id', 0 )
 		
 		# ------------------------------------------------------------------
@@ -7000,24 +6987,21 @@ elif mode == 'Prompt Engineering':
 		
 		def reset_selection( ):
 			st.session_state.pe_selected_id = None
-			st.session_state.pe_caption = ''
+			st.session_state.pe_Title = ''
 			st.session_state.pe_name = ''
 			st.session_state.pe_text = ''
-			st.session_state.pe_version = ''
 			st.session_state.pe_id = 0
 		
 		def load_prompt( pid: int ) -> None:
 			with get_conn( ) as conn:
-				_select = f"SELECT Caption, Name, Text, Version, ID FROM {TABLE} WHERE ID=?"
+				_select = f"SELECT Title, Name, Text FROM {TABLE} WHERE ID=?"
 				cur = conn.execute( _select, (pid,), )
 				row = cur.fetchone( )
 				if not row:
 					return
-				st.session_state.pe_caption = row[ 0 ]
+				st.session_state.pe_Title = row[ 0 ]
 				st.session_state.pe_name = row[ 1 ]
 				st.session_state.pe_text = row[ 2 ]
-				st.session_state.pe_version = row[ 3 ]
-				st.session_state.pe_id = row[ 4 ]
 		
 		# ------------------------------------------------------------------
 		# Filters
@@ -7027,7 +7011,7 @@ elif mode == 'Prompt Engineering':
 			st.text_input( 'Search (Name/Text contains)', key='pe_search' )
 		
 		with c2:
-			st.selectbox( 'Sort by', [ 'ID', 'Caption', 'Name', 'Text', 'Version', 'ID' ],
+			st.selectbox( 'Sort by', [ 'ID', 'Title', 'Name', 'Text' ],
 				key='pe_sort_col', )
 		
 		with c3:
@@ -7039,7 +7023,6 @@ elif mode == 'Prompt Engineering':
 				unsafe_allow_html=True, )
 			
 			a1, a2, a3 = st.columns( [ 2, 1, 1 ] )
-			
 			with a1:
 				jump_id = st.number_input( 'Go to ID', min_value=1,
 					step=1, label_visibility='collapsed', )
@@ -7064,7 +7047,7 @@ elif mode == 'Prompt Engineering':
 		
 		offset = (st.session_state.pe_page - 1) * PAGE_SIZE
 		query = f"""
-            SELECT ID, Caption, Name, Text, Version, ID
+            SELECT ID, Title, Name, Text
             FROM {TABLE}
             {where}
             ORDER BY {st.session_state.pe_sort_col} {st.session_state.pe_sort_dir}
@@ -7088,11 +7071,9 @@ elif mode == 'Prompt Engineering':
 				{
 						'Selected': r[ 0 ] == st.session_state.pe_selected_id,
 						'ID': r[ 0 ],
-						'Caption': r[ 1 ],
+						'Title': r[ 1 ],
 						'Name': r[ 2 ],
 						'Text': r[ 3 ],
-						'Version': r[ 4 ],
-						'ID': r[ 5 ],
 				} )
 		
 		edited = st.data_editor( table_rows, hide_index=True, use_container_width=True,
@@ -7117,9 +7098,9 @@ elif mode == 'Prompt Engineering':
 		# ------------------------------------------------------------------
 		# Paging
 		# ------------------------------------------------------------------
-		p1, p2, p3 = st.columns( [ 0.25, 3.5, 0.25 ] )
+		p1, p2, p3 = st.columns( [ 0.25, 0.5, 0.25 ] )
 		with p1:
-			if st.button( "◀ Prev" ) and st.session_state.pe_page > 1:
+			if st.button( "◀ Previous" ) and st.session_state.pe_page > 1:
 				st.session_state.pe_page -= 1
 		
 		with p2:
@@ -7140,7 +7121,6 @@ elif mode == 'Prompt Engineering':
 			st.text_input( 'Name', key='pe_name' )
 			
 			st.text_area( 'Text', key='pe_text', height=260 )
-			st.text_input( 'Version', key='pe_version' )
 			c1, c2, c3 = st.columns( 3 )
 			
 			with c1:
@@ -7152,29 +7132,25 @@ elif mode == 'Prompt Engineering':
 							conn.execute(
 								f"""
                                 UPDATE {TABLE}
-                                SET Caption=?, Name=?, Text=?, Version=?, ID=?
+                                SET Title=?, Name=?, Text=?
                                 WHERE ID=?
                                 """,
 								(
-										st.session_state.pe_caption,
+										st.session_state.pe_Title,
 										st.session_state.pe_name,
-										st.session_state.pe_text,
-										st.session_state.pe_version,
-										st.session_state.pe_id,
+									st.session_state.pe_text,
 										st.session_state.pe_selected_id
 								), )
 						else:
 							conn.execute(
 								f"""
-                                INSERT INTO {TABLE} (Caption, Name, Text, Version, ID)
+                                INSERT INTO {TABLE} (Title, Name, Text )
                                 VALUES (?, ?, ?, ? , ?)
                                 """,
 								(
-										st.session_state.pe_caption,
+										st.session_state.pe_Title,
 										st.session_state.pe_name,
 										st.session_state.pe_text,
-										st.session_state.pe_version,
-										st.session_state.pe_id
 								),
 							)
 						conn.commit( )
@@ -7206,7 +7182,7 @@ elif mode == 'Data Export':
 		
 		# -----------------------------------
 		# Prompt export (System Instructions)
-		st.caption( 'System Prompt' )
+		st.Title( 'System Prompt' )
 		export_format = st.radio( 'Export Format', options=[ 'XML-Delimited', 'Markdown' ],
 			horizontal=True, help='Choose how system instructions should be exported.' )
 		prompt_text: str = st.session_state.get( 'system_prompt', '' )
