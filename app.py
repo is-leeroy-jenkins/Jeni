@@ -5302,7 +5302,7 @@ elif mode == 'Audio':
 				st.button( label='XML <-> Markdown', width='stretch',
 					on_click=convert_audio_system_instructions )
 		
-		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		st.divider( )
 		
 		# ------------------------------------------------------------------
 		# Audio Workspace
@@ -5498,7 +5498,7 @@ elif mode == 'Audio':
 				else:
 					st.info( 'No audio output is currently available.' )
 		
-		st.divider( )
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		# ------------------------------------------------------------------
 		# Audio Conversation History
@@ -5581,7 +5581,6 @@ elif mode == 'Audio':
 				append_audio_message( role='assistant', content=response_message )
 				st.rerun( )
 		
-		
 		# ------------------------------------------------------------------
 		# Conversation and Output Controls
 		# ------------------------------------------------------------------
@@ -5598,8 +5597,7 @@ elif mode == 'Audio':
 		# Task Guidance
 		# ------------------------------------------------------------------
 		if audio_task == 'Text-to-Speech':
-			st.info( 'Enter text through the chat input or the text box to generate speech '
-			         'audio.' )
+			st.info( 'Enter text through the chat input or the text box to generate speech audio.' )
 		elif audio_task in ('Transcribe', 'Translate'):
 			st.info( 'Enter optional task instructions through the chat input, then use either '
 			         'an uploaded file or a recording to run the selected audio task.' )
@@ -7054,9 +7052,9 @@ elif mode == 'Prompt Engineering':
 			with c3:
 				st.button( '🧹 Clear Selection', on_click=reset_selection )
 
-# ==============================================================================
+# ======================================================================================
 # EXPORT MODE
-# ==============================================================================
+# ======================================================================================
 elif mode == 'Data Export':
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
@@ -7112,9 +7110,9 @@ elif mode == 'Data Export':
 		st.download_button( 'Download Chat History (PDF)', buf.getvalue( ),
 			'jeni_chat.pdf', mime='application/pdf' )
 
-# ==============================================================================
+# ======================================================================================
 # DATA MANAGEMENT MODE
-# ==============================================================================
+# ======================================================================================
 elif mode == 'Data Management':
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
@@ -7651,20 +7649,16 @@ elif mode == 'Data Management':
 # ======================================================================================
 # FOOTER — SECTION
 # ======================================================================================
-st.markdown(
-	"""
+st.markdown( """
     <style>
     .block-container {
         padding-bottom: 3rem;
     }
     </style>
-    """,
-	unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True )
 
 # ---- Fixed Container
-st.markdown(
-	"""
+st.markdown( """
     <style>
     .boo-status-bar {
         position: fixed;
@@ -7685,9 +7679,7 @@ st.markdown(
         max-width: 100%;
     }
     </style>
-    """,
-	unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True, )
 
 # ======================================================================================
 # FOOTER RENDERING
@@ -7905,7 +7897,6 @@ elif mode == 'Embeddings':
 	dimensions = st.session_state.get( 'embeddings_dimensions' )
 	encoding = st.session_state.get( 'embeddings_encoding_format' )
 	input_data = st.session_state.get( 'embeddings_text_input' )
-	
 	if model is not None:
 		right_parts.append( f'Model: {model}' )
 	
@@ -7923,7 +7914,6 @@ elif mode == 'Files':
 	files_type = st.session_state.get( 'files_type' )
 	files_id = st.session_state.get( 'files_id' )
 	files_url = st.session_state.get( 'files_url' )
-	
 	if files_purpose is not None:
 		right_parts.append( f'Purpose: {files_purpose}' )
 	
@@ -7951,7 +7941,6 @@ elif mode == 'VectorStores':
 	tool_choice = st.session_state.get( 'stores_tool_choice' )
 	messages = st.session_state.get( 'stores_messages' )
 	background = st.session_state.get( 'stores_background' )
-	
 	if model is not None:
 		right_parts.append( f'Model: {model}' )
 	
