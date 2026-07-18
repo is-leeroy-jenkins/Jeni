@@ -4622,7 +4622,7 @@ elif mode == "Images":
 			prompt = st.chat_input( 'Enter image generation prompt...' )
 			gen_c1, gen_c2, gen_c3 = st.columns( [ 0.2, 0.2, 0.8 ] )
 			with gen_c1:
-				if st.button( 'Generate Image' ):
+				if st.button( 'Generate Image', icon='🎨' ):
 					with st.spinner( 'Generating…' ):
 						try:
 							if not prompt or not str( prompt ).strip( ):
@@ -4680,7 +4680,7 @@ elif mode == "Images":
 			prompt = st.chat_input( 'Enter image analysis prompt …' )
 			ana_c1, ana_c2 = st.columns( [ 0.2, 0.8 ] )
 			with ana_c1:
-				if st.button( 'Analyze Image' ):
+				if st.button( 'Analyze Image', icon='🧪' ):
 					with st.spinner( 'Analyzing image…' ):
 						try:
 							if not tmp_path:
