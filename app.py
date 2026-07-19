@@ -4990,9 +4990,7 @@ if mode == 'Text':
 						if not selected_text_model:
 							selected_text_model = text.model
 						
-						grounding_enabled = bool(
-							st.session_state.get( 'text_google_grounding', False ) )
-						
+						grounding_enabled = bool( st.session_state.get( 'text_google_grounding', False ) )
 						derived_text_tools = [ 'google_search' ] if grounding_enabled else [ ]
 						raw_text_urls = str( st.session_state.get( 'text_urls_input', '' ) or '' )
 						derived_text_urls = [ url.strip( ) for url in raw_text_urls.split( ';' )
@@ -5331,85 +5329,85 @@ elif mode == "Images":
 		# ------------------------------------------------------------------
 		# Expander — Images System Instructions
 		# ------------------------------------------------------------------
-		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
-			image_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
-				mode_name='Images' )
+		render_system_prompt_expander(
+			state_prefix='image',
+			instruction_key='image_system_instructions',
+			label='System Instructions',
+			height=120
+		)
 			
-			image_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-				for
-				record in image_prompt_records }
+		image_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+			for record in image_prompt_records }
+		
+		image_prompt_ids = list( image_prompt_lookup.keys( ) )
 			
-			image_prompt_ids = list( image_prompt_lookup.keys( ) )
+		# ----------------------------------------------------------
+		# Images Prompt Callbacks
+		# ----------------------------------------------------------
+		def on_image_prompt_change( ) -> None:
+			"""Load the selected Images Mode prompt.
 			
-			# ----------------------------------------------------------
-			# Images Prompt Callbacks
-			# ----------------------------------------------------------
-			def on_image_prompt_change( ) -> None:
-				"""Load the selected Images Mode prompt.
-				
-				Purpose:
-				    Retrieves the selected Images Mode prompt by stable ID and copies its Text
-				    value into the Images Mode system-instruction control.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				load_prompt_into_state( prompt_id_key='image_prompt_id',
-					instruction_key='image_system_instructions' )
+			Purpose:
+			    Retrieves the selected Images Mode prompt by stable ID and copies its Text
+			    value into the Images Mode system-instruction control.
 			
-			def clear_image_prompt( ) -> None:
-				"""Clear the Images Mode prompt.
-				
-				Purpose:
-				    Clears the selected Images Mode prompt ID and system-instruction text
-				    without modifying any prompt record in the database.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				clear_prompt_state( prompt_id_key='image_prompt_id',
-					instruction_key='image_system_instructions' )
+			Returns:
+			    None: This function updates Streamlit session state through side effects.
+			"""
+			load_prompt_into_state( prompt_id_key='image_prompt_id',
+				instruction_key='image_system_instructions' )
+		
+		def clear_image_prompt( ) -> None:
+			"""Clear the Images Mode prompt.
 			
-			def convert_image_prompt( ) -> None:
-				"""Convert the Images Mode prompt.
-				
-				Purpose:
-				    Converts the current Images Mode system instructions between supported XML
-				    prompt blocks and Markdown headings.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				convert_prompt_state( instruction_key='image_system_instructions' )
+			Purpose:
+			    Clears the selected Images Mode prompt ID and system-instruction text
+			    without modifying any prompt record in the database.
 			
-			# ----------------------------------------------------------
-			# Images Prompt Controls
-			# ----------------------------------------------------------
-			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+			Returns:
+			    None: This function updates Streamlit session state through side effects.
+			"""
+			clear_prompt_state( prompt_id_key='image_prompt_id',
+				instruction_key='image_system_instructions' )
+		
+		def convert_image_prompt( ) -> None:
+			"""Convert the Images Mode prompt.
 			
-			with in_left:
-				st.text_area( label='Enter Text', height=50, width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
+			Purpose:
+			    Converts the current Images Mode system instructions between supported XML
+			    prompt blocks and Markdown headings.
 			
-			with in_right:
-				if image_prompt_ids:
-					st.selectbox( label='Use Template', options=image_prompt_ids,
-						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-							prompt_lookup=image_prompt_lookup ), index=None, key='image_prompt_id',
-						on_change=on_image_prompt_change, placeholder='Options' )
-				else:
-					st.selectbox( label='Use Template', options=[ ], index=None,
-						key='image_prompt_id', placeholder='No Images prompts', disabled=True )
-			
-			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
-			
-			with btn_c1:
-				st.button( label='Clear Instructions', key='image_clear_instructions',
-					width='stretch', on_click=clear_image_prompt )
-			
-			with btn_c2:
-				st.button( label='XML <-> Markdown', key='image_convert_instructions',
-					width='stretch', on_click=convert_image_prompt )
+			Returns:
+			    None: This function updates Streamlit session state through side effects.
+			"""
+			convert_prompt_state( instruction_key='image_system_instructions' )
+		
+		# ----------------------------------------------------------
+		# Images Prompt Controls
+		# ----------------------------------------------------------
+		in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+		with in_left:
+			st.text_area( label='Enter Text', height=50, width='stretch',
+				help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
+		
+		with in_right:
+			if image_prompt_ids:
+				st.selectbox( label='Use Template', options=image_prompt_ids,
+					format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+						prompt_lookup=image_prompt_lookup ), index=None, key='image_prompt_id',
+					on_change=on_image_prompt_change, placeholder='Options' )
+			else:
+				st.selectbox( label='Use Template', options=[ ], index=None,
+					key='image_prompt_id', placeholder='No Images prompts', disabled=True )
+		
+		btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+		with btn_c1:
+			st.button( label='Clear Instructions', key='image_clear_instructions',
+				width='stretch', on_click=clear_image_prompt )
+		
+		with btn_c2:
+			st.button( label='XML <-> Markdown', key='image_convert_instructions',
+				width='stretch', on_click=convert_image_prompt )
 		
 		def _append_image_message( role: str, content: str ) -> None:
 			try:
@@ -6043,86 +6041,83 @@ elif mode == 'Audio':
 		# ------------------------------------------------------------------
 		# Expander — Audio System Instructions
 		# ------------------------------------------------------------------
-		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
-			audio_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
-				mode_name='Audio' )
-			
-			audio_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-				for
-				record in audio_prompt_records }
-			
-			audio_prompt_ids = list( audio_prompt_lookup.keys( ) )
-			
-			# ----------------------------------------------------------
-			# Audio Prompt Callbacks
-			# ----------------------------------------------------------
-			def on_audio_prompt_change( ) -> None:
-				"""Load the selected Audio Mode prompt.
-				
-				Purpose:
-				    Retrieves the selected Audio Mode prompt by stable ID and copies its Text
-				    value into the Audio Mode system-instruction control.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				load_prompt_into_state( prompt_id_key='audio_prompt_id',
-					instruction_key='audio_system_instructions' )
-			
-			def clear_audio_prompt( ) -> None:
-				"""Clear the Audio Mode prompt.
-				
-				Purpose:
-				    Clears the selected Audio Mode prompt ID and system-instruction text
-				    without modifying any prompt record in the database.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				clear_prompt_state( prompt_id_key='audio_prompt_id',
-					instruction_key='audio_system_instructions' )
-			
-			def convert_audio_prompt( ) -> None:
-				"""Convert the Audio Mode prompt.
-				
-				Purpose:
-				    Converts the current Audio Mode system instructions between supported XML
-				    prompt blocks and Markdown headings.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				convert_prompt_state( instruction_key='audio_system_instructions' )
-			
-			# ----------------------------------------------------------
-			# Audio Prompt Controls
-			# ----------------------------------------------------------
-			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-			
-			with in_left:
-				st.text_area( label='Enter Text', height=50, width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
-			
-			with in_right:
-				if audio_prompt_ids:
-					st.selectbox( label='Use Template', options=audio_prompt_ids,
-						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-							prompt_lookup=audio_prompt_lookup ), index=None, key='audio_prompt_id',
-						on_change=on_audio_prompt_change, placeholder='Options' )
-				else:
-					st.selectbox( label='Use Template', options=[ ], index=None,
-						key='audio_prompt_id', placeholder='No Audio prompts', disabled=True )
-			
-			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
-			
-			with btn_c1:
-				st.button( label='Clear Instructions', key='audio_clear_instructions',
-					width='stretch', on_click=clear_audio_prompt )
-			
-			with btn_c2:
-				st.button( label='XML <-> Markdown', key='audio_convert_instructions',
-					width='stretch', on_click=convert_audio_prompt )
+		render_system_prompt_expander( state_prefix='audio',
+			instruction_key='audio_system_instructions', label='System Instructions', height=120 )
 		
+		audio_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
+			for record in audio_prompt_records }
+		
+		audio_prompt_ids = list( audio_prompt_lookup.keys( ) )
+		
+		# ----------------------------------------------------------
+		# Audio Prompt Callbacks
+		# ----------------------------------------------------------
+		def on_audio_prompt_change( ) -> None:
+			"""Load the selected Audio Mode prompt.
+			
+			Purpose:
+			    Retrieves the selected Audio Mode prompt by stable ID and copies its Text
+			    value into the Audio Mode system-instruction control.
+			
+			Returns:
+			    None: This function updates Streamlit session state through side effects.
+			"""
+			load_prompt_into_state( prompt_id_key='audio_prompt_id',
+				instruction_key='audio_system_instructions' )
+		
+		def clear_audio_prompt( ) -> None:
+			"""Clear the Audio Mode prompt.
+			
+			Purpose:
+			    Clears the selected Audio Mode prompt ID and system-instruction text
+			    without modifying any prompt record in the database.
+			
+			Returns:
+			    None: This function updates Streamlit session state through side effects.
+			"""
+			clear_prompt_state( prompt_id_key='audio_prompt_id',
+				instruction_key='audio_system_instructions' )
+		
+		def convert_audio_prompt( ) -> None:
+			"""Convert the Audio Mode prompt.
+			
+			Purpose:
+			    Converts the current Audio Mode system instructions between supported XML
+			    prompt blocks and Markdown headings.
+			
+			Returns:
+			    None: This function updates Streamlit session state through side effects.
+			"""
+			convert_prompt_state( instruction_key='audio_system_instructions' )
+		
+		# ----------------------------------------------------------
+		# Audio Prompt Controls
+		# ----------------------------------------------------------
+		in_left, in_right = st.columns( [ 0.8, 0.2 ] )
+		
+		with in_left:
+			st.text_area( label='Enter Text', height=50, width='stretch',
+				help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
+		
+		with in_right:
+			if audio_prompt_ids:
+				st.selectbox( label='Use Template', options=audio_prompt_ids,
+					format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
+						prompt_lookup=audio_prompt_lookup ), index=None, key='audio_prompt_id',
+					on_change=on_audio_prompt_change, placeholder='Options' )
+			else:
+				st.selectbox( label='Use Template', options=[ ], index=None,
+					key='audio_prompt_id', placeholder='No Audio prompts', disabled=True )
+		
+		btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
+		with btn_c1:
+			st.button( label='Clear Instructions', key='audio_clear_instructions',
+				width='stretch', on_click=clear_audio_prompt )
+		
+		with btn_c2:
+			st.button( label='XML <-> Markdown', key='audio_convert_instructions',
+				width='stretch', on_click=convert_audio_prompt )
+	
 		# ------------------------------------------------------------------
 		# Audio Workspace
 		# ------------------------------------------------------------------
@@ -6358,7 +6353,6 @@ elif mode == 'Audio':
 						try:
 							apply_gemini_runtime_config( )
 							audio_bytes = run_text_to_speech( audio_prompt )
-							
 							if audio_bytes is None:
 								raise ValueError(
 									'The text-to-speech model returned no audio output.' )
@@ -6369,8 +6363,7 @@ elif mode == 'Audio':
 								loop=bool( st.session_state.get( 'audio_loop', False ) ),
 								autoplay=bool( st.session_state.get( 'audio_autoplay', False ) ) )
 							
-							response_message = (
-								'The requested speech audio was generated successfully.')
+							response_message = 'The requested speech audio generated successfully.'
 							
 							st.markdown( response_message )
 							append_audio_message( role='assistant', content=response_message )
