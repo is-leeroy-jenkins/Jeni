@@ -6311,7 +6311,7 @@ elif mode == 'Embedding':
 				embeddings_overlap_amount = st.session_state[ 'embeddings_overlap_amount' ]
 			
 			# ---------  Reset --------
-			if st.button( label='Reset', key='embedding_reset', width='stretch' ):
+			if st.button( label='Reset', key='embedding_reset', width='stretch', icon='🔄' ):
 				for key in [ 'embedding_model', 'embeddings_dimensions',
 					'embeddings_encoding_format', 'embeddings_input_text',
 					'embeddings_overlap_amount', 'embeddings_chunk_size' ]:
@@ -6550,7 +6550,7 @@ elif mode == 'Document Q&A':
 					media_resolution = st.session_state[ 'docqna_media_resolution' ]
 				
 				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='docqna_model_reset', width='stretch' ):
+				if st.button( label='Reset', key='docqna_model_reset', width='stretch', icon='🔄' ):
 					for key in [ 'docqna_model', 'docqna_include', 'docqna_domains',
 						'docqna_reasoning', 'docqna_media_resolution' ]:
 						if key in st.session_state:
@@ -6609,7 +6609,7 @@ elif mode == 'Document Q&A':
 					docqna_top_k = st.session_state[ 'docqna_top_k' ]
 				
 				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='docqna_inference_reset', width='stretch' ):
+				if st.button( label='Reset', key='docqna_inference_reset', width='stretch', icon='🔄' ):
 					for key in [ 'docqna_top_percent', 'docqna_frequency_penalty',
 						'docqna_presence_penalty', 'docqna_temperature', 'docqna_top_k', ]:
 						if key in st.session_state:
@@ -6657,7 +6657,6 @@ elif mode == 'Document Q&A':
 						placeholder='Options' )
 					
 					docqna_tools = [ d.strip( ) for d in set_docqna_tools if d.strip( ) ]
-					
 					docqna_tools = st.session_state[ 'docqna_tools' ]
 				
 				# ---------- Modalities ------------
@@ -6668,11 +6667,10 @@ elif mode == 'Document Q&A':
 						help='Optional. Modality of the response', placeholder='Options' )
 					
 					docqna_modalities = [ d.strip( ) for d in set_docqna_modalities if d.strip( ) ]
-					
 					docqna_modalities = st.session_state[ 'docqna_modalities' ]
 				
 				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='docqna_tools_reset', width='stretch' ):
+				if st.button( label='Reset', key='docqna_tools_reset', width='stretch', icon='🔄' ):
 					for key in [ 'docqna_parallel_tools', 'docqna_tool_choice', 'docqna_number',
 						'docqna_tools', 'docqna_max_calls', 'docqna_modalities' ]:
 						if key in st.session_state:
@@ -6724,7 +6722,7 @@ elif mode == 'Document Q&A':
 					docqna_tokens = st.session_state[ 'docqna_max_tokens' ]
 				
 				# ---------- Reset Settings ------------
-				if st.button( label='Reset', key='docqna_response_reset', width='stretch' ):
+				if st.button( label='Reset', key='docqna_response_reset', width='stretch', icon='🔄' ):
 					for key in [ 'docqna_stream', 'docqna_store', 'docqna_background',
 						'docqna_stops', 'docqna_max_tokens' ]:
 						if key in st.session_state:
@@ -6854,6 +6852,9 @@ elif mode == 'Files':
 		st.subheader( '📚 Files API', help=cfg.FILES_API )
 		st.divider( )
 		
+		# ------------------------------------------------------------------
+		# Expander — Mind Controls
+		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
@@ -7050,6 +7051,9 @@ elif mode == 'Files':
 		render_system_prompt_expander( state_prefix='files',
 			instruction_key='files_system_instructions', label='System Instructions', height=120 )
 		
+		# ------------------------------------------------------------------
+		# Container — Files List/Upload
+		# ------------------------------------------------------------------
 		fls_c1, fls_c2 = st.columns( [ 0.4, 0.6 ], border=True )
 		with fls_c1:
 			if st.button( 'List Files' ):
