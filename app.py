@@ -6855,6 +6855,7 @@ elif mode == 'Files':
 		st.divider( )
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5, llm_c6 = st.columns(
 					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
@@ -6908,7 +6909,7 @@ elif mode == 'Files':
 					files_fequency = st.session_state[ 'files_frequency_penalty' ]
 				
 				# ---------- Reset Model ------------
-				if st.button( label='Reset', key='reset_files_model', width='stretch' ):
+				if st.button( label='Reset', key='reset_files_model', width='stretch', icon='🔄' ):
 					for key in [ 'files_model', 'files_temperature', 'files_presence_penalty',
 						'files_reasoning', 'files_top_percent', 'files_frequency_penalty' ]:
 						if key in st.session_state:
@@ -6976,10 +6977,9 @@ elif mode == 'Files':
 				
 				# ---------- Reset Tools ------------
 				st.button( label='Reset', key='reset_files_tools', width='stretch',
-					on_click=reset_files_tool_settings )
+					on_click=reset_files_tool_settings, icon='🔄' )
 			
-			with st.expander( label='Response Settings', icon='↔️', expanded=False,
-					width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5, resp_c6 = st.columns(
 					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
 				
@@ -7032,14 +7032,11 @@ elif mode == 'Files':
 						value=','.join( st.session_state.get( 'files_stops', [ ] ) ),
 						help=cfg.STOP_SEQUENCE, width='stretch', placeholder='Enter Stop Strings' )
 					
-					files_stops = [ d.strip( ) for d in set_files_stops.split( ',' ) if d.strip(
-					
-					) ]
-					
+					files_stops = [ d.strip( ) for d in set_files_stops.split( ',' ) if d.strip( ) ]
 					st.session_state[ 'files_stops' ] = files_stops
 				
 				# ---------- Reset Reponse ------------
-				if st.button( label='Reset', key='reset_files_response', width='stretch' ):
+				if st.button( label='Reset', key='reset_files_response', width='stretch', icon='🔄'):
 					for key in [ 'files_stream', 'files_store', 'files_number', 'files_stops',
 						'files_tools', 'files_max_tokens', 'files_modalities' ]:
 						if key in st.session_state:
@@ -7052,6 +7049,7 @@ elif mode == 'Files':
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='files',
 			instruction_key='files_system_instructions', label='System Instructions', height=120 )
+		
 		fls_c1, fls_c2 = st.columns( [ 0.4, 0.6 ], border=True )
 		with fls_c1:
 			if st.button( 'List Files' ):
@@ -7753,7 +7751,7 @@ elif mode == 'File Search Stores':
 						st.error( f'File Search query failed: {exception.info}' )
 		
 		# ------  Clear Messages ---------
-		st.button( label='Clear Messages', key='stores_clear_messages', icon='🧹', width='stretch',
+		st.button( label='Clear Messages', key='stores_clear_messages', icon='🧹', width='content',
 			on_click=clear_stores_messages )
 
 # ======================================================================================
@@ -8138,7 +8136,7 @@ elif mode == 'Google Cloud Buckets':
 		render_system_prompt_expander( state_prefix='bucket',
 			instruction_key='bucket_system_instructions', label='System Instructions', height=130 )
 		
-		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+		st.divider( )
 		st.caption( 'Cloud Bucket Management' )
 		
 		buckets_left, buckets_right = st.columns( [ 0.50, 0.50 ], border=True )
@@ -8169,7 +8167,9 @@ elif mode == 'Google Cloud Buckets':
 							Logger( ).write( exception )
 							st.error( f'Create bucket failed: {exception.info}' )
 			
-			# ------- Retrieve and Delete Bucket --------
+			# ----------------------------------------------------------
+			# Container - Retrieve and Delete Bucket
+			# ----------------------------------------------------------
 			bucket_map = getattr( searcher, 'collections', None )
 			bucket_options: List[ Tuple[ str, str ] ] = [ ]
 			if isinstance( bucket_map, dict ):
@@ -8296,16 +8296,12 @@ elif mode == 'Google Cloud Buckets':
 								Logger( ).write( exception )
 								st.error( f'Upload failed: {exception.info}' )
 			
-			active_bucket_label = str(
-				st.session_state.get( 'bucket_selected_label', '' ) or '' ).strip( )
-			
+			active_bucket_label = str( st.session_state.get( 'bucket_selected_label', '' ) or '' ).strip( )
 			active_bucket_id = str( st.session_state.get( 'bucket_id', '' ) or '' ).strip( )
 			if active_bucket_id:
-				st.info( 'Active Cloud Bucket: '
-				         f'{active_bucket_label or active_bucket_id}' )
+				st.info( f'Active Cloud Bucket: {active_bucket_label or active_bucket_id}' )
 			else:
-				st.info( 'Select a Cloud Bucket to provide bucket context '
-				         'to the conversational assistant.' )
+				st.info( 'Select a Cloud Bucket to provide bucket context to the assistant.' )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
