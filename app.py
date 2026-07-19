@@ -877,6 +877,21 @@ if 'bucket_include' not in st.session_state:
 
 if 'bucket_id' not in st.session_state:
 	st.session_state[ 'bucket_id' ] = ''
+	
+# ------ System Instruction Category Policies ------
+
+TEXT_PROMPT_CATEGORIES: Tuple[ str, ... ] = ('Text', 'Text Generation', 'Image Analysis',)
+
+IMAGE_PROMPT_CATEGORIES: Tuple[ str, ... ] = ('Images', 'Image Generation', 'Image Analysis',
+	'Image Editing',)
+
+AUDIO_PROMPT_CATEGORIES: Tuple[ str, ... ] = ('Audio', 'Audio Generation', 'Transcription',
+	'Translation', 'Text-to-Speech',)
+
+DOCUMENT_PROMPT_CATEGORIES: Tuple[ str, ... ] = ('Text', 'Text Generation', 'Image Analysis',)
+
+FILE_PROMPT_CATEGORIES: Tuple[ str, ... ] = ('Text', 'Text Generation', 'Image Analysis',
+	'Image Editing',)
 
 # ======================================================================================
 # Utilities
@@ -958,24 +973,19 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 	
 	try:
 		if isinstance( raw, dict ):
-			usage[ 'prompt_tokens' ] = int(
-				raw.get( 'prompt_tokens', raw.get( 'input_tokens', 0 ) ) )
-			usage[ 'completion_tokens' ] = int(
-				raw.get( 'completion_tokens', raw.get( 'output_tokens', 0 ) )
-			)
-			usage[ 'total_tokens' ] = int(
-				raw.get( 'total_tokens', usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] )
-			)
+			usage[ 'prompt_tokens' ] = int( raw.get( 'prompt_tokens',
+				raw.get( 'input_tokens', 0 ) ) )
+			usage[ 'completion_tokens' ] = int( raw.get( 'completion_tokens',
+				raw.get( 'output_tokens', 0 ) ) )
+			usage[ 'total_tokens' ] = int( raw.get( 'total_tokens',
+				usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] ) )
 		else:
-			usage[ 'prompt_tokens' ] = int(
-				getattr( raw, 'prompt_tokens', getattr( raw, 'input_tokens', 0 ) ) )
-			usage[ 'completion_tokens' ] = int(
-				getattr( raw, 'completion_tokens', getattr( raw, 'output_tokens', 0 ) )
-			)
-			usage[ 'total_tokens' ] = int(
-				getattr( raw, 'total_tokens',
-					usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] )
-			)
+			usage[ 'prompt_tokens' ] = int( getattr( raw, 'prompt_tokens',
+				getattr( raw, 'input_tokens', 0 ) ) )
+			usage[ 'completion_tokens' ] = int( getattr( raw, 'completion_tokens',
+				getattr( raw, 'output_tokens', 0 ) ) )
+			usage[ 'total_tokens' ] = int( getattr( raw, 'total_tokens',
+				usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] ) )
 	except Exception as _logged_exception:
 		try:
 			error = Error( _logged_exception )
@@ -1488,14 +1498,10 @@ def extract_usage( resp: Any ) -> Dict[ str, int ]:
 		if isinstance( raw, dict ):
 			usage[ 'prompt_tokens' ] = int( raw.get( 'prompt_tokens', 0 ) )
 			usage[ 'completion_tokens' ] = int(
-				raw.get( 'completion_tokens', raw.get( 'output_tokens', 0 ) )
-			)
+				raw.get( 'completion_tokens', raw.get( 'output_tokens', 0 ) ) )
 			usage[ 'total_tokens' ] = int(
-				raw.get(
-					'total_tokens',
-					usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ],
-				)
-			)
+				raw.get( 'total_tokens',
+					usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ], ) )
 		else:
 			usage[ "prompt_tokens" ] = int( getattr( raw, "prompt_tokens", 0 ) )
 			usage[ "completion_tokens" ] = int(
@@ -1674,7 +1680,6 @@ def convert_markdown( text: Any ) -> str:
 	
 	# Normalize newlines
 	src = text.replace( "\r\n", "\n" ).replace( "\r", "\n" )
-	
 	htag_pattern = re.compile( r"<h([1-6])>(.*?)</h\1>", flags=re.IGNORECASE | re.DOTALL )
 	md_heading_pattern = re.compile( r"^(#{1,6})[ \t]+(.+?)[ \t]*$", flags=re.MULTILINE )
 	
@@ -1915,7 +1920,6 @@ def route_document_query( prompt: str ) -> str:
 		# Resolve Document Q&A Configuration
 		# ------------------------------------------------------------------
 		model = str( st.session_state.get( 'docqna_model', '' ) or '' ).strip( )
-		
 		if not model:
 			raise ValueError( 'Select a Document Q&A model before submitting a question.' )
 		
@@ -2085,7 +2089,6 @@ def load_sqlite_vec( conn: sqlite3.Connection ) -> bool:
     """
 	try:
 		import sqlite_vec
-		
 		sqlite_vec.load( conn )
 		return True
 	except Exception as _logged_exception:
@@ -2166,17 +2169,13 @@ def rebuild_index( embedder: SentenceTransformer ) -> None:
 	st.session_state[ 'docqna_fingerprint' ] = fp
 	st.session_state[ 'docqna_chunk_count' ] = 0
 	st.session_state[ 'docqna_fallback_rows' ] = [ ]
-	
 	dim_value = getattr( embedder, 'get_sentence_embedding_dimension', lambda: 384 )( )
 	dim = int( dim_value ) if dim_value else 384
-	
 	vec_ready = ensure_schema( dim )
 	st.session_state[ 'docqna_vec_ready' ] = bool( vec_ready )
-	
 	conn = create_connection( )
 	try:
 		cur = conn.cursor( )
-		
 		if vec_ready:
 			try:
 				cur.execute( 'DELETE FROM docqna_vec;' )
@@ -2195,7 +2194,6 @@ def rebuild_index( embedder: SentenceTransformer ) -> None:
 		
 		total_chunks = 0
 		fallback_rows: List[ Tuple[ str, str, bytes ] ] = [ ]
-		
 		for name in active_docs:
 			b = doc_bytes.get( name )
 			if not b:
@@ -2265,10 +2263,8 @@ def retrieve_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] 
 	
 	embedder: SentenceTransformer = load_embedder( )
 	rebuild_index( embedder )
-	
 	qv = embedder.encode( [ query ], show_progress_bar=False )
 	qv = np.asarray( qv, dtype=np.float32 )[ 0 ]
-	
 	if st.session_state.get( 'docqna_vec_ready', False ):
 		conn = create_connection( )
 		try:
@@ -2298,10 +2294,8 @@ def retrieve_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] 
 		finally:
 			conn.close( )
 	
-	fallback_rows: List[
-		Tuple[ str, str, bytes ] ] = st.session_state.get( 'docqna_fallback_rows', [ ] )
+	fallback_rows: List[ Tuple[ str, str, bytes ] ] = st.session_state.get( 'docqna_fallback_rows', [ ] )
 	results: List[ Tuple[ str, str, float ] ] = [ ]
-	
 	for doc_name, chunk_text_value, vec_blob in fallback_rows:
 		if not vec_blob:
 			continue
@@ -2312,7 +2306,6 @@ def retrieve_chunks( query: str, k: int = 6 ) -> List[ Tuple[ str, str, float ] 
 		
 		score = cosine_sim( qv, v )
 		results.append( (doc_name, chunk_text_value, float( score )) )
-	
 	results.sort( key=lambda r: r[ 2 ], reverse=True )
 	return results[ : int( k ) ]
 
@@ -2333,15 +2326,12 @@ def build_document_user_input( user_query: str, k: int = 6 ) -> str:
     """
 	system = str( st.session_state.get( 'docqna_system_instructions', '' ) or '' ).strip( )
 	hits = retrieve_chunks( user_query, k=int( k ) )
-	
 	context_blocks: List[ str ] = [ ]
 	for doc_name, chunk, score in hits:
 		context_blocks.append( f'[Document: {doc_name}]\n{chunk}'.strip( ) )
 	
 	context = '\n\n'.join( context_blocks ).strip( )
-	
 	prompt_parts: List[ str ] = [ ]
-	
 	if system:
 		prompt_parts.append( system )
 	
@@ -2353,7 +2343,6 @@ def build_document_user_input( user_query: str, k: int = 6 ) -> str:
 		)
 	
 	prompt_parts.append( f'Question:\n{user_query}\n\nAnswer:' )
-	
 	return '\n\n'.join( prompt_parts ).strip( )
 
 # ----------  DATABASE UTILITIES ----------
@@ -2374,183 +2363,133 @@ def initialize_database( ) -> None:
 	"""
 	try:
 		Path( 'stores/sqlite' ).mkdir( parents=True, exist_ok=True )
-		
 		with sqlite3.connect( cfg.DB_PATH ) as conn:
 			# ------------------------------------------------------------------
 			# Chat History
 			# ------------------------------------------------------------------
-			conn.execute(
-				'''
-				CREATE TABLE IF NOT EXISTS "chat_history"
-				(
-					"id" INTEGER PRIMARY KEY AUTOINCREMENT,
-					"role" TEXT,
-					"content" TEXT
-				);
-				'''
-			)
+			conn.execute( '''
+                          CREATE TABLE IF NOT EXISTS "chat_history"
+                          (
+                              "id"
+                              INTEGER
+                              PRIMARY
+                              KEY
+                              AUTOINCREMENT,
+                              "role"
+                              TEXT,
+                              "content"
+                              TEXT
+                          );
+			              ''' )
 			
 			# ------------------------------------------------------------------
 			# Embeddings
 			# ------------------------------------------------------------------
-			conn.execute(
-				'''
-				CREATE TABLE IF NOT EXISTS "embeddings"
-				(
-					"id" INTEGER PRIMARY KEY AUTOINCREMENT,
-					"chunk" TEXT,
-					"vector" BLOB
-				);
-				'''
-			)
+			conn.execute( '''
+                          CREATE TABLE IF NOT EXISTS "embeddings"
+                          (
+                              "id"
+                              INTEGER
+                              PRIMARY
+                              KEY
+                              AUTOINCREMENT,
+                              "chunk"
+                              TEXT,
+                              "vector"
+                              BLOB
+                          );
+			              ''' )
 			
 			# ------------------------------------------------------------------
 			# Prompts
 			# ------------------------------------------------------------------
-			prompt_table_exists = conn.execute(
-				'''
-				SELECT 1
-				FROM "sqlite_master"
-				WHERE "type" = 'table'
-					AND "name" = 'Prompts';
-				'''
-			).fetchone( ) is not None
+			prompt_table_exists = conn.execute( '''
+                                                SELECT 1
+                                                FROM "sqlite_master"
+                                                WHERE "type" = 'table'
+                                                  AND "name" = 'Prompts';
+			                                    ''' ).fetchone( ) is not None
 			
 			if not prompt_table_exists:
-				conn.execute(
-					'''
-					CREATE TABLE "Prompts"
-					(
-						"ID" INTEGER NOT NULL UNIQUE,
-						"Title" TEXT(80),
-						"Name" TEXT(80),
-						"Category" TEXT(80),
-						"Text" TEXT(2040),
-						PRIMARY KEY("ID" AUTOINCREMENT)
-					);
-					'''
-				)
+				conn.execute( '''
+                              CREATE TABLE "Prompts"
+                              (
+                                  "ID"       INTEGER NOT NULL UNIQUE,
+                                  "Title"    TEXT(80),
+                                  "Name"     TEXT(80),
+                                  "Category" TEXT(80),
+                                  "Text"     TEXT(2040),
+                                  PRIMARY KEY ("ID" AUTOINCREMENT)
+                              );
+				              ''' )
 			else:
-				existing_schema = conn.execute(
-					'PRAGMA table_info("Prompts");'
-				).fetchall( )
+				existing_schema = conn.execute( 'PRAGMA table_info("Prompts");' ).fetchall( )
 				
-				existing_columns = [
-					str( row[ 1 ] )
-					for row in existing_schema
-				]
+				existing_columns = [ str( row[ 1 ] ) for row in existing_schema ]
 				
-				required_columns = [
-					'ID',
-					'Title',
-					'Name',
-					'Category',
-					'Text',
-				]
+				required_columns = [ 'ID', 'Title', 'Name', 'Category', 'Text', ]
 				
-				schema_requires_migration = (
-					existing_columns != required_columns
-				)
+				schema_requires_migration = (existing_columns != required_columns)
 				
 				if schema_requires_migration:
 					# ----------------------------------------------------------
 					# Preserve Legacy Prompt Data
 					# ----------------------------------------------------------
-					legacy_rows = conn.execute(
-						'SELECT * FROM "Prompts";'
-					).fetchall( )
+					legacy_rows = conn.execute( 'SELECT * FROM "Prompts";' ).fetchall( )
 					
-					legacy_column_names = [
-						str( description[ 0 ] )
-						for description in conn.execute(
-							'SELECT * FROM "Prompts" LIMIT 0;'
-						).description
-					]
+					legacy_column_names = [ str( description[ 0 ] ) for description in
+						conn.execute( 'SELECT * FROM "Prompts" LIMIT 0;' ).description ]
 					
-					legacy_records = [
-						dict( zip( legacy_column_names, row ) )
-						for row in legacy_rows
-					]
+					legacy_records = [ dict( zip( legacy_column_names, row ) ) for row in
+						legacy_rows ]
 					
 					# ----------------------------------------------------------
 					# Rebuild Prompts Table
 					# ----------------------------------------------------------
-					conn.execute(
-						'DROP TABLE IF EXISTS "Prompts__Migration";'
-					)
+					conn.execute( 'DROP TABLE IF EXISTS "Prompts__Migration";' )
 					
-					conn.execute(
-						'''
-						CREATE TABLE "Prompts__Migration"
-						(
-							"ID" INTEGER NOT NULL UNIQUE,
-							"Title" TEXT(80),
-							"Name" TEXT(80),
-							"Category" TEXT(80),
-							"Text" TEXT(2040),
-							PRIMARY KEY("ID" AUTOINCREMENT)
-						);
-						'''
-					)
+					conn.execute( '''
+                                  CREATE TABLE "Prompts__Migration"
+                                  (
+                                      "ID"       INTEGER NOT NULL UNIQUE,
+                                      "Title"    TEXT(80),
+                                      "Name"     TEXT(80),
+                                      "Category" TEXT(80),
+                                      "Text"     TEXT(2040),
+                                      PRIMARY KEY ("ID" AUTOINCREMENT)
+                                  );
+					              ''' )
 					
 					for record in legacy_records:
 						raw_id = record.get( 'ID' )
 						
 						try:
-							prompt_id = (
-								int( raw_id )
-								if raw_id is not None
-								and str( raw_id ).strip( )
-								else None
-							)
+							prompt_id = (int( raw_id ) if raw_id is not None and str(
+								raw_id ).strip( ) else None)
 						except (TypeError, ValueError):
 							prompt_id = None
 						
 						title = str(
-							record.get(
-								'Title',
-								record.get( 'Caption', '' )
-							)
-							or ''
-						).strip( )[ :80 ]
+							record.get( 'Title', record.get( 'Caption', '' ) ) or '' ).strip( )[
+							:80 ]
 						
-						name = str(
-							record.get( 'Name', '' )
-							or ''
-						).strip( )[ :80 ]
+						name = str( record.get( 'Name', '' ) or '' ).strip( )[ :80 ]
 						
-						category = str(
-							record.get( 'Category', '' )
-							or ''
-						).strip( )[ :80 ]
+						category = str( record.get( 'Category', '' ) or '' ).strip( )[ :80 ]
 						
-						text = str(
-							record.get( 'Text', '' )
-							or ''
-						).strip( )[ :2040 ]
+						text = str( record.get( 'Text', '' ) or '' ).strip( )[ :2040 ]
 						
 						if prompt_id is None:
-							conn.execute(
-								'''
-								INSERT INTO "Prompts__Migration"
-									(
-										"Title",
-										"Name",
-										"Category",
-										"Text"
-									)
-								VALUES (?, ?, ?, ?);
-								''',
-								(
-									title,
-									name,
-									category,
-									text,
-								)
-							)
+							conn.execute( '''
+                                          INSERT INTO "Prompts__Migration"
+                                          ("Title",
+                                           "Name",
+                                           "Category",
+                                           "Text")
+                                          VALUES (?, ?, ?, ?);
+							              ''', (title, name, category, text,) )
 						else:
-							conn.execute(
-								'''
+							conn.execute( '''
 								INSERT OR REPLACE INTO "Prompts__Migration"
 									(
 										"ID",
@@ -2560,23 +2499,13 @@ def initialize_database( ) -> None:
 										"Text"
 									)
 								VALUES (?, ?, ?, ?, ?);
-								''',
-								(
-									prompt_id,
-									title,
-									name,
-									category,
-									text,
-								)
-							)
+								''', (prompt_id, title, name, category, text,) )
 					
 					conn.execute( 'DROP TABLE "Prompts";' )
-					conn.execute(
-						'''
-						ALTER TABLE "Prompts__Migration"
-						RENAME TO "Prompts";
-						'''
-					)
+					conn.execute( '''
+                                  ALTER TABLE "Prompts__Migration"
+                                      RENAME TO "Prompts";
+					              ''' )
 			
 			conn.commit( )
 	
@@ -2664,7 +2593,6 @@ def read_table( table: str, limit: int = None, offset: int = 0 ) -> pd.DataFrame
 	
 	seen: Dict[ str, int ] = { }
 	columns: List[ str ] = [ ]
-	
 	for col in raw_columns:
 		name = str( col )
 		if name not in seen:
@@ -2906,16 +2834,13 @@ def create_aggregation( df: pd.DataFrame ):
         df (pd.DataFrame): Df value used by this workflow.
     """
 	st.subheader( 'Aggregation Engine' )
-	
 	numeric_cols = df.select_dtypes( include=[ 'number' ] ).columns.tolist( )
-	
 	if not numeric_cols:
 		st.info( 'No numeric columns available.' )
 		return
 	
 	col = st.selectbox( 'Column', numeric_cols )
 	agg = st.selectbox( 'Aggregation', [ 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'MEDIAN' ] )
-	
 	if agg == 'COUNT':
 		result = df[ col ].count( )
 	elif agg == 'SUM':
@@ -2948,12 +2873,9 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		return
 	
 	df_plot = df.copy( )
-	
 	for col in df_plot.columns:
 		if df_plot[ col ].dtype == object:
-			df_plot[ col ] = df_plot[ col ].map(
-				lambda x: '' if x is None else str( x )
-			)
+			df_plot[ col ] = df_plot[ col ].map( lambda x: '' if x is None else str( x ) )
 	
 	numeric_cols: List[ str ] = [ ]
 	for col in df_plot.columns:
@@ -2962,9 +2884,7 @@ def create_visualization( df: pd.DataFrame ) -> None:
 			numeric_cols.append( col )
 	
 	categorical_cols: List[ str ] = [ col for col in df_plot.columns if col not in numeric_cols ]
-	
-	chart = st.selectbox(
-		'Chart Type',
+	chart = st.selectbox( 'Chart Type',
 		[ 'Histogram', 'Bar', 'Line', 'Scatter', 'Box', 'Pie', 'Correlation' ] )
 	
 	if chart == 'Histogram':
@@ -2974,7 +2894,6 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		
 		col = st.selectbox( 'Column', numeric_cols )
 		values = pd.to_numeric( df_plot[ col ], errors='coerce' ).dropna( ).tolist( )
-		
 		fig = go.Figure( data=[ go.Histogram( x=values ) ] )
 		fig.update_layout( xaxis_title=col, yaxis_title='Count' )
 		st.plotly_chart( fig, use_container_width=True )
@@ -2986,10 +2905,8 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		
 		x = st.selectbox( 'X', df_plot.columns )
 		y = st.selectbox( 'Y', numeric_cols )
-		
 		x_values = df_plot[ x ].astype( str ).tolist( )
 		y_values = pd.to_numeric( df_plot[ y ], errors='coerce' ).fillna( 0 ).tolist( )
-		
 		fig = go.Figure( data=[ go.Bar( x=x_values, y=y_values ) ] )
 		fig.update_layout( xaxis_title=x, yaxis_title=y )
 		st.plotly_chart( fig, use_container_width=True )
@@ -3001,10 +2918,8 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		
 		x = st.selectbox( 'X', df_plot.columns )
 		y = st.selectbox( 'Y', numeric_cols )
-		
 		x_values = df_plot[ x ].astype( str ).tolist( )
 		y_values = pd.to_numeric( df_plot[ y ], errors='coerce' ).fillna( 0 ).tolist( )
-		
 		fig = go.Figure( data=[ go.Scatter( x=x_values, y=y_values, mode='lines' ) ] )
 		fig.update_layout( xaxis_title=x, yaxis_title=y )
 		st.plotly_chart( fig, use_container_width=True )
@@ -3016,14 +2931,11 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		
 		x = st.selectbox( 'X', numeric_cols, key='viz_scatter_x' )
 		y = st.selectbox( 'Y', numeric_cols, key='viz_scatter_y' )
-		
 		x_series = pd.to_numeric( df_plot[ x ], errors='coerce' )
 		y_series = pd.to_numeric( df_plot[ y ], errors='coerce' )
 		mask = x_series.notna( ) & y_series.notna( )
-		
 		x_values = x_series[ mask ].tolist( )
 		y_values = y_series[ mask ].tolist( )
-		
 		fig = go.Figure( data=[ go.Scatter( x=x_values, y=y_values, mode='markers' ) ] )
 		fig.update_layout( xaxis_title=x, yaxis_title=y )
 		st.plotly_chart( fig, use_container_width=True )
@@ -3035,7 +2947,6 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		
 		col = st.selectbox( 'Column', numeric_cols, key='viz_box_col' )
 		values = pd.to_numeric( df_plot[ col ], errors='coerce' ).dropna( ).tolist( )
-		
 		fig = go.Figure( data=[ go.Box( y=values, name=col ) ] )
 		fig.update_layout( yaxis_title=col )
 		st.plotly_chart( fig, use_container_width=True )
@@ -3047,9 +2958,8 @@ def create_visualization( df: pd.DataFrame ) -> None:
 		
 		col = st.selectbox( 'Category Column', categorical_cols )
 		counts = df_plot[ col ].astype( str ).value_counts( )
-		
-		fig = go.Figure(
-			data=[ go.Pie( labels=counts.index.tolist( ), values=counts.values.tolist( ) ) ] )
+		fig = go.Figure( data=[ go.Pie( labels=counts.index.tolist( ),
+			values=counts.values.tolist( ) ) ] )
 		st.plotly_chart( fig, use_container_width=True )
 	
 	elif chart == 'Correlation':
@@ -3062,11 +2972,7 @@ def create_visualization( df: pd.DataFrame ) -> None:
 			corr_df[ col ] = pd.to_numeric( df_plot[ col ], errors='coerce' )
 		
 		corr = corr_df.corr( )
-		
-		fig = go.Figure(
-			data=[ go.Heatmap(
-				z=corr.values.tolist( ),
-				x=corr.columns.tolist( ),
+		fig = go.Figure( data=[ go.Heatmap( z=corr.values.tolist( ), x=corr.columns.tolist( ),
 				y=corr.index.tolist( ) ) ] )
 		st.plotly_chart( fig, use_container_width=True )
 
@@ -3111,7 +3017,6 @@ def insert_data( table_name: str, df: pd.DataFrame ):
 	
 	placeholders = ', '.join( [ '?' ] * len( df.columns ) )
 	stmt = f'INSERT INTO {table_name} VALUES ({placeholders});'
-	
 	with create_connection( ) as conn:
 		conn.executemany( stmt, df.values.tolist( ) )
 		conn.commit( )
@@ -3189,16 +3094,13 @@ def create_custom_table( table_name: str, columns: list ) -> None:
 		raise ValueError( 'Invalid table name.' )
 	
 	col_defs = [ ]
-	
 	for col in columns:
 		col_name = col[ 'name' ]
 		col_type = col[ 'type' ].upper( )
-		
 		if not re.match( r"^[A-Za-z_][A-Za-z0-9_]*$", col_name ):
 			raise ValueError( f"Invalid column name: {col_name}" )
 		
 		definition = f'"{col_name}" {col_type}'
-		
 		if col[ 'primary_key' ]:
 			definition += ' PRIMARY KEY'
 			if col[ 'auto_increment' ] and col_type == 'INTEGER':
@@ -3208,9 +3110,7 @@ def create_custom_table( table_name: str, columns: list ) -> None:
 			definition += " NOT NULL"
 		
 		col_defs.append( definition )
-	
 	sql = f'CREATE TABLE IF NOT EXISTS "{table_name}" ({", ".join( col_defs )});'
-	
 	with create_connection( ) as conn:
 		conn.execute( sql )
 		conn.commit( )
@@ -3398,23 +3298,18 @@ def rename_column( table_name: str, old_name: str, new_name: str ) -> None:
 			raise ValueError( "Column not found." )
 		
 		mapped_cols = [ (new_name if c == old_name else c) for c in cols ]
-		
 		temp_table = f"{table_name}__rebuild_temp"
-		
 		col_defs: List[ str ] = [ ]
 		pk_cols = [ r for r in schema if int( r[ 5 ] or 0 ) > 0 ]
 		single_pk = len( pk_cols ) == 1
-		
 		for row in schema:
 			col_name = row[ 1 ]
 			col_type = row[ 2 ] or ''
 			not_null = int( row[ 3 ] or 0 )
 			default_value = row[ 4 ]
 			pk = int( row[ 5 ] or 0 )
-			
 			out_name = new_name if col_name == old_name else col_name
 			col_def = f'"{out_name}" {col_type}'.strip( )
-			
 			if not_null:
 				col_def += ' NOT NULL'
 			
@@ -4395,23 +4290,24 @@ def convert_prompt_state( instruction_key: str ) -> None:
 		raise exception
 
 def render_system_prompt_expander( state_prefix: str, instruction_key: str,
-	label: str='System Instructions', height: int=120 ) -> None:
-	"""Render a category-driven system-prompt expander.
+	allowed_categories: Tuple[ str, ... ], label: str = 'System Instructions',
+	height: int=130 ) -> None:
+	"""Render a filtered category-driven system-prompt expander.
 	
 	Purpose:
-	    Renders a reusable System Instructions expander containing an editable text
-	    area, a database-backed Category selector, and a Prompt selector filtered by
-	    the selected category. Selecting a prompt loads its Text into the editable
-	    instruction area.
+	    Renders a reusable System Instructions expander containing an editable
+	    instruction area, a category selector restricted by the active mode's
+	    category policy, and a prompt selector filtered by the selected category.
 	
 	Args:
 	    state_prefix (str): Unique prefix used for mode-specific widget keys.
 	    instruction_key (str): Session-state key containing editable instructions.
+	    allowed_categories (Tuple[str, ...]): Categories permitted for the mode.
 	    label (str): Expander label displayed in the interface.
 	    height (int): Height of the instruction text area in pixels.
 	
 	Returns:
-	    None: This function renders Streamlit controls and updates session state.
+	    None: This function renders controls and updates Streamlit session state.
 	
 	Raises:
 	    Error: Raised when prompt data or selector state cannot be rendered.
@@ -4424,31 +4320,32 @@ def render_system_prompt_expander( state_prefix: str, instruction_key: str,
 		st.session_state.setdefault( instruction_key, '' )
 		st.session_state.setdefault( category_key, None )
 		st.session_state.setdefault( prompt_id_key, None )
-		categories = fetch_prompt_categories( cfg.DB_PATH )
+		
+		# ----------------------------------------------------------
+		# Retrieve and Filter Available Categories
+		# ----------------------------------------------------------
+		database_categories = fetch_prompt_categories( cfg.DB_PATH )
+		allowed_lookup = { str( category ).strip( ).casefold( ) for category in allowed_categories
+			if str( category ).strip( ) }
+		
+		categories = [ category for category in database_categories if
+			str( category ).strip( ).casefold( ) in allowed_lookup ]
+		
 		selected_category = st.session_state.get( category_key )
 		if (selected_category and selected_category not in categories):
 			st.session_state[ category_key ] = None
 			st.session_state[ prompt_id_key ] = None
 			selected_category = None
 		
-		prompt_records = fetch_prompts_by_category( db_path=cfg.DB_PATH,
-			category=str( selected_category or '' ) )
-		
-		prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record for
-			record in
-			prompt_records }
-		
-		prompt_ids = list( prompt_lookup.keys( ) )
-		current_prompt_id = st.session_state.get( prompt_id_key )
-		if (current_prompt_id is not None and current_prompt_id not in prompt_ids):
-			st.session_state[ prompt_id_key ] = None
-		
+		# ----------------------------------------------------------
+		# Category Callback
+		# ----------------------------------------------------------
 		def on_category_change( ) -> None:
 			"""Reset the dependent prompt after a category change.
 			
 			Purpose:
-			    Clears the selected prompt ID and editable instruction text when the
-			    user selects a different category.
+			    Clears the selected prompt and editable instruction text whenever
+			    the user selects a different category.
 			
 			Returns:
 			    None: This callback updates Streamlit session state.
@@ -4456,6 +4353,9 @@ def render_system_prompt_expander( state_prefix: str, instruction_key: str,
 			st.session_state[ prompt_id_key ] = None
 			st.session_state[ instruction_key ] = ''
 		
+		# ----------------------------------------------------------
+		# Prompt Callback
+		# ----------------------------------------------------------
 		def on_prompt_change( ) -> None:
 			"""Load the selected prompt text.
 			
@@ -4468,12 +4368,15 @@ def render_system_prompt_expander( state_prefix: str, instruction_key: str,
 			"""
 			load_prompt_into_state( prompt_id_key=prompt_id_key, instruction_key=instruction_key )
 		
+		# ----------------------------------------------------------
+		# Clear Callback
+		# ----------------------------------------------------------
 		def on_clear( ) -> None:
 			"""Clear the complete prompt selection.
 			
 			Purpose:
-			    Clears the category, prompt, and editable instruction state associated
-			    with the current application mode.
+			    Clears the category, prompt, and editable instruction state for
+			    the active application mode.
 			
 			Returns:
 			    None: This callback updates Streamlit session state.
@@ -4481,30 +4384,34 @@ def render_system_prompt_expander( state_prefix: str, instruction_key: str,
 			clear_prompt_state( category_key=category_key, prompt_id_key=prompt_id_key,
 				instruction_key=instruction_key )
 		
+		# ----------------------------------------------------------
+		# Conversion Callback
+		# ----------------------------------------------------------
 		def on_convert( ) -> None:
 			"""Convert the editable instruction text.
 			
 			Purpose:
-			    Converts the current instruction text between XML prompt blocks and
-			    Markdown heading notation.
+			    Converts the current instruction text between supported XML
+			    prompt blocks and Markdown heading notation.
 			
 			Returns:
 			    None: This callback updates Streamlit session state.
 			"""
 			convert_prompt_state( instruction_key=instruction_key )
 		
+		# ----------------------------------------------------------
+		# System Instructions Expander
+		# ----------------------------------------------------------
 		with st.expander( label=label, icon='🖥️', expanded=False, width='stretch' ):
 			instruction_column, selector_column = st.columns( [ 0.70, 0.30 ] )
-			
 			with selector_column:
 				st.selectbox( label='Category', options=categories, index=None, key=category_key,
 					on_change=on_category_change,
-					placeholder=('Select Category' if categories else 'No Categories Found'),
-					disabled=not categories,
-					help=('Select a prompt category from the Prompts table.') )
+					placeholder=('Select Category' if categories else 'No Matching Categories'),
+					disabled=not categories, help=('Select an instruction category available for '
+					                               'the current application mode.') )
 				
 				active_category = st.session_state.get( category_key )
-				
 				active_records = fetch_prompts_by_category( db_path=cfg.DB_PATH,
 					category=str( active_category or '' ) )
 				
@@ -4512,6 +4419,9 @@ def render_system_prompt_expander( state_prefix: str, instruction_key: str,
 					record in active_records }
 				
 				active_prompt_ids = list( active_lookup.keys( ) )
+				current_prompt_id = st.session_state.get( prompt_id_key )
+				if (current_prompt_id is not None and current_prompt_id not in active_prompt_ids):
+					st.session_state[ prompt_id_key ] = None
 				
 				st.selectbox( label='Prompt', options=active_prompt_ids,
 					format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
@@ -4527,7 +4437,6 @@ def render_system_prompt_expander( state_prefix: str, instruction_key: str,
 					help=cfg.SYSTEM_INSTRUCTIONS, key=instruction_key )
 			
 			button_column, convert_column = st.columns( [ 0.80, 0.20 ] )
-			
 			with button_column:
 				st.button( label='Clear Instructions', key=clear_key, icon='🧹', width='stretch',
 					on_click=on_clear )
@@ -4542,6 +4451,7 @@ def render_system_prompt_expander( state_prefix: str, instruction_key: str,
 		exception.cause = 'render_system_prompt_expander'
 		exception.method = ('render_system_prompt_expander( '
 		                    'state_prefix: str, instruction_key: str, '
+		                    'allowed_categories: Tuple[ str, ... ], '
 		                    'label: str = "System Instructions", '
 		                    'height: int = 120 ) -> None')
 		Logger( ).write( exception )
@@ -7049,7 +6959,7 @@ elif mode == 'Files':
 		# Expander — Files System Instructions
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='files',
-			instruction_key='files_system_instructions', label='System Instructions', height=120 )
+			instruction_key='files_system_instructions', label='System Instructions', height=130 )
 		
 		# ------------------------------------------------------------------
 		# Container — Files List/Upload
