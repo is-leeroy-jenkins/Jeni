@@ -6327,7 +6327,7 @@ elif mode == 'Embedding':
 		btn_left, btn_right = st.columns( [ 0.50, 0.50 ] )
 		
 		with btn_left:
-			embed_clicked = st.button( 'Embed', width='stretch', key='embedding_set' )
+			embed_clicked = st.button( 'Embed', width='stretch', key='embedding_set', icon='⚡' )
 			if embed_clicked and embeddings_input and embeddings_input.strip( ):
 				with st.spinner( 'Embedding…' ):
 					try:
@@ -6381,7 +6381,7 @@ elif mode == 'Embedding':
 						st.error( f'Embedding failed: {exc}' )
 		
 		with btn_right:
-			if st.button( 'Reset', width='stretch', key='input_text_reset' ):
+			if st.button( 'Reset', width='stretch', key='input_text_reset', icon='🔄' ):
 				# ----------------------------------------------------------
 				# Clear Embedding State
 				# ----------------------------------------------------------
