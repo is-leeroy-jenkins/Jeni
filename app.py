@@ -4754,7 +4754,7 @@ if mode == 'Text':
 			st.session_state[ 'clear_instructions' ] = False
 		
 		# ------------------------------------------------------------------
-		# Mind Controls
+		# Expander - Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			def reset_text_model_settings( ) -> None:
@@ -4945,10 +4945,10 @@ if mode == 'Text':
 					on_click=reset_text_response_settings )
 		
 		# ------------------------------------------------------------------
-		# System Instructions
+		# Expander - System Instructions
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='text',
-			instruction_key='text_system_instructions', label='System Instructions', height=140 )
+			instruction_key='text_system_instructions', label='System Instructions', height=135 )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
@@ -5134,13 +5134,16 @@ elif mode == "Images":
 		st.session_state[ 'clear_image_instructions' ] = False
 		st.session_state[ 'clear_instructions' ] = False
 	
+	# ------------------------------------------------------------------
+	# Main Chat UI
+	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
 		st.subheader( '📷 Images API', help=cfg.IMAGES_API )
 		st.divider( )
 		
 		# ------------------------------------------------------------------
-		# Mind Controls
+		# Expander - Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
@@ -5318,10 +5321,10 @@ elif mode == "Images":
 					st.rerun( )
 		
 		# ------------------------------------------------------------------
-		# Images System Instructions
+		# Expander - System Instructions
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='image',
-			instruction_key='image_system_instructions', label='System Instructions', height=120 )
+			instruction_key='image_system_instructions', label='System Instructions', height=135 )
 		
 		def _append_image_message( role: str, content: str ) -> None:
 			try:
@@ -5546,9 +5549,7 @@ elif mode == 'Audio':
 	available_tasks = [ 'Transcribe', 'Translate', 'Text-to-Speech' ]
 	model_options: List[ str ] = [ ]
 	
-	# ------------------------------------------------------------------
-	# Audio Mode State Guards
-	# ------------------------------------------------------------------
+	# -------- Audio Mode State Guards --------
 	if not isinstance( st.session_state.get( 'audio_messages' ), list ):
 		st.session_state[ 'audio_messages' ] = [ ]
 	
@@ -5558,9 +5559,7 @@ elif mode == 'Audio':
 	if 'audio_chat_instruction' not in st.session_state:
 		st.session_state[ 'audio_chat_instruction' ] = ''
 	
-	# ------------------------------------------------------------------
-	# Audio Mode Helpers
-	# ------------------------------------------------------------------
+	# --------- Audio Mode Helpers -------------
 	def append_audio_message( role: str, content: str ) -> None:
 		"""Append an Audio Mode message.
 		
@@ -5807,16 +5806,14 @@ elif mode == 'Audio':
 			Logger( ).write( exception )
 			raise exception
 	
-	# ------------------------------------------------------------------
-	# Instruction Clearing Contract
-	# ------------------------------------------------------------------
+	# ----------- Instruction Clearing Contract ----------
 	if st.session_state.get( 'clear_instructions' ):
 		st.session_state[ 'audio_system_instructions' ] = ''
 		st.session_state[ 'clear_audio_instructions' ] = False
 		st.session_state[ 'clear_instructions' ] = False
 	
 	# ------------------------------------------------------------------
-	# Audio Mode Interface
+	# Main Chat UI
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.9, 0.05 ] )
 	with center:
@@ -5824,9 +5821,10 @@ elif mode == 'Audio':
 		st.divider( )
 		
 		# ------------------------------------------------------------------
-		# Mind Controls
+		# Expander - Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
 			# -------- LLM Settings ---------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				aud_c1, aud_c2, aud_c3, aud_c4, aud_c5 = st.columns( [ 0.2, 0.2, 0.2, 0.2, 0.2 ],
@@ -5957,16 +5955,11 @@ elif mode == 'Audio':
 		# Expander — Audio System Instructions
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='audio',
-			instruction_key='audio_system_instructions', label='System Instructions', height=120 )
+			instruction_key='audio_system_instructions', label='System Instructions', height=130 )
 		# ------------------------------------------------------------------
 		# Audio Workspace
 		# ------------------------------------------------------------------
-		left_audio, center_audio, right_audio = st.columns( [ 0.33, 0.33, 0.33 ], border=True,
-			gap='medium' )
-		
-		# ------------------------------------------------------------------
-		# Uploaded File / Text-to-Speech Input
-		# ------------------------------------------------------------------
+		left_audio, center_audio, right_audio = st.columns( [ 0.33, 0.33, 0.33 ], border=True, gap='medium' )
 		with left_audio:
 			if audio_task in ('Transcribe', 'Translate'):
 				uploaded = st.file_uploader( label='Input File',
@@ -6055,9 +6048,7 @@ elif mode == 'Audio':
 			else:
 				st.info( 'Select an Audio Mode to display the corresponding input controls.' )
 		
-		# ------------------------------------------------------------------
-		# Audio Recording
-		# ------------------------------------------------------------------
+		# ------- Audio Recording -------
 		with center_audio:
 			if isinstance( audio_rate, int ) and audio_rate > 0:
 				recording = st.audio_input( label='Record Audio', sample_rate=audio_rate,
@@ -6115,9 +6106,7 @@ elif mode == 'Audio':
 				else:
 					st.caption( 'Select Transcribe or Translate to process the recording.' )
 		
-		# ------------------------------------------------------------------
-		# Audio Output
-		# ------------------------------------------------------------------
+		# ------- Audio Output --------
 		with right_audio:
 			st.caption( 'Audio Output' )
 			if st.session_state.get( 'audio_output_bytes' ) is not None:
@@ -6153,7 +6142,7 @@ elif mode == 'Audio':
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		# ------------------------------------------------------------------
-		# Audio Conversation History
+		# Conversation History
 		# ------------------------------------------------------------------
 		for message in st.session_state.get( 'audio_messages', [ ] ):
 			if not isinstance( message, dict ):
@@ -6169,7 +6158,7 @@ elif mode == 'Audio':
 				st.markdown( message_content )
 		
 		# ------------------------------------------------------------------
-		# Audio Chat Input
+		# Chat Input
 		# ------------------------------------------------------------------
 		if audio_task == 'Text-to-Speech':
 			audio_chat_placeholder = 'Enter text to synthesize …'
@@ -6192,8 +6181,7 @@ elif mode == 'Audio':
 							apply_gemini_runtime_config( )
 							audio_bytes = run_text_to_speech( audio_prompt )
 							if audio_bytes is None:
-								raise ValueError(
-									'The text-to-speech model returned no audio output.' )
+								raise ValueError( 'The text-to-speech model returned no audio output.' )
 							
 							st.session_state[ 'audio_output_bytes' ] = audio_bytes
 							st.session_state[ 'audio_output' ] = ''
@@ -6202,7 +6190,6 @@ elif mode == 'Audio':
 								autoplay=bool( st.session_state.get( 'audio_autoplay', False ) ) )
 							
 							response_message = 'The requested speech audio generated successfully.'
-							
 							st.markdown( response_message )
 							append_audio_message( role='assistant', content=response_message )
 							
@@ -6224,10 +6211,7 @@ elif mode == 'Audio':
 				st.rerun( )
 			
 			else:
-				response_message = (
-					'Select Transcribe, Translate, or Text-to-Speech before submitting '
-					'an audio request.')
-				
+				response_message = ( 'Select Transcribe, Translate, or Text-to-Speech ')
 				append_audio_message( role='assistant', content=response_message )
 				st.rerun( )
 		
@@ -6507,7 +6491,11 @@ elif mode == 'Document Q&A':
 		st.subheader( '📓 Document Q & A', help=cfg.DOCUMENT_Q_AND_A )
 		st.divider( )
 		
+		# ------------------------------------------------------------------
+		# Expander - Mind Controls
+		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
 			# -------- LLM Settings ----------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
@@ -6571,8 +6559,7 @@ elif mode == 'Document Q&A':
 					st.rerun( )
 			
 			# -------- Inference Settings ----------
-			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
-					width='stretch' ):
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -6694,8 +6681,7 @@ elif mode == 'Document Q&A':
 					st.rerun( )
 			
 			# -------- Respose Settings ----------
-			with st.expander( label='Response Settings', icon='↔️', expanded=False,
-					width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
 				
@@ -6749,12 +6735,15 @@ elif mode == 'Document Q&A':
 					
 					st.rerun( )
 			
-			# ------------------------------------------------------------------
-			# Expander — Audio System Instructions
-			# ------------------------------------------------------------------
-			render_system_prompt_expander( state_prefix='docqna',
-				instruction_key='docqna_system_instructions', label='System Instructions',
-				height=120 )
+		# ------------------------------------------------------------------
+		# Expander - System Instructions
+		# ------------------------------------------------------------------
+		render_system_prompt_expander( state_prefix='docqna',
+			instruction_key='docqna_system_instructions', label='System Instructions', height=130 )
+		
+		# ------------------------------------------------------------------
+		# Document Loading
+		# ------------------------------------------------------------------
 		with st.expander( label='Document Loading', icon='📥', expanded=False, width='stretch' ):
 			doc_left, doc_right = st.columns( [ 0.2, 0.8 ], border=True )
 			with doc_left:
@@ -7206,9 +7195,7 @@ elif mode == 'File Search Stores':
 	searcher = FileSearch( )
 	chat = Chat( )
 	
-	# ------------------------------------------------------------------
-	# File Search Stores State Guards
-	# ------------------------------------------------------------------
+	# ------- File Search Stores State Guards ---------
 	if not isinstance( st.session_state.get( 'stores_messages' ), list ):
 		st.session_state[ 'stores_messages' ] = [ ]
 	
@@ -7224,9 +7211,7 @@ elif mode == 'File Search Stores':
 	if 'stores_selected_label' not in st.session_state:
 		st.session_state[ 'stores_selected_label' ] = ''
 	
-	# ------------------------------------------------------------------
-	# File Search Stores Helpers
-	# ------------------------------------------------------------------
+	# -------- File Search Stores Helpers --------
 	def reset_stores_model_settings( ) -> None:
 		"""Reset File Search Stores model settings.
 		
@@ -7404,7 +7389,6 @@ elif mode == 'File Search Stores':
 			prompt_text = str( prompt or '' ).strip( )
 			selected_store = str( store_name or '' ).strip( )
 			selected_model = str( st.session_state.get( 'stores_model', '' ) or '' ).strip( )
-			
 			if not prompt_text:
 				raise ValueError( 'Enter a question before running File Search.' )
 			
@@ -7464,17 +7448,11 @@ elif mode == 'File Search Stores':
 			Logger( ).write( exception )
 			raise exception
 	
-	# ------------------------------------------------------------------
-	# Global Instruction Clearing Contract
-	# ------------------------------------------------------------------
 	if st.session_state.get( 'clear_instructions' ):
 		st.session_state[ 'stores_system_instructions' ] = ''
 		st.session_state[ 'stores_prompt_id' ] = None
 		st.session_state[ 'clear_instructions' ] = False
 	
-	# ------------------------------------------------------------------
-	# Main File Search Stores Interface
-	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
 		st.subheader( '📦 File Search Stores', help=cfg.VECTORSTORES_API )
@@ -7482,9 +7460,10 @@ elif mode == 'File Search Stores':
 		st.divider( )
 		
 		# ------------------------------------------------------------------
-		# Mind Controls
+		# Expander — Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
+			
 			# --------- LLM Settings ---------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				model_c1, model_c2, model_c3 = st.columns( [ 0.40, 0.35, 0.25 ], border=True,
@@ -7563,22 +7542,19 @@ elif mode == 'File Search Stores':
 					on_click=reset_stores_response_settings )
 		
 		# ------------------------------------------------------------------
-		# Expander — File Search Stores System Instructions
+		# Expander — System Instructions
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='stores',
-			instruction_key='stores_system_instructions', label='System Instructions', height=120 )
-		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+			instruction_key='stores_system_instructions', label='System Instructions', height=130 )
 		
-		# ------------------------------------------------------------------
-		# File Search Store Management
-		# ------------------------------------------------------------------
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		st.caption( 'File Search Store Management' )
 		
-		# ------------------------------------------------------------------
-		# Store Creation, Retrieval, and Deletion
-		# ------------------------------------------------------------------
 		stores_left, stores_right = st.columns( [ 0.50, 0.50 ], border=True )
 		with stores_left:
+			# ------------------------------------------------------------------
+			# Expander — Create File Search Stores
+			# ------------------------------------------------------------------
 			with st.expander( label='Create', expanded=True ):
 				new_store_name = st.text_input( label='New File Search Store name',
 					key='stores_new_store_name' )
@@ -7610,6 +7586,10 @@ elif mode == 'File Search Stores':
 			
 			store_lookup = { identifier: name for name, identifier in store_options }
 			store_ids = list( store_lookup.keys( ) )
+			
+			# ------------------------------------------------------------------
+			# Expander — Retrieve File Search Stores
+			# ------------------------------------------------------------------
 			with st.expander( label='Retrieve', expanded=True ):
 				if store_ids:
 					selected_store_id = st.selectbox( label='Select File Search Store',
@@ -7684,13 +7664,12 @@ elif mode == 'File Search Stores':
 					st.info( 'No File Search Stores are currently available.' )
 		
 		# ------------------------------------------------------------------
-		# File Upload
+		# File Uploader
 		# ------------------------------------------------------------------
 		with stores_right:
 			st.caption( 'Upload File' )
 			uploaded_file = st.file_uploader( label='Upload file (server-side via Files API)',
-				type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ],
-				key='stores_file_uploader' )
+				type=[ 'pdf', 'txt', 'md', 'docx', 'png', 'jpg', 'jpeg', ], key='stores_file_uploader' )
 			if uploaded_file is not None:
 				tmp_path = save_temp( uploaded_file )
 				upload_function = None
@@ -7720,11 +7699,9 @@ elif mode == 'File Search Stores':
 								Logger( ).write( exception )
 								st.error( f'Upload failed: {exception.info}' )
 			
-			active_store_label = str(
-				st.session_state.get( 'stores_selected_label', '' ) or '' ).strip( )
-			
+			active_store_label = str( st.session_state.get(
+				'stores_selected_label', '' ) or '' ).strip( )
 			active_store_id = str( st.session_state.get( 'stores_id', '' ) or '' ).strip( )
-			
 			if active_store_id:
 				st.info( f'Active File Search Store: {active_store_label or active_store_id}' )
 			else:
@@ -7732,9 +7709,6 @@ elif mode == 'File Search Stores':
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
-		# ------------------------------------------------------------------
-		# File Search Stores Conversation History
-		# ------------------------------------------------------------------
 		for message in st.session_state.get( 'stores_messages', [ ] ):
 			if not isinstance( message, dict ):
 				continue
@@ -7757,8 +7731,8 @@ elif mode == 'File Search Stores':
 		if (stores_prompt is not None and str( stores_prompt ).strip( )):
 			stores_prompt = str( stores_prompt ).strip( )
 			active_store_id = str( st.session_state.get( 'stores_id', '' ) or '' ).strip( )
-			st.session_state[ 'stores_messages' ].append(
-				{ 'role': 'user', 'content': stores_prompt, } )
+			st.session_state[ 'stores_messages' ].append( { 'role': 'user',
+				'content': stores_prompt, } )
 			
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Searching the selected File Search Store…' ):
@@ -7767,8 +7741,8 @@ elif mode == 'File Search Stores':
 							store_name=active_store_id )
 						
 						st.markdown( response_text )
-						st.session_state[ 'stores_messages' ].append(
-							{ 'role': 'assistant', 'content': response_text, } )
+						st.session_state[ 'stores_messages' ].append( { 'role': 'assistant',
+							'content': response_text, } )
 						
 						st.session_state[ 'stores_input' ] = [
 							{ 'role': 'user', 'content': stores_prompt, } ]
@@ -7778,9 +7752,7 @@ elif mode == 'File Search Stores':
 						exception = (e if isinstance( e, Error ) else Error( e ))
 						st.error( f'File Search query failed: {exception.info}' )
 		
-		# ------------------------------------------------------------------
-		# Clear Messages
-		# ------------------------------------------------------------------
+		# ------  Clear Messages ---------
 		st.button( label='Clear Messages', key='stores_clear_messages', icon='🧹', width='stretch',
 			on_click=clear_stores_messages )
 
@@ -7808,9 +7780,7 @@ elif mode == 'Google Cloud Buckets':
 	searcher = CloudBuckets( )
 	chat = Chat( )
 	
-	# ------------------------------------------------------------------
-	# Session-State Guards
-	# ------------------------------------------------------------------
+	# -------- Session-State Guards --------
 	if not isinstance( st.session_state.get( 'bucket_messages' ), list ):
 		st.session_state[ 'bucket_messages' ] = [ ]
 	
@@ -7823,9 +7793,7 @@ elif mode == 'Google Cloud Buckets':
 	if 'bucket_selected_label' not in st.session_state:
 		st.session_state[ 'bucket_selected_label' ] = ''
 	
-	# ------------------------------------------------------------------
-	# Reset Callbacks
-	# ------------------------------------------------------------------
+	# ----- Callbacks --------
 	def reset_bucket_model_settings( ) -> None:
 		"""Reset Google Cloud Buckets model settings.
 		
@@ -7893,9 +7861,6 @@ elif mode == 'Google Cloud Buckets':
 			Logger( ).write( exception )
 			raise exception
 	
-	# ------------------------------------------------------------------
-	# Message and Prompt Callbacks
-	# ------------------------------------------------------------------
 	def clear_bucket_messages( ) -> None:
 		"""Clear Google Cloud Buckets conversation history.
 		
@@ -7985,9 +7950,6 @@ elif mode == 'Google Cloud Buckets':
 			Logger( ).write( exception )
 			raise exception
 	
-	# ------------------------------------------------------------------
-	# Chat Execution
-	# ------------------------------------------------------------------
 	def run_bucket_chat_query( prompt: str, selected_bucket_id: str,
 		selected_bucket_label: str ) -> str:
 		"""Run a Google Cloud Buckets chat query.
@@ -8080,17 +8042,11 @@ elif mode == 'Google Cloud Buckets':
 			Logger( ).write( exception )
 			raise exception
 	
-	# ------------------------------------------------------------------
-	# Global Instruction Clearing Contract
-	# ------------------------------------------------------------------
 	if st.session_state.get( 'clear_instructions' ):
 		st.session_state[ 'bucket_system_instructions' ] = ''
 		st.session_state[ 'bucket_prompt_id' ] = None
 		st.session_state[ 'clear_instructions' ] = False
-	
-	# ------------------------------------------------------------------
-	# Main Google Cloud Buckets Interface
-	# ------------------------------------------------------------------
+		
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
 	with center:
 		st.subheader( '🧊 Google Cloud Buckets', help=cfg.VECTORSTORES_API )
@@ -8098,12 +8054,11 @@ elif mode == 'Google Cloud Buckets':
 		st.divider( )
 		
 		# ------------------------------------------------------------------
-		# Mind Controls
+		# Expander - Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			# ----------------------------------------------------------
-			# LLM Settings
-			# ----------------------------------------------------------
+			
+			# ------ LLM Settings ---------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				model_c1, model_c2, model_c3 = st.columns( [ 0.40, 0.35, 0.25 ], border=True,
 					gap='xxsmall' )
@@ -8128,11 +8083,8 @@ elif mode == 'Google Cloud Buckets':
 				st.button( label='Reset', key='bucket_model_reset', icon='🔄', width='stretch',
 					on_click=reset_bucket_model_settings )
 			
-			# ----------------------------------------------------------
-			# Inference Settings
-			# ----------------------------------------------------------
-			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
-					width='stretch' ):
+			# ------ Inference Settings ---------
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
 				inference_c1, inference_c2, inference_c3, inference_c4 = (
 					st.columns( [ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' ))
 				
@@ -8157,11 +8109,8 @@ elif mode == 'Google Cloud Buckets':
 				st.button( label='Reset', key='bucket_inference_reset', icon='🔄', width='stretch',
 					on_click=reset_bucket_inference_settings )
 			
-			# ----------------------------------------------------------
-			# Response Settings
-			# ----------------------------------------------------------
-			with st.expander( label='Response Settings', icon='↔️', expanded=False,
-					width='stretch' ):
+			# ------ Response Settings ---------
+			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
 				response_c1, response_c2, response_c3 = st.columns( [ 0.40, 0.35, 0.25 ],
 					border=True, gap='xxsmall' )
 				
@@ -8184,21 +8133,18 @@ elif mode == 'Google Cloud Buckets':
 					on_click=reset_bucket_response_settings )
 		
 		# ------------------------------------------------------------------
-		# Expander — Google Cloud Buckets System Instructions
+		# Expander — System Instructions
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='bucket',
-			instruction_key='bucket_system_instructions', label='System Instructions', height=120 )
-		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
+			instruction_key='bucket_system_instructions', label='System Instructions', height=130 )
 		
-		# ------------------------------------------------------------------
-		# Cloud Bucket Management
-		# ------------------------------------------------------------------
+		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		st.caption( 'Cloud Bucket Management' )
 		
 		buckets_left, buckets_right = st.columns( [ 0.50, 0.50 ], border=True )
 		with buckets_left:
 			# ----------------------------------------------------------
-			# Create Bucket
+			# Expander — Create Bucket
 			# ----------------------------------------------------------
 			with st.expander( label='Create', expanded=False ):
 				new_bucket_name = st.text_input( label='New Cloud Bucket name',
@@ -8223,9 +8169,7 @@ elif mode == 'Google Cloud Buckets':
 							Logger( ).write( exception )
 							st.error( f'Create bucket failed: {exception.info}' )
 			
-			# ----------------------------------------------------------
-			# Retrieve and Delete Bucket
-			# ----------------------------------------------------------
+			# ------- Retrieve and Delete Bucket --------
 			bucket_map = getattr( searcher, 'collections', None )
 			bucket_options: List[ Tuple[ str, str ] ] = [ ]
 			if isinstance( bucket_map, dict ):
@@ -8234,6 +8178,9 @@ elif mode == 'Google Cloud Buckets':
 			
 			bucket_lookup = { identifier: name for name, identifier in bucket_options }
 			bucket_ids = list( bucket_lookup.keys( ) )
+			# ----------------------------------------------------------
+			# Expander — Retrieve Bucket
+			# ----------------------------------------------------------
 			with st.expander( label='Retrieve', expanded=True ):
 				if bucket_ids:
 					selected_bucket_id = st.selectbox( label='Select Cloud Bucket',
@@ -8311,7 +8258,7 @@ elif mode == 'Google Cloud Buckets':
 					st.info( 'No Cloud Buckets are currently available.' )
 		
 		# ------------------------------------------------------------------
-		# Bucket Upload
+		#  File Upload
 		# ------------------------------------------------------------------
 		with buckets_right:
 			st.caption( 'Upload File' )
@@ -8363,7 +8310,7 @@ elif mode == 'Google Cloud Buckets':
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		# ------------------------------------------------------------------
-		# Bucket Conversation History
+		# Conversation History
 		# ------------------------------------------------------------------
 		for message in st.session_state.get( 'bucket_messages', [ ] ):
 			if not isinstance( message, dict ):
@@ -8379,7 +8326,7 @@ elif mode == 'Google Cloud Buckets':
 				st.markdown( message_content )
 		
 		# ------------------------------------------------------------------
-		# Bucket Chat Input
+		# Chat Input
 		# ------------------------------------------------------------------
 		bucket_prompt = st.chat_input( 'Enter a Google Cloud Buckets request …',
 			key='bucket_chat_input' )
@@ -8414,9 +8361,6 @@ elif mode == 'Google Cloud Buckets':
 						st.error( 'Google Cloud Buckets request failed: '
 						          f'{exception.info}' )
 		
-		# ------------------------------------------------------------------
-		# Clear Messages
-		# ------------------------------------------------------------------
 		st.button( label='Clear Messages', key='bucket_clear_messages', icon='🧹', width='content',
 			on_click=clear_bucket_messages )
 
