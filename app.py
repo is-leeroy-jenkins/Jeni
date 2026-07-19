@@ -1996,7 +1996,7 @@ def summarize_active_document( ) -> str:
     Returns:
         Value produced by the operation for display or downstream processing.
     """
-	system_instructions = st.session_state.get( "system_instructions", "" )
+	system_instructions = st.session_state.get( 'docqna_system_instructions', '' )
 	summary_prompt = """
         Provide a clear, structured summary of this document.
         Include:
@@ -2331,7 +2331,7 @@ def build_document_user_input( user_query: str, k: int = 6 ) -> str:
     Returns:
         Value produced by the operation for display or downstream processing.
     """
-	system = str( st.session_state.get( 'system_instructions', '' ) or '' ).strip( )
+	system = str( st.session_state.get( 'docqna_system_instructions', '' ) or '' ).strip( )
 	hits = retrieve_chunks( user_query, k=int( k ) )
 	
 	context_blocks: List[ str ] = [ ]
@@ -3667,17 +3667,11 @@ def rename_table( old_name: str, new_name: str ) -> None:
 		
 		conn.execute( "BEGIN" )
 		conn.execute( f'CREATE TABLE "{temp_name}" {create_sql[ open_paren: ]}' )
-		
 		cols = [ r[ 1 ] for r in conn.execute( f'PRAGMA table_info("{old_name}");' ).fetchall( ) ]
 		col_list = ", ".join( [ f'"{c}"' for c in cols ] )
-		
-		conn.execute(
-			f'INSERT INTO "{temp_name}" ({col_list}) SELECT {col_list} FROM "{old_name}";'
-		)
-		
+		conn.execute(f'INSERT INTO "{temp_name}" ({col_list}) SELECT {col_list} FROM "{old_name}";')
 		conn.execute( f'DROP TABLE "{old_name}";' )
 		conn.execute( f'ALTER TABLE "{temp_name}" RENAME TO "{new_name}";' )
-		
 		for idx in indexes:
 			idx_sql = idx[ 0 ]
 			if idx_sql:
@@ -4401,7 +4395,7 @@ def convert_prompt_state( instruction_key: str ) -> None:
 		raise exception
 
 def render_system_prompt_expander( state_prefix: str, instruction_key: str,
-	label: str = 'System Instructions', height: int = 120 ) -> None:
+	label: str='System Instructions', height: int=120 ) -> None:
 	"""Render a category-driven system-prompt expander.
 	
 	Purpose:
@@ -4664,7 +4658,6 @@ with st.sidebar:
 		label_visibility='collapsed' )
 	
 	st.divider( )
-	
 	st.text( 'API Settings' )
 	
 	# -----API KEY Expander------------------------------
@@ -4761,7 +4754,7 @@ if mode == 'Text':
 			st.session_state[ 'clear_instructions' ] = False
 		
 		# ------------------------------------------------------------------
-		# Expander — Text Mind Controls
+		# Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			def reset_text_model_settings( ) -> None:
@@ -4789,6 +4782,7 @@ if mode == 'Text':
 					if key in st.session_state:
 						del st.session_state[ key ]
 			
+			# --------- LLM Settings
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				model_c1, model_c2, model_c3, model_c4, model_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
@@ -4803,8 +4797,7 @@ if mode == 'Text':
 				with model_c2:
 					text_reasoning = st.selectbox( label='Thinking Level',
 						options=list( text.reasoning_options ), key='text_reasoning',
-						help=cfg.REASONING, index=None,
-						placeholder='Options' )
+						help=cfg.REASONING, index=None, placeholder='Options' )
 				
 				# ---------- Response Modalities ------------
 				with model_c3:
@@ -4821,13 +4814,14 @@ if mode == 'Text':
 				
 				# ---------- Number/Candidates ------------
 				with model_c5:
-					text_number = st.slider( label='Candidates', min_value=0, max_value=50,
-						step=1, help='Optional. Upper limit on the responses returned by the model',
+					text_number = st.slider( label='Candidates', min_value=0, max_value=50, step=1,
+						help='Optional. Upper limit on the responses returned by the model',
 						key='text_number' )
 				
 				st.button( label='Reset', key='text_model_reset', width='stretch',
 					on_click=reset_text_model_settings, icon='🔄' )
 			
+			# --------- Inference Settings
 			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
 					width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4, prm_c5 = st.columns(
@@ -4845,14 +4839,14 @@ if mode == 'Text':
 				
 				# ---------- Top-K ------------
 				with prm_c3:
-					text_top_k = st.slider( label='Top K', min_value=0, max_value=20,
-						step=1, help=cfg.TOP_K, key='text_top_k' )
+					text_top_k = st.slider( label='Top K', min_value=0, max_value=20, step=1,
+						help=cfg.TOP_K, key='text_top_k' )
 				
 				# ---------- Frequency ------------
 				with prm_c4:
-					text_frequency_penalty = st.slider( label='Frequency Penalty',
-						min_value=-2.0, max_value=2.0, step=0.01,
-						help=cfg.FREQUENCY_PENALTY, key='text_frequency_penalty' )
+					text_frequency_penalty = st.slider( label='Frequency Penalty', min_value=-2.0,
+						max_value=2.0, step=0.01, help=cfg.FREQUENCY_PENALTY,
+						key='text_frequency_penalty' )
 				
 				# ---------- Presence ------------
 				with prm_c5:
@@ -4863,16 +4857,18 @@ if mode == 'Text':
 				st.button( label='Reset', key='text_inference_reset', width='stretch',
 					on_click=reset_text_inference_settings, icon='🔄' )
 			
+			# --------- Grounding Settings
 			with st.expander( label='Grounding / Context Settings', icon='🔎', expanded=False,
 					width='stretch' ):
-				ground_c1, ground_c2, ground_c3 = st.columns(
-					[ 0.25, 0.25, 0.50 ], border=True, gap='xxsmall' )
+				ground_c1, ground_c2, ground_c3 = st.columns( [ 0.25, 0.25, 0.50 ], border=True,
+					gap='xxsmall' )
 				
 				# ---------- Google Grounding ------------
 				with ground_c1:
 					text_google_grounding = st.toggle( label='Google Grounding',
 						key='text_google_grounding',
-						help='When enabled, Gemini grounds this Text response using Google Search.' )
+						help='When enabled, Gemini grounds this Text response using Google '
+						     'Search.' )
 					
 					if text_google_grounding:
 						st.caption( 'Google Search grounding is enabled.' )
@@ -4881,21 +4877,23 @@ if mode == 'Text':
 				
 				# ---------- Max URLs ------------
 				with ground_c2:
-					text_max_urls = st.slider( label='Max URLs', min_value=0, max_value=25,
-						step=1, key='text_max_urls',
+					text_max_urls = st.slider( label='Max URLs', min_value=0, max_value=25, step=1,
+						key='text_max_urls',
 						help='Optional. Maximum number of URLs from the URL list to include.',
 						width='stretch' )
 				
 				# ---------- URLs ------------
 				with ground_c3:
 					text_urls_input = st.text_input( label='URLs', key='text_urls_input',
-						help='Optional. Enter URLs separated by semicolons for added prompt context.',
+						help='Optional. Enter URLs separated by semicolons for added prompt '
+						     'context.',
 						width='stretch',
 						placeholder='https://example.com/page-1;https://example.com/page-2' )
 				
 				st.button( label='Reset', key='reset_text_grounding', width='stretch',
-					on_click=reset_text_grounding_settings, icon='🔄')
+					on_click=reset_text_grounding_settings, icon='🔄' )
 			
+			# --------- Response Settings
 			with st.expander( label='Output / Response Settings', icon='↔️', expanded=False,
 					width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5, resp_c6 = st.columns(
@@ -4917,37 +4915,37 @@ if mode == 'Text':
 				with resp_c3:
 					text_response_schema = st.text_input( label='Response Schema',
 						key='text_response_schema',
-						help='Optional. JSON schema used when Response Format is application/json.',
+						help='Optional. JSON schema used when Response Format is '
+						     'application/json.',
 						width='stretch',
-						placeholder='{"type":"object","properties":{"answer":{"type":"string"}},"required":["answer"]}' )
+						placeholder='{"type":"object","properties":{"answer":{"type":"string"}},'
+						            '"required":["answer"]}' )
 				
 				# ---------- Stops ------------
 				with resp_c4:
 					text_stops_input = st.text_input( label='Stop Sequences',
-						key='text_stops_input',
-						help=cfg.STOP_SEQUENCE, width='stretch',
+						key='text_stops_input', help=cfg.STOP_SEQUENCE, width='stretch',
 						placeholder='Enter Stop Strings separated by commas' )
 				
 				# ---------- Safety ------------
 				with resp_c5:
 					safety_options = [ 'OFF', 'BLOCK_NONE', 'BLOCK_ONLY_HIGH',
-					                   'BLOCK_MEDIUM_AND_ABOVE', 'BLOCK_LOW_AND_ABOVE' ]
+						'BLOCK_MEDIUM_AND_ABOVE', 'BLOCK_LOW_AND_ABOVE' ]
 					
 					text_safety_profile = st.selectbox( label='Safety', options=safety_options,
 						key='text_safety_profile',
-						help='Optional. Gemini safety profile for the request.',
-						index=None, placeholder='Options' )
+						help='Optional. Gemini safety profile for the request.', index=None,
+						placeholder='Options' )
 				
 				# ---------- Stream ------------
 				with resp_c6:
-					text_stream = st.toggle( label='Stream', key='text_stream',
-						help=cfg.STREAM )
+					text_stream = st.toggle( label='Stream', key='text_stream', help=cfg.STREAM )
 				
-				st.button( label='Reset', key='reset_text_response', icon='🔄',
-					width='stretch', on_click=reset_text_response_settings )
+				st.button( label='Reset', key='reset_text_response', icon='🔄', width='stretch',
+					on_click=reset_text_response_settings )
 		
 		# ------------------------------------------------------------------
-		# Expander — Text System Instructions
+		# System Instructions
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='text',
 			instruction_key='text_system_instructions', label='System Instructions', height=140 )
@@ -4973,7 +4971,6 @@ if mode == 'Text':
 					response = None
 					stream_buffer: List[ str ] = [ ]
 					stream_placeholder = st.empty( )
-					
 					def _on_stream_chunk( chunk: str ) -> None:
 						if chunk is None:
 							return
@@ -4993,19 +4990,17 @@ if mode == 'Text':
 						grounding_enabled = bool( st.session_state.get( 'text_google_grounding', False ) )
 						derived_text_tools = [ 'google_search' ] if grounding_enabled else [ ]
 						raw_text_urls = str( st.session_state.get( 'text_urls_input', '' ) or '' )
-						derived_text_urls = [ url.strip( ) for url in raw_text_urls.split( ';' )
-						                      if url.strip( ) ]
+						derived_text_urls = [ url.strip( ) for url in raw_text_urls.split( ';' ) if
+							url.strip( ) ]
 						
-						raw_text_stops = str( st.session_state.get( 'text_stops_input', '' ) or '' )
-						derived_text_stops = [ stop.strip( ) for stop in raw_text_stops.split( ',' )
-						                       if stop.strip( ) ]
-						
+						raw_text_stops = str( st.session_state.get( 'text_stops_input', '' ) or
+						                      '' )
+						derived_text_stops = [ stop.strip( ) for stop in raw_text_stops.split( ',' ) if stop.strip( ) ]
 						derived_text_modalities = [ str( modality ).strip( ) for modality in
-						                            st.session_state.get( 'text_modalities', [ ] )
-						                            if str( modality ).strip( ) ]
+							st.session_state.get( 'text_modalities', [ ] ) if
+							str( modality ).strip( ) ]
 						
-						response = text.generate_text( prompt=prompt,
-							model=selected_text_model,
+						response = text.generate_text( prompt=prompt, model=selected_text_model,
 							number=st.session_state.get( 'text_number' ),
 							temperature=st.session_state.get( 'text_temperature' ),
 							top_p=st.session_state.get( 'text_top_percent' ),
@@ -5016,21 +5011,19 @@ if mode == 'Text':
 							stops=derived_text_stops,
 							instruct=st.session_state.get( 'text_system_instructions' ),
 							response_format=st.session_state.get( 'text_response_format' ),
-							tools=derived_text_tools,
-							tool_choice=None,
+							tools=derived_text_tools, tool_choice=None,
 							reasoning=st.session_state.get( 'text_reasoning' ),
 							modalities=derived_text_modalities,
 							media_resolution=st.session_state.get( 'text_media_resolution' ),
 							context=structured_context,
-							content=st.session_state.get( 'text_content' ),
-							urls=derived_text_urls,
+							content=st.session_state.get( 'text_content' ), urls=derived_text_urls,
 							max_urls=st.session_state.get( 'text_max_urls' ),
 							response_schema=st.session_state.get( 'text_response_schema' ),
 							safety_profile=st.session_state.get( 'text_safety_profile' ),
 							file_search_store_names=[ ],
 							stream=st.session_state.get( 'text_stream', False ),
-							stream_handler=_on_stream_chunk if st.session_state.get(
-								'text_stream', False ) else None )
+							stream_handler=_on_stream_chunk if st.session_state.get( 'text_stream',
+								False ) else None )
 					except Exception as exc:
 						err = Error( exc )
 						st.error( f'Generation Failed: {err.info}' )
@@ -5045,8 +5038,8 @@ if mode == 'Text':
 						
 						if grounding_sources:
 							st.session_state.last_sources = grounding_sources
-							with st.expander( label='Grounding Sources', icon='🔎',
-									expanded=False, width='stretch' ):
+							with st.expander( label='Grounding Sources', icon='🔎', expanded=False,
+									width='stretch' ):
 								for source in grounding_sources:
 									title = source.get( 'title', '' ) or source.get( 'url', '' )
 									url = source.get( 'url', '' )
@@ -5054,11 +5047,8 @@ if mode == 'Text':
 									if url:
 										st.markdown( f'- [{title}]({url})' )
 						
-						st.session_state.text_messages.append( {
-								'role': 'assistant',
-								'content': str( response ).strip( ),
-						} )
-						
+						st.session_state.text_messages.append({ 'role': 'assistant',
+								'content': str( response ).strip( ), } )
 						if st.session_state.get( 'text_stream', False ):
 							st.session_state[ 'text_gemini_history' ] = [ ]
 						else:
@@ -5149,12 +5139,15 @@ elif mode == "Images":
 		st.subheader( '📷 Images API', help=cfg.IMAGES_API )
 		st.divider( )
 		
+		# ------------------------------------------------------------------
+		# Mind Controls
+		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
 			
 			# ------- LLM Settings ------------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
-				llm_c1, llm_c2, llm_c3, llm_c4 = st.columns(
-					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
+				llm_c1, llm_c2, llm_c3, llm_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
+					border=True, gap='xxsmall' )
 				
 				with llm_c1:
 					_modes = [ 'Generation', 'Analysis', 'Editing' ]
@@ -5192,7 +5185,7 @@ elif mode == "Images":
 				
 				if st.button( label='Reset', key='image_model_reset', width='stretch', icon='🔄' ):
 					for key in [ 'image_mode', 'image_model', 'image_top_percent',
-					             'image_temperature' ]:
+						'image_temperature' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					st.rerun( )
@@ -5200,19 +5193,19 @@ elif mode == "Images":
 			# ------- Response Settings ------------
 			with st.expander( label='Response Settings', icon='↔️', expanded=False,
 					width='stretch' ):
-				resp_c1, resp_c2, resp_c3, resp_c4 = st.columns(
-					[ 0.25, 0.25, 0.25, 0.25 ], border=True, gap='xxsmall' )
+				resp_c1, resp_c2, resp_c3, resp_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
+					border=True, gap='xxsmall' )
 				
 				with resp_c1:
 					st.slider( label='Max Output Tokens', min_value=0, max_value=100000,
-						value=int( st.session_state.get( 'image_max_tokens', 0 ) ),
-						step=1000, help=cfg.MAX_OUTPUT_TOKENS, key='image_max_tokens' )
+						value=int( st.session_state.get( 'image_max_tokens', 0 ) ), step=1000,
+						help=cfg.MAX_OUTPUT_TOKENS, key='image_max_tokens' )
 					image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
 				
 				with resp_c2:
 					st.slider( label='Candidates', min_value=1, max_value=8,
-						value=int( st.session_state.get( 'image_number', 1 ) ),
-						step=1, help='Optional. Upper bound on generated image candidates.',
+						value=int( st.session_state.get( 'image_number', 1 ) ), step=1,
+						help='Optional. Upper bound on generated image candidates.',
 						key='image_number' )
 					image_number = st.session_state.get( 'image_number', 1 )
 				
@@ -5235,7 +5228,8 @@ elif mode == "Images":
 					if mime_enabled:
 						st.selectbox( label='Output MIME Type', options=image.mime_options,
 							key='image_mime_type',
-							help='Optional. Output image MIME type when the model returns an image.',
+							help='Optional. Output image MIME type when the model returns an '
+							     'image.',
 							index=None, placeholder='Options' )
 					else:
 						st.text_input( label='Output MIME Type', value='Not used for Analysis',
@@ -5244,9 +5238,10 @@ elif mode == "Images":
 					
 					image_mime_type = st.session_state.get( 'image_mime_type', '' )
 				
-				if st.button( label='Reset', key='image_response_reset', width='stretch', icon='🔄' ):
+				if st.button( label='Reset', key='image_response_reset', width='stretch',
+						icon='🔄' ):
 					for key in [ 'image_max_tokens', 'image_number', 'image_modality',
-					             'image_mime_type' ]:
+						'image_mime_type' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					st.rerun( )
@@ -5261,18 +5256,17 @@ elif mode == "Images":
 				supports_grounding = image.supports_search_grounding( image_model )
 				supports_image_search = image.supports_image_search( image_model )
 				visual_enabled = image_mode in [ 'Generation', 'Editing' ]
-				
 				if not supports_grounding and st.session_state.get( 'image_grounded', False ):
 					st.session_state[ 'image_grounded' ] = False
 				
 				if (not supports_image_search or not st.session_state.get( 'image_grounded',
-					False )) and st.session_state.get( 'image_image_search', False ):
+						False )) and st.session_state.get( 'image_image_search', False ):
 					st.session_state[ 'image_image_search' ] = False
 				
 				with img_c1:
 					if visual_enabled:
 						st.selectbox( label='Aspect Ratio', options=list( image.aspect_options ),
-							help='Optional. Output aspect ratio for Gemini image generation/editing.',
+							help='Optional. Output aspect ratio for Gemini image generation',
 							key='image_aspect_ratio', placeholder='Options', index=None )
 					else:
 						st.text_input( label='Aspect Ratio', value='Not used for Analysis',
@@ -5299,8 +5293,7 @@ elif mode == "Images":
 				with img_c3:
 					st.checkbox( label='Ground with Google Search', key='image_grounded',
 						help='Enables Gemini Search grounding when supported by the selected '
-						     'model.',
-						disabled=not supports_grounding )
+						     'model.', disabled=not supports_grounding )
 					
 					if not supports_grounding:
 						st.caption( 'Not supported by selected model.' )
@@ -5311,15 +5304,13 @@ elif mode == "Images":
 					st.checkbox( label='Include Google Image Search', key='image_image_search',
 						help=('Available only for gemini-3.1-flash-image-preview when grounding '
 						      'is enabled.'), disabled=(
-									not supports_image_search or not st.session_state.get(
-								'image_grounded', False )) )
+								not supports_image_search or not st.session_state.get(
+							'image_grounded', False )) )
 					
 					image_image_search = st.session_state.get( 'image_image_search', False )
 				
 				_sync_image_tools( )
-				
-				if st.button( label='Reset', key='image_visual_reset', width='stretch',
-						icon='🔄' ):
+				if st.button( label='Reset', key='image_visual_reset', width='stretch', icon='🔄' ):
 					for key in [ 'image_size', 'image_aspect_ratio', 'image_grounded',
 						'image_image_search', 'image_tools' ]:
 						if key in st.session_state:
@@ -5327,87 +5318,10 @@ elif mode == "Images":
 					st.rerun( )
 		
 		# ------------------------------------------------------------------
-		# Expander — Images System Instructions
+		# Images System Instructions
 		# ------------------------------------------------------------------
-		render_system_prompt_expander(
-			state_prefix='image',
-			instruction_key='image_system_instructions',
-			label='System Instructions',
-			height=120
-		)
-			
-		image_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-			for record in image_prompt_records }
-		
-		image_prompt_ids = list( image_prompt_lookup.keys( ) )
-			
-		# ----------------------------------------------------------
-		# Images Prompt Callbacks
-		# ----------------------------------------------------------
-		def on_image_prompt_change( ) -> None:
-			"""Load the selected Images Mode prompt.
-			
-			Purpose:
-			    Retrieves the selected Images Mode prompt by stable ID and copies its Text
-			    value into the Images Mode system-instruction control.
-			
-			Returns:
-			    None: This function updates Streamlit session state through side effects.
-			"""
-			load_prompt_into_state( prompt_id_key='image_prompt_id',
-				instruction_key='image_system_instructions' )
-		
-		def clear_image_prompt( ) -> None:
-			"""Clear the Images Mode prompt.
-			
-			Purpose:
-			    Clears the selected Images Mode prompt ID and system-instruction text
-			    without modifying any prompt record in the database.
-			
-			Returns:
-			    None: This function updates Streamlit session state through side effects.
-			"""
-			clear_prompt_state( prompt_id_key='image_prompt_id',
-				instruction_key='image_system_instructions' )
-		
-		def convert_image_prompt( ) -> None:
-			"""Convert the Images Mode prompt.
-			
-			Purpose:
-			    Converts the current Images Mode system instructions between supported XML
-			    prompt blocks and Markdown headings.
-			
-			Returns:
-			    None: This function updates Streamlit session state through side effects.
-			"""
-			convert_prompt_state( instruction_key='image_system_instructions' )
-		
-		# ----------------------------------------------------------
-		# Images Prompt Controls
-		# ----------------------------------------------------------
-		in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-		with in_left:
-			st.text_area( label='Enter Text', height=50, width='stretch',
-				help=cfg.SYSTEM_INSTRUCTIONS, key='image_system_instructions' )
-		
-		with in_right:
-			if image_prompt_ids:
-				st.selectbox( label='Use Template', options=image_prompt_ids,
-					format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-						prompt_lookup=image_prompt_lookup ), index=None, key='image_prompt_id',
-					on_change=on_image_prompt_change, placeholder='Options' )
-			else:
-				st.selectbox( label='Use Template', options=[ ], index=None,
-					key='image_prompt_id', placeholder='No Images prompts', disabled=True )
-		
-		btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
-		with btn_c1:
-			st.button( label='Clear Instructions', key='image_clear_instructions',
-				width='stretch', on_click=clear_image_prompt )
-		
-		with btn_c2:
-			st.button( label='XML <-> Markdown', key='image_convert_instructions',
-				width='stretch', on_click=convert_image_prompt )
+		render_system_prompt_expander( state_prefix='image',
+			instruction_key='image_system_instructions', label='System Instructions', height=120 )
 		
 		def _append_image_message( role: str, content: str ) -> None:
 			try:
@@ -5415,8 +5329,7 @@ elif mode == "Images":
 						st.session_state[ 'image_input' ], list ):
 					st.session_state[ 'image_input' ] = [ ]
 				
-				st.session_state[ 'image_input' ].append(
-					{ 'role': role, 'content': content } )
+				st.session_state[ 'image_input' ].append( { 'role': role, 'content': content } )
 			except Exception as _logged_exception:
 				try:
 					error = Error( _logged_exception )
@@ -5503,7 +5416,8 @@ elif mode == "Images":
 							if not tmp_path:
 								st.warning( 'Upload an image before analyzing.' )
 							elif not prompt or not str( prompt ).strip( ):
-								st.warning( 'Enter an analysis prompt before analyzing the image.' )
+								st.warning( 'Enter an analysis prompt before analyzing the '
+								            'image.' )
 							elif not image_model:
 								st.warning( 'Select a model before analyzing an image.' )
 							else:
@@ -5512,9 +5426,9 @@ elif mode == "Images":
 									model=image_model, number=image_number,
 									temperature=image_temperature, top_p=image_top_percent,
 									max_tokens=image_max_tokens,
-									instruct=st.session_state.get( 'image_system_instructions', '' ),
-									response_modalities=image_modality, grounded=image_grounded,
-									image_search=image_image_search )
+									instruct=st.session_state.get( 'image_system_instructions',
+										'' ), response_modalities=image_modality,
+									grounded=image_grounded, image_search=image_image_search )
 								
 								if analysis_result is None:
 									st.warning( 'No analysis output returned by the model.' )
@@ -5913,7 +5827,6 @@ elif mode == 'Audio':
 		# Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			# -------- LLM Settings ---------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				aud_c1, aud_c2, aud_c3, aud_c4, aud_c5 = st.columns( [ 0.2, 0.2, 0.2, 0.2, 0.2 ],
@@ -5986,7 +5899,8 @@ elif mode == 'Audio':
 					on_click=reset_audio_model_settings )
 			
 			# -------- Inference Settings --------
-			with st.expander( label='Inference Settings', icon='🎚️', expanded=False, width='stretch' ):
+			with st.expander( label='Inference Settings', icon='🎚️', expanded=False,
+					width='stretch' ):
 				prm_c1, prm_c2, prm_c3, prm_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
 					border=True, gap='medium' )
 				
@@ -6012,7 +5926,8 @@ elif mode == 'Audio':
 					on_click=reset_audio_inference_settings )
 			
 			# -------- Response Settings --------
-			with st.expander( label='Response Settings', icon='↔️', expanded=False, width='stretch' ):
+			with st.expander( label='Response Settings', icon='↔️', expanded=False,
+					width='stretch' ):
 				resp_c1, resp_c2, resp_c3, resp_c4, resp_c5 = st.columns(
 					[ 0.20, 0.20, 0.20, 0.20, 0.20 ], gap='xxsmall', border=True )
 				
@@ -6043,81 +5958,6 @@ elif mode == 'Audio':
 		# ------------------------------------------------------------------
 		render_system_prompt_expander( state_prefix='audio',
 			instruction_key='audio_system_instructions', label='System Instructions', height=120 )
-		
-		audio_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-			for record in audio_prompt_records }
-		
-		audio_prompt_ids = list( audio_prompt_lookup.keys( ) )
-		
-		# ----------------------------------------------------------
-		# Audio Prompt Callbacks
-		# ----------------------------------------------------------
-		def on_audio_prompt_change( ) -> None:
-			"""Load the selected Audio Mode prompt.
-			
-			Purpose:
-			    Retrieves the selected Audio Mode prompt by stable ID and copies its Text
-			    value into the Audio Mode system-instruction control.
-			
-			Returns:
-			    None: This function updates Streamlit session state through side effects.
-			"""
-			load_prompt_into_state( prompt_id_key='audio_prompt_id',
-				instruction_key='audio_system_instructions' )
-		
-		def clear_audio_prompt( ) -> None:
-			"""Clear the Audio Mode prompt.
-			
-			Purpose:
-			    Clears the selected Audio Mode prompt ID and system-instruction text
-			    without modifying any prompt record in the database.
-			
-			Returns:
-			    None: This function updates Streamlit session state through side effects.
-			"""
-			clear_prompt_state( prompt_id_key='audio_prompt_id',
-				instruction_key='audio_system_instructions' )
-		
-		def convert_audio_prompt( ) -> None:
-			"""Convert the Audio Mode prompt.
-			
-			Purpose:
-			    Converts the current Audio Mode system instructions between supported XML
-			    prompt blocks and Markdown headings.
-			
-			Returns:
-			    None: This function updates Streamlit session state through side effects.
-			"""
-			convert_prompt_state( instruction_key='audio_system_instructions' )
-		
-		# ----------------------------------------------------------
-		# Audio Prompt Controls
-		# ----------------------------------------------------------
-		in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-		
-		with in_left:
-			st.text_area( label='Enter Text', height=50, width='stretch',
-				help=cfg.SYSTEM_INSTRUCTIONS, key='audio_system_instructions' )
-		
-		with in_right:
-			if audio_prompt_ids:
-				st.selectbox( label='Use Template', options=audio_prompt_ids,
-					format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-						prompt_lookup=audio_prompt_lookup ), index=None, key='audio_prompt_id',
-					on_change=on_audio_prompt_change, placeholder='Options' )
-			else:
-				st.selectbox( label='Use Template', options=[ ], index=None,
-					key='audio_prompt_id', placeholder='No Audio prompts', disabled=True )
-		
-		btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
-		with btn_c1:
-			st.button( label='Clear Instructions', key='audio_clear_instructions',
-				width='stretch', on_click=clear_audio_prompt )
-		
-		with btn_c2:
-			st.button( label='XML <-> Markdown', key='audio_convert_instructions',
-				width='stretch', on_click=convert_audio_prompt )
-	
 		# ------------------------------------------------------------------
 		# Audio Workspace
 		# ------------------------------------------------------------------
@@ -6240,7 +6080,6 @@ elif mode == 'Audio':
 						with st.spinner( f'{audio_task}ing recording…' ):
 							try:
 								apply_gemini_runtime_config( )
-								
 								if not record_path:
 									raise ValueError( 'The recorded audio could not be prepared.' )
 								
@@ -6252,7 +6091,6 @@ elif mode == 'Audio':
 								result_text = str( result ).strip( )
 								st.session_state[ 'audio_output' ] = result_text
 								st.session_state[ 'audio_output_bytes' ] = None
-								
 								append_audio_message( role='user',
 									content=f'{audio_task} the recorded audio.' )
 								
@@ -6409,7 +6247,8 @@ elif mode == 'Audio':
 		# Task Guidance
 		# ------------------------------------------------------------------
 		if audio_task == 'Text-to-Speech':
-			st.info( 'Enter text through the chat input or the text box to generate speech audio.' )
+			st.info( 'Enter text through the chat input or the text box to generate speech '
+			         'audio.' )
 		elif audio_task in ('Transcribe', 'Translate'):
 			st.info( 'Enter optional task instructions through the chat input, then use either '
 			         'an uploaded file or a recording to run the selected audio task.' )
@@ -6437,16 +6276,15 @@ elif mode == 'Embedding':
 		st.divider( )
 		
 		with st.expander( label='Configuration', icon='🎚️', expanded=False, width='stretch' ):
-			emb_c1, emb_c2, emb_c3, emb_c4, emb_c5 = st.columns(
-				[ 0.20, 0.20, 0.20, 0.20, 0.20 ], border=True, gap='xxsmall' )
+			emb_c1, emb_c2, emb_c3, emb_c4, emb_c5 = st.columns( [ 0.20, 0.20, 0.20, 0.20, 0.20 ],
+				border=True, gap='xxsmall' )
 			
 			# ---------  Model --------
 			with emb_c1:
 				embedding_models = list( embedding.model_options )
 				set_embedding_model = st.selectbox( label='Embedding Model:',
-					options=embedding_models,
-					help='REQUIRED. Embedding model used by the AI', key='embedding_model',
-					index=None, placeholder='Options' )
+					options=embedding_models, help='REQUIRED. Embedding model used by the AI',
+					key='embedding_model', index=None, placeholder='Options' )
 				
 				embedding_model = st.session_state[ 'embedding_model' ]
 			
@@ -6463,8 +6301,7 @@ elif mode == 'Embedding':
 			# ---------  Dimensions --------
 			with emb_c3:
 				set_embedding_dimensions = st.slider( label='Dimensions', min_value=0,
-					max_value=2048,
-					value=int( st.session_state.get( 'embeddings_dimensions' ) ),
+					max_value=2048, value=int( st.session_state.get( 'embeddings_dimensions' ) ),
 					step=1, key='embeddings_dimensions',
 					help='Optional (large llm only): An integer between 1 and 2048',
 					width='stretch' )
@@ -6482,7 +6319,8 @@ elif mode == 'Embedding':
 			
 			# ---------  Overlap --------
 			with emb_c5:
-				set_overlap_amount = st.slider( label='Overlap Amount', min_value=0, max_value=1000,
+				set_overlap_amount = st.slider( label='Overlap Amount', min_value=0,
+					max_value=1000,
 					step=50, key='embeddings_overlap_amount',
 					help='The number of tokens spanning two chunks for embedding segmentation.' )
 				
@@ -6491,8 +6329,8 @@ elif mode == 'Embedding':
 			# ---------  Reset --------
 			if st.button( label='Reset', key='embedding_reset', width='stretch' ):
 				for key in [ 'embedding_model', 'embeddings_dimensions',
-				             'embeddings_encoding_format', 'embeddings_input_text',
-				             'embeddings_overlap_amount', 'embeddings_chunk_size' ]:
+					'embeddings_encoding_format', 'embeddings_input_text',
+					'embeddings_overlap_amount', 'embeddings_chunk_size' ]:
 					if key in st.session_state:
 						del st.session_state[ key ]
 				
@@ -6534,8 +6372,9 @@ elif mode == 'Embedding':
 						# Display Summary
 						# ----------------------------------------------------------
 						try:
-							if isinstance( vectors, list ) and vectors and isinstance(
-									vectors[ 0 ], list ):
+							if isinstance( vectors, list ) and vectors and isinstance( vectors[
+								0 ],
+									list ):
 								vector_dimension = len( vectors[ 0 ] )
 								st.write( 'Chunks:', len( vectors ) )
 								st.write( 'Vector dimension:', vector_dimension )
@@ -6563,7 +6402,7 @@ elif mode == 'Embedding':
 				# Clear Embedding State
 				# ----------------------------------------------------------
 				for key in [ 'embeddings', 'embeddings_chunks', 'embeddings_df',
-				             'embeddings_input_text' ]:
+					'embeddings_input_text' ]:
 					if key in st.session_state:
 						del st.session_state[ key ]
 				
@@ -6591,9 +6430,9 @@ elif mode == 'Embedding':
 			col_m4.metric( 'TTR', f"{ttr:.3f}" )
 			col_m5.metric( 'Characters', char_count )
 			
-			st.session_state[ 'embedding_metrics' ] = { 'tokens': token_count, 'words': total_words,
-			                                            'unique_words': unique_words, 'ttr': ttr,
-			                                            'characters': char_count }
+			st.session_state[ 'embedding_metrics' ] = { 'tokens': token_count, 'words':
+				total_words,
+				'unique_words': unique_words, 'ttr': ttr, 'characters': char_count }
 		
 		# ------------------------------------------------------------------
 		# EMBEDDING DATAFRAME (Dimension-Safe)
@@ -6669,7 +6508,6 @@ elif mode == 'Document Q&A':
 		st.divider( )
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			# -------- LLM Settings ----------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5 = st.columns(
@@ -6700,8 +6538,8 @@ elif mode == 'Document Q&A':
 						value=','.join( st.session_state.get( 'docqna_domains', [ ] ) ),
 						help=cfg.ALLOWED_DOMAINS, width='stretch', placeholder='Enter Domains' )
 					
-					docqna_domains = [ d.strip( ) for d in set_docqna_domains.split( ',' )
-					                   if d.strip( ) ]
+					docqna_domains = [ d.strip( ) for d in set_docqna_domains.split( ',' ) if
+						d.strip( ) ]
 					
 					st.session_state[ 'docqna_domains' ] = docqna_domains
 				
@@ -6709,8 +6547,8 @@ elif mode == 'Document Q&A':
 				with llm_c4:
 					reasoning_options = list( docqna.reasoning_options )
 					set_docqna_reasoning = st.selectbox( label='Thinking Level',
-						options=reasoning_options, key='docqna_reasoning',
-						help=cfg.REASONING, index=None, placeholder='Options' )
+						options=reasoning_options, key='docqna_reasoning', help=cfg.REASONING,
+						index=None, placeholder='Options' )
 					
 					docqna_reasoning = st.session_state[ 'docqna_reasoning' ]
 				
@@ -6718,15 +6556,15 @@ elif mode == 'Document Q&A':
 				with llm_c5:
 					media_options = list( docqna.media_options )
 					set_media_resolution = st.selectbox( label='Media Resolution',
-						options=media_options, key='docqna_media_resolution',
-						help=cfg.REASONING, index=None, placeholder='Options' )
+						options=media_options, key='docqna_media_resolution', help=cfg.REASONING,
+						index=None, placeholder='Options' )
 					
 					media_resolution = st.session_state[ 'docqna_media_resolution' ]
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='docqna_model_reset', width='stretch' ):
 					for key in [ 'docqna_model', 'docqna_include', 'docqna_domains',
-					             'docqna_reasoning', 'docqna_media_resolution' ]:
+						'docqna_reasoning', 'docqna_media_resolution' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -6742,7 +6580,8 @@ elif mode == 'Document Q&A':
 				with prm_c1:
 					set_docqna_top_p = st.slider( label='Top-P', min_value=0.0, max_value=1.0,
 						value=float( st.session_state.get( 'docqna_top_percent', 0.0 ) ),
-						step=0.01, help=cfg.TOP_P, key='docqna_top_percent' )
+						step=0.01,
+						help=cfg.TOP_P, key='docqna_top_percent' )
 					
 					docqna_top_percent = st.session_state[ 'docqna_top_percent' ]
 				
@@ -6768,7 +6607,8 @@ elif mode == 'Document Q&A':
 				with prm_c4:
 					set_docqna_temperature = st.slider( label='Temperature', min_value=0.0,
 						max_value=1.0,
-						value=float( st.session_state.get( 'docqna_temperature', 0.0 ) ), step=0.01,
+						value=float( st.session_state.get( 'docqna_temperature', 0.0 ) ),
+						step=0.01,
 						help=cfg.TEMPERATURE, key='docqna_temperature' )
 					
 					docqna_temperature = st.session_state[ 'docqna_temperature' ]
@@ -6777,16 +6617,14 @@ elif mode == 'Document Q&A':
 				with prm_c5:
 					set_docqna_topk = st.slider( label='Top K', min_value=0, max_value=20,
 						value=int( st.session_state.get( 'docqna_top_k', 0 ) ), step=1,
-						help=cfg.TOP_K,
-						key='docqna_top_k' )
+						help=cfg.TOP_K, key='docqna_top_k' )
 					
 					docqna_top_k = st.session_state[ 'docqna_top_k' ]
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='docqna_inference_reset', width='stretch' ):
 					for key in [ 'docqna_top_percent', 'docqna_frequency_penalty',
-					             'docqna_presence_penalty', 'docqna_temperature',
-					             'docqna_top_k', ]:
+						'docqna_presence_penalty', 'docqna_temperature', 'docqna_top_k', ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -6808,7 +6646,8 @@ elif mode == 'Document Q&A':
 				
 				# ---------- Max Calls ------------
 				with tool_c2:
-					set_docqna_calls = st.slider( label='Max Tool Calls', min_value=0, max_value=10,
+					set_docqna_calls = st.slider( label='Max Tool Calls', min_value=0,
+						max_value=10,
 						value=int( st.session_state.get( 'docqna_max_calls', 0 ) ), step=1,
 						help=cfg.MAX_TOOL_CALLS, key='docqna_max_calls' )
 					
@@ -6827,11 +6666,10 @@ elif mode == 'Document Q&A':
 				with tool_c4:
 					tool_options = list( docqna.tool_options )
 					set_docqna_tools = st.multiselect( label='Available Tools',
-						options=tool_options,
-						key='docqna_tools', help=cfg.TOOLS, placeholder='Options' )
+						options=tool_options, key='docqna_tools', help=cfg.TOOLS,
+						placeholder='Options' )
 					
-					docqna_tools = [ d.strip( ) for d in set_docqna_tools
-					                 if d.strip( ) ]
+					docqna_tools = [ d.strip( ) for d in set_docqna_tools if d.strip( ) ]
 					
 					docqna_tools = st.session_state[ 'docqna_tools' ]
 				
@@ -6839,19 +6677,17 @@ elif mode == 'Document Q&A':
 				with tool_c5:
 					modality_options = list( docqna.modality_options )
 					set_docqna_modalities = st.multiselect( label='Response Modalities',
-						options=modality_options,
-						key='docqna_modalities', help='Optional. Modality of the response',
-						placeholder='Options' )
+						options=modality_options, key='docqna_modalities',
+						help='Optional. Modality of the response', placeholder='Options' )
 					
-					docqna_modalities = [ d.strip( ) for d in set_docqna_modalities
-					                      if d.strip( ) ]
+					docqna_modalities = [ d.strip( ) for d in set_docqna_modalities if d.strip( ) ]
 					
 					docqna_modalities = st.session_state[ 'docqna_modalities' ]
 				
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='docqna_tools_reset', width='stretch' ):
 					for key in [ 'docqna_parallel_tools', 'docqna_tool_choice', 'docqna_number',
-					             'docqna_tools', 'docqna_max_calls', 'docqna_modalities' ]:
+						'docqna_tools', 'docqna_max_calls', 'docqna_modalities' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -6889,8 +6725,8 @@ elif mode == 'Document Q&A':
 					set_docqna_stops = st.text_input( label='Stop Sequences', key='docqna_stops',
 						help=cfg.STOP_SEQUENCE, width='stretch', placeholder='Enter Stops' )
 					
-					docqna_stops = [ d.strip( ) for d in set_docqna_stops.split( ',' )
-					                 if d.strip( ) ]
+					docqna_stops = [ d.strip( ) for d in set_docqna_stops.split( ',' ) if
+						d.strip( ) ]
 				
 				# ---------- Max Tokens ------------
 				with resp_c5:
@@ -6904,8 +6740,7 @@ elif mode == 'Document Q&A':
 				# ---------- Reset Settings ------------
 				if st.button( label='Reset', key='docqna_response_reset', width='stretch' ):
 					for key in [ 'docqna_stream', 'docqna_store', 'docqna_background',
-					             'docqna_stops',
-					             'docqna_max_tokens' ]:
+						'docqna_stops', 'docqna_max_tokens' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					# If using separated UI key for stops
@@ -6913,89 +6748,13 @@ elif mode == 'Document Q&A':
 						del st.session_state[ 'docqna_stops_input' ]
 					
 					st.rerun( )
-		
-		# ------------------------------------------------------------------
-		# Expander — Document Q&A System Instructions
-		# ------------------------------------------------------------------
-		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
-			docqna_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
-				mode_name='Document Q&A' )
 			
-			docqna_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-				for record in docqna_prompt_records }
-			
-			docqna_prompt_ids = list( docqna_prompt_lookup.keys( ) )
-			
-			# ----------------------------------------------------------
-			# Document Q&A Prompt Callbacks
-			# ----------------------------------------------------------
-			def on_docqna_prompt_change( ) -> None:
-				"""Load the selected Document Q&A prompt.
-				
-				Purpose:
-				    Retrieves the selected Document Q&A prompt by stable ID and copies its
-				    Text value into the Document Q&A system-instruction control.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				load_prompt_into_state( prompt_id_key='docqna_prompt_id',
-					instruction_key='docqna_system_instructions' )
-			
-			def clear_docqna_prompt( ) -> None:
-				"""Clear the Document Q&A prompt.
-				
-				Purpose:
-				    Clears the selected Document Q&A prompt ID and system-instruction text
-				    without modifying any prompt record in the database.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				clear_prompt_state( prompt_id_key='docqna_prompt_id',
-					instruction_key='docqna_system_instructions' )
-			
-			def convert_docqna_prompt( ) -> None:
-				"""Convert the Document Q&A prompt.
-				
-				Purpose:
-				    Converts the current Document Q&A system instructions between supported
-				    XML prompt blocks and Markdown headings.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				convert_prompt_state( instruction_key='docqna_system_instructions' )
-			
-			# ----------------------------------------------------------
-			# Document Q&A Prompt Controls
-			# ----------------------------------------------------------
-			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-			with in_left:
-				st.text_area( label='Enter Text', height=120, width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS, key='docqna_system_instructions' )
-			
-			with in_right:
-				if docqna_prompt_ids:
-					st.selectbox( label='Use Template', options=docqna_prompt_ids,
-						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-							prompt_lookup=docqna_prompt_lookup ), index=None,
-						key='docqna_prompt_id', on_change=on_docqna_prompt_change,
-						placeholder='Options' )
-				else:
-					st.selectbox( label='Use Template', options=[ ], index=None,
-						key='docqna_prompt_id', placeholder='No Document Q&A prompts',
-						disabled=True )
-			
-			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
-			with btn_c1:
-				st.button( label='Clear Instructions', key='docqna_clear_instructions',
-					width='stretch', on_click=clear_docqna_prompt )
-			
-			with btn_c2:
-				st.button( label='XML <-> Markdown', key='docqna_convert_instructions',
-					width='stretch', on_click=convert_docqna_prompt )
-		
+			# ------------------------------------------------------------------
+			# Expander — Audio System Instructions
+			# ------------------------------------------------------------------
+			render_system_prompt_expander( state_prefix='docqna',
+				instruction_key='docqna_system_instructions', label='System Instructions',
+				height=120 )
 		with st.expander( label='Document Loading', icon='📥', expanded=False, width='stretch' ):
 			doc_left, doc_right = st.columns( [ 0.2, 0.8 ], border=True )
 			with doc_left:
@@ -7005,7 +6764,7 @@ elif mode == 'Document Q&A':
 				if docqna_uploaded is not None:
 					st.session_state.docqna_active_docs = [ docqna_uploaded.name ]
 					st.session_state.doc_bytes = {
-							docqna_uploaded.name: docqna_uploaded.getvalue( ) }
+						docqna_uploaded.name: docqna_uploaded.getvalue( ) }
 					st.success( f'{docqna_uploaded.name} has been loaded!' )
 				else:
 					st.info( 'Load a document.' )
@@ -7074,8 +6833,8 @@ elif mode == 'Document Q&A':
 		# ------------------------------------------------------------------
 		# Clear Messages
 		# ------------------------------------------------------------------
-		if st.button( label='Clear Messages', key='docqna_clear_messages',
-				width='content', icon='🧹' ):
+		if st.button( label='Clear Messages', key='docqna_clear_messages', width='content',
+				icon='🧹' ):
 			st.session_state[ 'docqna_messages' ] = [ ]
 			st.session_state[ 'docqna_context' ] = [ ]
 			st.session_state[ 'last_answer' ] = ''
@@ -7107,7 +6866,6 @@ elif mode == 'Files':
 		st.divider( )
 		
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				llm_c1, llm_c2, llm_c3, llm_c4, llm_c5, llm_c6 = st.columns(
 					[ 0.16, 0.16, 0.16, 0.16, 0.16, 0.16 ], border=True, gap='xxsmall' )
@@ -7125,8 +6883,8 @@ elif mode == 'Files':
 				with llm_c2:
 					reasoning_options = list( files.reasoning_options )
 					set_files_reasoning = st.selectbox( label='Reasoning',
-						options=reasoning_options, key='files_reasoning',
-						help=cfg.REASONING, index=None, placeholder='Options' )
+						options=reasoning_options, key='files_reasoning', help=cfg.REASONING,
+						index=None, placeholder='Options' )
 					
 					files_reasoning = st.session_state[ 'files_reasoning' ]
 				
@@ -7140,9 +6898,7 @@ elif mode == 'Files':
 				# ---------- Temperature ------------
 				with llm_c4:
 					set_files_temperature = st.slider( label='Temperature', min_value=-2.0,
-						max_value=2.0,
-						step=0.01,
-						help=cfg.TEMPERATURE, key='files_temperature' )
+						max_value=2.0, step=0.01, help=cfg.TEMPERATURE, key='files_temperature' )
 					
 					files_temperature = st.session_state[ 'files_temperature' ]
 				
@@ -7165,8 +6921,7 @@ elif mode == 'Files':
 				# ---------- Reset Model ------------
 				if st.button( label='Reset', key='reset_files_model', width='stretch' ):
 					for key in [ 'files_model', 'files_temperature', 'files_presence_penalty',
-					             'files_reasoning', 'files_top_percent',
-					             'files_frequency_penalty' ]:
+						'files_reasoning', 'files_top_percent', 'files_frequency_penalty' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -7263,7 +7018,8 @@ elif mode == 'Files':
 				
 				# ---------- Max Tokens ------------
 				with resp_c4:
-					set_files_tokens = st.slider( label='Max Tokens', min_value=0, max_value=100000,
+					set_files_tokens = st.slider( label='Max Tokens', min_value=0,
+						max_value=100000,
 						value=int( st.session_state.get( 'files_max_tokens', 0 ) ), step=500,
 						help=cfg.MAX_OUTPUT_TOKENS, key='files_max_tokens' )
 					
@@ -7276,8 +7032,7 @@ elif mode == 'Files':
 						options=modality_options, key='files_modalities',
 						help='Optional. Modality of the response', placeholder='Options' )
 					
-					files_modalities = [ d.strip( ) for d in set_files_modalities
-					                     if d.strip( ) ]
+					files_modalities = [ d.strip( ) for d in set_files_modalities if d.strip( ) ]
 					
 					files_modalities = st.session_state[ 'files_modalities' ]
 				
@@ -7288,15 +7043,16 @@ elif mode == 'Files':
 						value=','.join( st.session_state.get( 'files_stops', [ ] ) ),
 						help=cfg.STOP_SEQUENCE, width='stretch', placeholder='Enter Stop Strings' )
 					
-					files_stops = [ d.strip( ) for d in set_files_stops.split( ',' )
-					                if d.strip( ) ]
+					files_stops = [ d.strip( ) for d in set_files_stops.split( ',' ) if d.strip(
+					
+					) ]
 					
 					st.session_state[ 'files_stops' ] = files_stops
 				
 				# ---------- Reset Reponse ------------
 				if st.button( label='Reset', key='reset_files_response', width='stretch' ):
 					for key in [ 'files_stream', 'files_store', 'files_number', 'files_stops',
-					             'files_tools', 'files_max_tokens', 'files_modalities' ]:
+						'files_tools', 'files_max_tokens', 'files_modalities' ]:
 						if key in st.session_state:
 							del st.session_state[ key ]
 					
@@ -7305,85 +7061,8 @@ elif mode == 'Files':
 		# ------------------------------------------------------------------
 		# Expander — Files System Instructions
 		# ------------------------------------------------------------------
-		with st.expander( label='System Prompt', icon='🖥️', expanded=False, width='stretch' ):
-			files_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
-				mode_name='Document Q&A' )
-			
-			files_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-				for
-				record in files_prompt_records }
-			
-			files_prompt_ids = list( files_prompt_lookup.keys( ) )
-			
-			# ----------------------------------------------------------
-			# Files Prompt Callbacks
-			# ----------------------------------------------------------
-			def on_files_prompt_change( ) -> None:
-				"""Load the selected Files Mode prompt.
-				
-				Purpose:
-				    Retrieves the selected Files Mode prompt by stable ID and copies its Text
-				    value into the Files Mode system-instruction control.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				load_prompt_into_state( prompt_id_key='files_prompt_id',
-					instruction_key='files_system_instructions' )
-			
-			def clear_files_prompt( ) -> None:
-				"""Clear the Files Mode prompt.
-				
-				Purpose:
-				    Clears the selected Files Mode prompt ID and system-instruction text without
-				    modifying any prompt record in the database.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				clear_prompt_state( prompt_id_key='files_prompt_id',
-					instruction_key='files_system_instructions' )
-			
-			def convert_files_prompt( ) -> None:
-				"""Convert the Files Mode prompt.
-				
-				Purpose:
-				    Converts the current Files Mode system instructions between supported XML
-				    prompt blocks and Markdown headings.
-				
-				Returns:
-				    None: This function updates Streamlit session state through side effects.
-				"""
-				convert_prompt_state( instruction_key='files_system_instructions' )
-			
-			# ----------------------------------------------------------
-			# Files Prompt Controls
-			# ----------------------------------------------------------
-			in_left, in_right = st.columns( [ 0.8, 0.2 ] )
-			
-			with in_left:
-				st.text_area( label='Enter Text', height=50, width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS, key='files_system_instructions' )
-			
-			with in_right:
-				if files_prompt_ids:
-					st.selectbox( label='Use Template', options=files_prompt_ids,
-						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-							prompt_lookup=files_prompt_lookup ), index=None, key='files_prompt_id',
-						on_change=on_files_prompt_change, placeholder='Options' )
-				else:
-					st.selectbox( label='Use Template', options=[ ], index=None,
-						key='files_prompt_id', placeholder='No Files prompts', disabled=True )
-			
-			btn_c1, btn_c2 = st.columns( [ 0.8, 0.2 ] )
-			with btn_c1:
-				st.button( label='Clear Instructions', key='files_clear_instructions',
-					width='stretch', on_click=clear_files_prompt )
-			
-			with btn_c2:
-				st.button( label='XML <-> Markdown', key='files_convert_instructions',
-					width='stretch', on_click=convert_files_prompt )
-		
+		render_system_prompt_expander( state_prefix='files',
+			instruction_key='files_system_instructions', label='System Instructions', height=120 )
 		fls_c1, fls_c2 = st.columns( [ 0.4, 0.6 ], border=True )
 		with fls_c1:
 			if st.button( 'List Files' ):
@@ -7423,29 +7102,22 @@ elif mode == 'Files':
 				
 				for row in files_list:
 					if isinstance( row, dict ):
-						value = (
-								row.get( 'id' )
-								or row.get( 'filename' )
-								or row.get( 'name' )
-								or row.get( 'display_name' )
-						)
+						value = (row.get( 'id' ) or row.get( 'filename' ) or row.get(
+							'name' ) or row.get( 'display_name' ))
 					elif isinstance( row, str ):
 						value = row
 					else:
-						value = (
-								getattr( row, 'name', None )
-								or getattr( row, 'id', None )
-								or getattr( row, 'filename', None )
-								or getattr( row, 'display_name', None )
-						)
+						value = (getattr( row, 'name', None ) or getattr( row, 'id',
+							None ) or getattr( row, 'filename', None ) or getattr( row,
+							'display_name', None ))
 					
 					if value:
 						file_ids.append( str( value ) )
 				
 				file_ids = sorted( set( file_ids ) )
 				
-				sel = st.selectbox( label='Select File to Delete', options=file_ids,
-					index=None, placeholder='Options' )
+				sel = st.selectbox( label='Select File to Delete', options=file_ids, index=None,
+					placeholder='Options' )
 				
 				if st.button( 'Delete File' ):
 					del_fn = None
@@ -7813,7 +7485,6 @@ elif mode == 'File Search Stores':
 		# Mind Controls
 		# ------------------------------------------------------------------
 		with st.expander( label='Mind Controls', icon='🧠', expanded=False, width='stretch' ):
-			
 			# --------- LLM Settings ---------
 			with st.expander( label='LLM Settings', icon='🧊', expanded=False, width='stretch' ):
 				model_c1, model_c2, model_c3 = st.columns( [ 0.40, 0.35, 0.25 ], border=True,
@@ -7892,42 +7563,10 @@ elif mode == 'File Search Stores':
 					on_click=reset_stores_response_settings )
 		
 		# ------------------------------------------------------------------
-		# File Search Stores System Prompt
+		# Expander — File Search Stores System Instructions
 		# ------------------------------------------------------------------
-		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
-			stores_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
-				mode_name='Document Q&A' )
-			
-			stores_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-				for record in stores_prompt_records }
-			
-			stores_prompt_ids = list( stores_prompt_lookup.keys( ) )
-			prompt_c1, prompt_c2 = st.columns( [ 0.80, 0.20 ] )
-			with prompt_c1:
-				st.text_area( label='Enter Text', height=50, width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS, key='stores_system_instructions' )
-			
-			with prompt_c2:
-				if stores_prompt_ids:
-					st.selectbox( label='Use Template', options=stores_prompt_ids,
-						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-							prompt_lookup=stores_prompt_lookup ), index=None,
-						key='stores_prompt_id', on_change=on_stores_prompt_change,
-						placeholder='Options' )
-				else:
-					st.selectbox( label='Use Template', options=[ ], index=None,
-						key='stores_prompt_id', placeholder='No File Search prompts',
-						disabled=True )
-			
-			prompt_button_c1, prompt_button_c2 = st.columns( [ 0.80, 0.20 ] )
-			with prompt_button_c1:
-				st.button( label='Clear Instructions', key='stores_clear_instructions',
-					width='stretch', on_click=clear_stores_prompt, icon='🧹' )
-			
-			with prompt_button_c2:
-				st.button( label='XML ↔️ Markdown', key='stores_convert_instructions',
-					width='stretch', on_click=convert_stores_prompt )
-		
+		render_system_prompt_expander( state_prefix='stores',
+			instruction_key='stores_system_instructions', label='System Instructions', height=120 )
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		# ------------------------------------------------------------------
@@ -8453,7 +8092,6 @@ elif mode == 'Google Cloud Buckets':
 	# Main Google Cloud Buckets Interface
 	# ------------------------------------------------------------------
 	left, center, right = st.columns( [ 0.05, 0.90, 0.05 ] )
-	
 	with center:
 		st.subheader( '🧊 Google Cloud Buckets', help=cfg.VECTORSTORES_API )
 		
@@ -8546,42 +8184,10 @@ elif mode == 'Google Cloud Buckets':
 					on_click=reset_bucket_response_settings )
 		
 		# ------------------------------------------------------------------
-		# Google Cloud Buckets System Prompt
+		# Expander — Google Cloud Buckets System Instructions
 		# ------------------------------------------------------------------
-		with st.expander( label='System Instructions', icon='🖥️', expanded=False, width='stretch' ):
-			bucket_prompt_records = fetch_mode_prompt_records( db_path=cfg.DB_PATH,
-				mode_name='Document Q&A' )
-			
-			bucket_prompt_lookup: Dict[ int, Dict[ str, Any ] ] = { int( record[ 'ID' ] ): record
-				for record in bucket_prompt_records }
-			
-			bucket_prompt_ids = list( bucket_prompt_lookup.keys( ) )
-			prompt_c1, prompt_c2 = st.columns( [ 0.80, 0.20 ] )
-			with prompt_c1:
-				st.text_area( label='Enter Text', height=120, width='stretch',
-					help=cfg.SYSTEM_INSTRUCTIONS, key='bucket_system_instructions' )
-			
-			with prompt_c2:
-				if bucket_prompt_ids:
-					st.selectbox( label='Use Template', options=bucket_prompt_ids,
-						format_func=lambda prompt_id: format_prompt_option( prompt_id=prompt_id,
-							prompt_lookup=bucket_prompt_lookup ), index=None,
-						key='bucket_prompt_id', on_change=on_bucket_prompt_change,
-						placeholder='Options' )
-				else:
-					st.selectbox( label='Use Template', options=[ ], index=None,
-						key='bucket_prompt_id', placeholder='No Cloud Bucket prompts',
-						disabled=True )
-			
-			prompt_button_c1, prompt_button_c2 = st.columns( [ 0.80, 0.20 ] )
-			with prompt_button_c1:
-				st.button( label='Clear Instructions', key='bucket_clear_instructions',
-					width='stretch', on_click=clear_bucket_prompt, icon='🧹' )
-			
-			with prompt_button_c2:
-				st.button( label='XML ↔️ Markdown', key='bucket_convert_instructions',
-					width='stretch', on_click=convert_bucket_prompt )
-		
+		render_system_prompt_expander( state_prefix='bucket',
+			instruction_key='bucket_system_instructions', label='System Instructions', height=120 )
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
 		# ------------------------------------------------------------------
@@ -8656,7 +8262,8 @@ elif mode == 'Google Cloud Buckets':
 								try:
 									bucket_result = searcher.retrieve( store_id=active_bucket_id )
 									st.write( 'Name:', getattr( bucket_result, 'name', '—' ) )
-									st.write( 'Files:', getattr( bucket_result, 'file_counts', '—' ) )
+									st.write( 'Files:',
+										getattr( bucket_result, 'file_counts', '—' ) )
 									usage_bytes = getattr( bucket_result, 'usage_bytes', 0 )
 									
 									st.write( 'Size (MB):',
@@ -8874,21 +8481,21 @@ elif mode == 'Prompt Engineering':
 			st.text_input( 'Search (Name/Text contains)', key='pe_search' )
 		
 		with c2:
-			st.selectbox( 'Sort by', [ 'ID', 'Title', 'Name', 'Text' ],
-				key='pe_sort_col', )
+			st.selectbox( 'Sort by', [ 'ID', 'Title', 'Name', 'Text' ], key='pe_sort_col', )
 		
 		with c3:
 			st.selectbox( 'Direction', [ 'ASC', 'DESC' ], key='pe_sort_dir' )
 		
 		with c4:
 			st.markdown(
-				"<div style='font-size:0.95rem;font-weight:600;margin-bottom:0.25rem;'>Go to ID</div>",
+				"<div style='font-size:0.95rem;font-weight:600;margin-bottom:0.25rem;'>Go to "
+				"ID</div>",
 				unsafe_allow_html=True, )
 			
 			a1, a2, a3 = st.columns( [ 2, 1, 1 ] )
 			with a1:
-				jump_id = st.number_input( 'Go to ID', min_value=1,
-					step=1, label_visibility='collapsed', )
+				jump_id = st.number_input( 'Go to ID', min_value=1, step=1,
+					label_visibility='collapsed', )
 			
 			with a2:
 				if st.button( 'Go' ):
@@ -8931,13 +8538,8 @@ elif mode == 'Prompt Engineering':
 		table_rows = [ ]
 		for r in rows:
 			table_rows.append(
-				{
-						'Selected': r[ 0 ] == st.session_state.pe_selected_id,
-						'ID': r[ 0 ],
-						'Title': r[ 1 ],
-						'Name': r[ 2 ],
-						'Text': r[ 3 ],
-				} )
+				{ 'Selected': r[ 0 ] == st.session_state.pe_selected_id, 'ID': r[ 0 ],
+					'Title': r[ 1 ], 'Name': r[ 2 ], 'Text': r[ 3 ], } )
 		
 		edited = st.data_editor( table_rows, hide_index=True, use_container_width=True,
 			key="prompt_table", )
@@ -8979,43 +8581,30 @@ elif mode == 'Prompt Engineering':
 		# Edit Prompt
 		# ------------------------------------------------------------------
 		with st.expander( "🖊️ Edit Prompt", expanded=False ):
-			st.text_input( "ID", value=st.session_state.pe_selected_id or "",
-				disabled=True, )
+			st.text_input( "ID", value=st.session_state.pe_selected_id or "", disabled=True, )
 			st.text_input( 'Name', key='pe_name' )
 			
 			st.text_area( 'Text', key='pe_text', height=260 )
 			c1, c2, c3 = st.columns( 3 )
 			
 			with c1:
-				if st.button( '💾 Save Changes'
-				if st.session_state.pe_selected_id
-				else '➕ Create Prompt' ):
+				if st.button(
+						'💾 Save Changes' if st.session_state.pe_selected_id else '➕ Create '
+						                                                         'Prompt' ):
 					with get_conn( ) as conn:
 						if st.session_state.pe_selected_id:
-							conn.execute(
-								f"""
+							conn.execute( f"""
                                 UPDATE {TABLE}
                                 SET Caption=?, Name=?, Text=?
                                 WHERE ID=?
-                                """,
-								(
-										st.session_state.pe_title,
-										st.session_state.pe_name,
-									st.session_state.pe_text,
-										st.session_state.pe_selected_id
-								), )
+                                """, (st.session_state.pe_title, st.session_state.pe_name,
+								st.session_state.pe_text, st.session_state.pe_selected_id), )
 						else:
-							conn.execute(
-								f"""
+							conn.execute( f"""
                                 INSERT INTO {TABLE} (Caption, Name, Text )
                                 VALUES (?, ?, ?, ? , ?)
-                                """,
-								(
-										st.session_state.pe_title,
-										st.session_state.pe_name,
-										st.session_state.pe_text,
-								),
-							)
+                                """, (st.session_state.pe_title, st.session_state.pe_name,
+								st.session_state.pe_text,), )
 						conn.commit( )
 					
 					st.success( 'Saved.' )
@@ -9024,8 +8613,7 @@ elif mode == 'Prompt Engineering':
 			with c2:
 				if st.session_state.pe_selected_id and st.button( 'Delete' ):
 					with get_conn( ) as conn:
-						conn.execute(
-							f'DELETE FROM {TABLE} WHERE ID=?',
+						conn.execute( f'DELETE FROM {TABLE} WHERE ID=?',
 							(st.session_state.pe_selected_id,), )
 						conn.commit( )
 					reset_selection( )
@@ -9073,8 +8661,8 @@ elif mode == 'Data Export':
 		hist = load_history( )
 		md_history = '\n\n'.join( [ f'**{role.upper( )}**\n{content}' for role, content in hist ] )
 		
-		st.download_button( 'Download Chat History (Markdown)', md_history,
-			'buddy_chat.md', mime='text/markdown' )
+		st.download_button( 'Download Chat History (Markdown)', md_history, 'buddy_chat.md',
+			mime='text/markdown' )
 		
 		buf = io.BytesIO( )
 		pdf = canvas.Canvas( buf, pagesize=LETTER )
@@ -9089,8 +8677,8 @@ elif mode == 'Data Export':
 		
 		pdf.save( )
 		
-		st.download_button( 'Download Chat History (PDF)', buf.getvalue( ),
-			'jeni_chat.pdf', mime='application/pdf' )
+		st.download_button( 'Download Chat History (PDF)', buf.getvalue( ), 'jeni_chat.pdf',
+			mime='application/pdf' )
 
 # ======================================================================================
 # DATA MANAGEMENT MODE
@@ -9100,7 +8688,8 @@ elif mode == 'Data Management':
 	with center:
 		st.subheader( '🏛️ Data Management', help=cfg.DATA_MANAGEMENT )
 		tabs = st.tabs( [ '📥 Import', '🗂 Browse', '💉 CRUD', '📊 Explore', '🔎 Filter',
-		                  '🧮 Aggregate', '📈 Visualize', '⚙ Admin', '🧠 SQL' ] )
+			'🧮 Aggregate',
+			'📈 Visualize', '⚙ Admin', '🧠 SQL' ] )
 		
 		# ------------------------------------------------------------------------------
 		# UPLOAD TAB
@@ -9174,8 +8763,8 @@ elif mode == 'Data Management':
 			if not tables:
 				st.info( 'No tables available.' )
 			else:
-				crud_header_c1, crud_header_c2, crud_header_c3 = st.columns(
-					[ 0.45, 0.25, 0.30 ], border=True )
+				crud_header_c1, crud_header_c2, crud_header_c3 = st.columns( [ 0.45, 0.25, 0.30 ],
+					border=True )
 				
 				with crud_header_c1:
 					table = st.selectbox( 'Select Table', tables, key='crud_table' )
@@ -9204,25 +8793,19 @@ elif mode == 'Data Management':
 					
 					for column, col_type in type_map.items( ):
 						if 'INT' in col_type:
-							insert_data[ column ] = st.number_input(
-								column,
-								step=1,
+							insert_data[ column ] = st.number_input( column, step=1,
 								key=f'ins_{table}_{column}' )
 						
 						elif 'REAL' in col_type:
-							insert_data[ column ] = st.number_input(
-								column,
-								format='%.6f',
+							insert_data[ column ] = st.number_input( column, format='%.6f',
 								key=f'ins_{table}_{column}' )
 						
 						elif 'BOOL' in col_type:
-							insert_data[ column ] = 1 if st.checkbox(
-								column,
+							insert_data[ column ] = 1 if st.checkbox( column,
 								key=f'ins_{table}_{column}' ) else 0
 						
 						else:
-							insert_data[ column ] = st.text_input(
-								column,
+							insert_data[ column ] = st.text_input( column,
 								key=f'ins_{table}_{column}' )
 					
 					if st.button( 'Insert Row', key=f'insert_row_{table}',
@@ -9230,9 +8813,8 @@ elif mode == 'Data Management':
 						cols = list( insert_data.keys( ) )
 						quoted_cols = [ f'"{c}"' for c in cols ]
 						placeholders = ', '.join( [ '?' ] * len( cols ) )
-						stmt = (
-								f'INSERT INTO "{table}" ({", ".join( quoted_cols )}) '
-								f'VALUES ({placeholders});')
+						stmt = (f'INSERT INTO "{table}" ({", ".join( quoted_cols )}) '
+						        f'VALUES ({placeholders});')
 						
 						with create_connection( ) as conn:
 							conn.execute( stmt, list( insert_data.values( ) ) )
@@ -9246,39 +8828,27 @@ elif mode == 'Data Management':
 				# ------------------------------------------------------------------
 				with update_col:
 					st.subheader( 'Update Row' )
-					rowid = st.number_input(
-						'Row ID',
-						min_value=1,
-						step=1,
+					rowid = st.number_input( 'Row ID', min_value=1, step=1,
 						key=f'crud_update_rowid_{table}' )
 					
 					update_data = { }
 					
 					for column, col_type in type_map.items( ):
 						if 'INT' in col_type:
-							val = st.number_input(
-								column,
-								step=1,
-								key=f'upd_{table}_{column}' )
+							val = st.number_input( column, step=1, key=f'upd_{table}_{column}' )
 							update_data[ column ] = val
 						
 						elif 'REAL' in col_type:
-							val = st.number_input(
-								column,
-								format='%.6f',
+							val = st.number_input( column, format='%.6f',
 								key=f'upd_{table}_{column}' )
 							update_data[ column ] = val
 						
 						elif 'BOOL' in col_type:
-							val = 1 if st.checkbox(
-								column,
-								key=f'upd_{table}_{column}' ) else 0
+							val = 1 if st.checkbox( column, key=f'upd_{table}_{column}' ) else 0
 							update_data[ column ] = val
 						
 						else:
-							val = st.text_input(
-								column,
-								key=f'upd_{table}_{column}' )
+							val = st.text_input( column, key=f'upd_{table}_{column}' )
 							update_data[ column ] = val
 					
 					if st.button( 'Update Row', key=f'update_row_{table}',
@@ -9302,10 +8872,7 @@ elif mode == 'Data Management':
 				# ------------------------------------------------------------------
 				with delete_col:
 					st.subheader( 'Delete Row' )
-					delete_id = st.number_input(
-						'Row ID to Delete',
-						min_value=1,
-						step=1,
+					delete_id = st.number_input( 'Row ID to Delete', min_value=1, step=1,
 						key=f'crud_delete_rowid_{table}' )
 					
 					if st.button( 'Delete Row', key=f'delete_row_{table}',
@@ -9322,11 +8889,8 @@ elif mode == 'Data Management':
 				# ------------------------------------------------------------------
 				with preview_col:
 					st.subheader( 'Current Data Preview' )
-					st.data_editor(
-						df.head( 25 ),
-						key=f'dm_crud_preview_{table}',
-						use_container_width=True,
-						disabled=True )
+					st.data_editor( df.head( 25 ), key=f'dm_crud_preview_{table}',
+						use_container_width=True, disabled=True )
 		
 		# ------------------------------------------------------------------------------
 		# EXPLORE
@@ -9478,7 +9042,7 @@ elif mode == 'Data Management':
 				auto_inc = st.checkbox( 'AUTOINCREMENT (INTEGER only)', key=f'ai_{i}' )
 				
 				columns.append( { 'name': col_name, 'type': col_type, 'not_null': not_null,
-				                  'primary_key': primary_key, 'auto_increment': auto_inc } )
+					'primary_key': primary_key, 'auto_increment': auto_inc } )
 			
 			if st.button( 'Create Table' ):
 				try:
@@ -9498,38 +9062,27 @@ elif mode == 'Data Management':
 				
 				# Column schema
 				schema = create_schema( table )
-				schema_df = pd.DataFrame(
-					schema,
+				schema_df = pd.DataFrame( schema,
 					columns=[ 'cid', 'name', 'type', 'notnull', 'default', 'pk' ] )
 				
 				st.markdown( "### Columns" )
-				st.data_editor(
-					make_display_safe( schema_df ),
-					hide_index=True,
-					use_container_width=True,
-					disabled=True )
+				st.data_editor( make_display_safe( schema_df ), hide_index=True,
+					use_container_width=True, disabled=True )
 				
 				# Row count
 				with create_connection( ) as conn:
-					count = conn.execute(
-						f'SELECT COUNT(*) FROM "{table}"'
-					).fetchone( )[ 0 ]
+					count = conn.execute( f'SELECT COUNT(*) FROM "{table}"' ).fetchone( )[ 0 ]
 				
 				st.metric( "Row Count", f"{count:,}" )
 				
 				# Indexes
 				indexes = get_indexes( table )
 				if indexes:
-					idx_df = pd.DataFrame(
-						indexes,
-						columns=[ 'seq', 'name', 'unique', 'origin', 'partial' ]
-					)
+					idx_df = pd.DataFrame( indexes,
+						columns=[ 'seq', 'name', 'unique', 'origin', 'partial' ] )
 					st.markdown( "### Indexes" )
-					st.data_editor(
-						make_display_safe( idx_df ),
-						hide_index=True,
-						use_container_width=True,
-						disabled=True )
+					st.data_editor( make_display_safe( idx_df ), hide_index=True,
+						use_container_width=True, disabled=True )
 				else:
 					st.info( "No indexes defined." )
 			
@@ -9622,8 +9175,8 @@ elif mode == 'Data Management':
 						# ----------------------------------------------------------
 						if not result.empty:
 							csv = result.to_csv( index=False ).encode( 'utf-8' )
-							st.download_button( 'Download CSV', csv,
-								'query_results.csv', 'text/csv' )
+							st.download_button( 'Download CSV', csv, 'query_results.csv',
+								'text/csv' )
 					
 					except Exception as e:
 						st.error( f'Execution failed: {e}' )
@@ -9666,19 +9219,10 @@ st.markdown( """
 # ======================================================================================
 # FOOTER RENDERING
 # ======================================================================================
-_mode_to_model_key = \
-	{
-			'Text': 'text_model',
-			'Images': 'image_model',
-			'Audio': 'audio_model',
-			'Embedding': 'embedding_model',
-			'Document Q&A': 'docqna_model',
-			'Files': 'files_model',
-			'File Search Stores': 'stores_model',
-			'Google Cloud Buckets': 'bucket_model',
-			'Prompt Engineering': 'text_model',
-			'Data Management': 'text_model'
-	}
+_mode_to_model_key = { 'Text': 'text_model', 'Images': 'image_model', 'Audio': 'audio_model',
+	'Embedding': 'embedding_model', 'Document Q&A': 'docqna_model', 'Files': 'files_model',
+	'File Search Stores': 'stores_model', 'Google Cloud Buckets': 'bucket_model',
+	'Prompt Engineering': 'text_model', 'Data Management': 'text_model' }
 
 provider_val = st.session_state.get( 'provider', 'Gemini' )
 mode_val = mode or '—'
@@ -9968,14 +9512,11 @@ elif mode == 'VectorStores':
 right_text = ' ◽ '.join( right_parts ) if right_parts else '—'
 
 # ---- Rendering Method
-st.markdown(
-	f"""
+st.markdown( f"""
     <div class="boo-status-bar">
         <div class="boo-status-inner">
             <span>{provider_val} — {mode_val}</span>
             <span>{right_text}</span>
         </div>
     </div>
-    """,
-	unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True, )
