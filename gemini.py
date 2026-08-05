@@ -42,9 +42,9 @@ import json
 import os
 import requests
 import PIL.Image
+from typing import Any, Callable, Dict, List, Optional, Union
 from pathlib import Path
 from google.cloud.storage.blob import Blob
-from typing import Any, List, Optional, Dict, Union
 from google import genai
 from google.cloud import storage
 from google.genai import types
@@ -196,240 +196,293 @@ class Gemini:
 		self.stops = [ ]
 		self.tools = [ ]
 
+
 class Chat( Gemini ):
-	"""Gemini text-generation wrapper.
+	"""Gemini Interactions API text-generation wrapper.
 
 	Purpose:
-		Handles Gemini text-generation workflows for the application. The class builds request
-		contents, configures model options, coordinates optional grounding and tool settings,
-		captures response metadata, and exposes generated text and structured history to callers.
+		Provides the application-facing text-generation contract used by the Jeni Streamlit
+		interface. The class translates existing Jeni prompt, history, tool, structured-output,
+		reasoning, URL-context, File Search, and streaming values into Gemini Interactions API
+		requests while preserving the return values and runtime members consumed by ``app.py``.
 
 	Attributes:
-		use_vertex (Optional[bool]): Whether the wrapper is using Vertex configuration.
-		http_options (Optional[HttpOptions]): Optional HTTP client configuration.
+		use_vertex (Optional[bool]): Whether Vertex AI configuration is active.
+		http_options (Optional[Dict[str, Any]]): HTTP client configuration.
 		client (Optional[genai.Client]): Gemini SDK client.
 		storage_client (Optional[storage.Client]): Optional Google Cloud Storage client.
-		contents (Optional[Union[str, List[str], List[Content]]]): Request contents.
-		image_uri (Optional[str]): Optional image URI.
-		audio_uri (Optional[str]): Optional audio URI.
-		file_path (Optional[str]): Optional local file path.
-		files (Optional[List[str]]): File paths or file identifiers used by the workflow.
-		content_block (Optional[str]): Additional content prepended to a prompt.
-		context (Optional[List[Dict[str, Any]]]): Structured chat history or context.
-		urls (Optional[List[str]]): Reference URLs appended to the prompt.
-		max_urls (Optional[int]): Maximum number of URLs to include.
-		response_schema (Optional[Any]): Structured-output schema.
-		safety_profile (Optional[str]): Safety-profile selector.
-		safety_settings (Optional[List[SafetySetting]]): Gemini safety settings.
+		contents (Optional[List[Dict[str, Any]]]): Interactions API input steps.
+		input_steps (List[Dict[str, Any]]): Normalized Interactions API input timeline.
+		image_uri (Optional[str]): Optional image URI retained for compatibility.
+		audio_uri (Optional[str]): Optional audio URI retained for compatibility.
+		file_path (Optional[str]): Optional local file path retained for compatibility.
+		files (List[str]): File identifiers retained for compatibility.
+		content_block (Optional[str]): Additional application content prepended to the prompt.
+		context (List[Dict[str, Any]]): Existing Jeni chat history.
+		urls (List[str]): Normalized URL-context values.
+		max_urls (int): Maximum number of URL values included in a request.
+		response_schema (Optional[Dict[str, Any]]): Parsed structured-output JSON Schema.
+		safety_profile (Optional[str]): UI safety-profile value retained for compatibility.
+		safety_settings (Optional[List[SafetySetting]]): Legacy safety configuration placeholder.
+		file_search_store_names (List[str]): File Search Store resource names.
+		interaction (Optional[Any]): Most recent completed Interaction resource.
+		interaction_id (Optional[str]): Identifier of the most recent Interaction.
+		previous_interaction_id (Optional[str]): Optional server-side conversation predecessor.
+		steps (List[Any]): Model-generated steps returned by the Interactions API.
+		response (Optional[Any]): Raw response retained for application usage accounting.
+		output_text (str): Extracted text returned to the application.
+		grounding_sources (List[Dict[str, Any]]): Sources extracted from annotations and tool
+		steps.
+		generation_config (Dict[str, Any]): Interactions generation configuration.
+		interaction_response_format (Optional[List[Dict[str, Any]]]): Output-format definitions.
+		tool_objects (List[Dict[str, Any]]): Interactions server-side tool definitions.
+		stream (bool): Whether the request uses server-sent event streaming.
+		stream_handler (Optional[Callable[[str], None]]): Application text-delta callback.
+		store (bool): Whether Google stores the Interaction resource.
 	"""
 	
 	use_vertex: Optional[ bool ]
-	http_options: Optional[ HttpOptions ]
+	http_options: Optional[ Dict[ str, Any ] ]
 	client: Optional[ genai.Client ]
 	storage_client: Optional[ storage.Client ]
-	contents: Optional[ Union[ str, List[ str ], List[ Content ] ] ]
+	contents: Optional[ List[ Dict[ str, Any ] ] ]
+	input_steps: List[ Dict[ str, Any ] ]
 	image_uri: Optional[ str ]
 	audio_uri: Optional[ str ]
 	file_path: Optional[ str ]
-	files: Optional[ List[ str ] ]
+	files: List[ str ]
 	content_block: Optional[ str ]
-	context: Optional[ List[ Dict[ str, Any ] ] ]
-	urls: Optional[ List[ str ] ]
-	max_urls: Optional[ int ]
-	response_schema: Optional[ Any ]
+	context: List[ Dict[ str, Any ] ]
+	urls: List[ str ]
+	max_urls: int
+	response_schema: Optional[ Dict[ str, Any ] ]
 	safety_profile: Optional[ str ]
 	safety_settings: Optional[ List[ SafetySetting ] ]
+	file_search_store_names: List[ str ]
+	interaction: Optional[ Any ]
+	interaction_id: Optional[ str ]
+	previous_interaction_id: Optional[ str ]
+	steps: List[ Any ]
+	response: Optional[ Any ]
+	output_text: str
+	grounding_sources: List[ Dict[ str, Any ] ]
+	generation_config: Dict[ str, Any ]
+	interaction_response_format: Optional[ List[ Dict[ str, Any ] ] ]
+	tool_objects: List[ Dict[ str, Any ] ]
+	stream: bool
+	stream_handler: Optional[ Callable[ [ str ], None ] ]
+	store: bool
 	
-	def __init__( self, model: str="gemini-2.5-flash-lite" ) -> None:
-		"""Initialize the Chat wrapper.
+	def __init__( self, model: str = 'gemini-2.5-flash-lite' ) -> None:
+		"""Initialize the Gemini Interactions text wrapper.
 
 		Purpose:
-			Initializes default text-generation state, option placeholders, tool settings,
-			grounding metadata, content history, and response placeholders used by later Chat
-			method calls.
+			Initializes the complete compatibility state required by the Jeni application and
+			the Gemini Interactions API. The constructor performs local state assignment only and
+			does not execute a provider request.
 
 		Args:
 			model (str): Default Gemini text-generation model.
+
+		Returns:
+			None: This method initializes object state through side effects.
 		"""
 		super( ).__init__( )
 		self.gemini_api_key = cfg.GEMINI_API_KEY
 		self.google_api_key = cfg.GOOGLE_API_KEY
-		self.api_version = None
-		self.client = None
-		self.content_config = None
-		self.image_config = None
-		self.function_tool_config = None
-		self.thought_config = None
-		self.genimg_config = None
-		self.tool_objects = None
-		self.tools = [ ]
-		self.response_modalities = [ ]
-		self.files = [ ]
-		self.http_options = { }
-		self.number = None
-		self.candidate_count = None
-		self.model = model
-		self.top_p = None
-		self.top_k = None
-		self.temperature = None
-		self.frequency_penalty = None
-		self.presence_penalty = None
-		self.max_tokens = None
-		self.use_vertex = None
-		self.instructions = None
-		self.media_resolution = None
-		self.tool_choice = None
-		self.contents = None
-		self.grounding_metadata = None
-		self.content_block = None
-		self.context = [ ]
+		self.api_version = 'v1'
 		self.client = None
 		self.storage_client = None
-		self.content_response = None
-		self.image_response = None
+		self.http_options = { 'api_version': self.api_version }
+		self.use_vertex = False
+		self.model = model
+		self.prompt = None
+		self.instructions = None
+		self.number = 1
+		self.candidate_count = 1
+		self.temperature = 0.0
+		self.top_p = 0.0
+		self.top_k = 0
+		self.frequency_penalty = 0.0
+		self.presence_penalty = 0.0
+		self.max_tokens = 0
+		self.stops = [ ]
+		self.response_format = None
+		self.response_mime_type = None
+		self.response_schema = None
+		self.response_modalities = [ ]
+		self.media_resolution = None
+		self.tool_choice = None
+		self.tools = [ ]
+		self.tool_objects = [ ]
+		self.generation_config = { }
+		self.interaction_response_format = None
+		self.safety_profile = None
+		self.safety_settings = None
+		self.include_server_side_tool_invocations = True
+		self.contents = None
+		self.input_steps = [ ]
+		self.content_block = None
+		self.context = [ ]
+		self.urls = [ ]
+		self.max_urls = 0
+		self.files = [ ]
+		self.file_search_store_names = [ ]
 		self.image_uri = None
 		self.audio_uri = None
 		self.file_path = None
-		self.stops = [ ]
-		self.response_mime_type = None
-		self.response_schema = None
-		self.urls = [ ]
-		self.max_urls = None
-		self.safety_profile = None
-		self.safety_settings = None
-		self.file_search_store_names = [ ]
-		self.include_server_side_tool_invocations = None
+		self.interaction = None
+		self.interaction_id = None
+		self.previous_interaction_id = None
+		self.steps = [ ]
+		self.response = None
+		self.content_response = None
+		self.image_response = None
+		self.output_text = ''
+		self.grounding_metadata = None
+		self.grounding_sources = [ ]
+		self.stream = False
+		self.stream_handler = None
+		self.store = False
 	
 	@property
 	def model_options( self ) -> List[ str ]:
-		"""Return supported Gemini text-generation models.
+		"""Return supported Gemini Interactions text models.
 
 		Purpose:
-			Provides model choices for Streamlit controls and documentation.
+			Provides the model identifiers displayed by the Jeni Text, Document Q&A, File Search
+			Stores, and Google Cloud Buckets controls. Existing model identifiers are retained for
+			compatibility while currently supported Interactions models are added.
 
 		Returns:
-			Supported Gemini text-generation model names.
+			List[str]: Supported Gemini text-generation model identifiers.
 		"""
-		return [ "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro",
-			"gemini-3-flash-preview", "gemini-3.1-flash-lite-preview", "gemini-3.1-pro-preview",
-			"gemini-2.0-flash", "gemini-2.0-flash-lite", ]
+		return [ 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite',
+			'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview',
+			'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash',
+			'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', ]
 	
 	@property
 	def tool_options( self ) -> List[ str ]:
-		"""Return supported tool names for text-generation workflows.
+		"""Return supported Interactions server-side tool names.
 
 		Purpose:
-			Provides selectable tool options for UI controls and request builders.
+			Provides the tool identifiers consumed by the Jeni Text mode controls and translated
+			by ``build_tools`` into Interactions API tool definitions.
 
 		Returns:
-			Supported tool names.
+			List[str]: Supported server-side tool identifiers.
 		"""
-		return [ "google_search", "google_maps", "url_context", "file_search", "code_execution", ]
+		return [ 'google_search', 'google_maps', 'url_context', 'file_search', 'code_execution', ]
 	
 	@property
 	def reasoning_options( self ) -> List[ str ]:
-		"""Return supported reasoning-level options.
+		"""Return supported Interactions thinking levels.
 
 		Purpose:
-			Provides selectable thinking-level values for supported Gemini models.
+			Provides the reasoning-level values displayed by Jeni and accepted by the
+			Interactions API generation configuration.
 
 		Returns:
-			Supported reasoning-level option values.
+			List[str]: Supported thinking-level values.
 		"""
-		return [ "THINKING_LEVEL_UNSPECIFIED", "MINIMAL", "LOW", "MEDIUM", "HIGH", ]
+		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH', ]
 	
 	@property
 	def media_options( self ) -> List[ str ]:
-		"""Return supported media-resolution options.
+		"""Return supported media-resolution values.
 
 		Purpose:
-			Provides selectable media-resolution values for multimodal requests.
+			Retains the media-resolution options used by the existing Jeni controls. Text-only
+			Interactions requests preserve this value without sending it as an unsupported
+			top-level parameter.
 
 		Returns:
-			Supported media-resolution option values.
+			List[str]: Supported media-resolution values.
 		"""
-		return [ "media_resolution_high", "media_resolution_medium", "media_resolution_low", ]
+		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low', ]
 	
 	@property
 	def choice_options( self ) -> List[ str ]:
-		"""Return supported tool-choice options.
+		"""Return supported Interactions tool-choice modes.
 
 		Purpose:
-			Provides selectable tool-choice values for request configuration.
+			Provides values accepted by the Interactions API ``tool_choice`` parameter.
 
 		Returns:
-			Supported tool-choice values.
+			List[str]: Supported tool-choice modes.
 		"""
-		return [ "auto", "any", "none", "validated" ]
+		return [ 'auto', 'any', 'none', 'validated' ]
 	
 	@property
 	def include_options( self ) -> List[ str ]:
-		"""Return supported include options.
+		"""Return legacy include options retained for UI compatibility.
 
 		Purpose:
-			Provides selectable include values for workflows that support additional response
-			content.
+			Preserves the option-list contract currently exposed by the Jeni wrapper. Interactions
+			tool calls and citations are returned through typed steps and content annotations
+			instead of the legacy include mechanism.
 
 		Returns:
-			Supported include option values.
+			List[str]: Existing application include-option identifiers.
 		"""
-		return [ "file_search_call.results", "message.input_image.image_url",
-			"message.output_text.logprobs", "reasoning.encrypted_content", ]
+		return [ 'file_search_call.results', 'message.input_image.image_url',
+			'message.output_text.logprobs', 'reasoning.encrypted_content', ]
 	
 	@property
 	def modality_options( self ) -> List[ str ]:
-		"""Return supported response-modality options.
+		"""Return supported output-modality values.
 
 		Purpose:
-			Provides selectable modality values for supported Gemini requests.
+			Provides modality names used to construct Interactions ``response_format`` entries.
 
 		Returns:
-			Supported modality option values.
+			List[str]: Supported output modalities.
 		"""
-		return [ "", "text", "image", "audio" ]
+		return [ '', 'text', 'image', 'audio' ]
 	
 	@property
 	def format_options( self ) -> List[ str ]:
-		"""Return supported response MIME types.
+		"""Return supported text response MIME types.
 
 		Purpose:
-			Provides selectable response-format values for supported Gemini requests.
+			Provides MIME types used by Jeni's response-format control and structured-output
+			configuration.
 
 		Returns:
-			Supported response MIME types.
+			List[str]: Supported text response MIME types.
 		"""
-		return [ "text/plain", "application/json", "text/x.enum", ]
+		return [ 'text/plain', 'application/json', 'text/x.enum' ]
 	
 	def get_supported_tools( self, model: str ) -> List[ str ]:
-		"""Return tool options supported by a model.
+		"""Return tools supported by the selected model.
 
 		Purpose:
-			Builds a model-specific tool list so the UI exposes only compatible options.
+			Builds the model-specific tool list consumed by the Jeni interface while preserving
+			the existing helper contract.
 
 		Args:
-			model (str): Gemini model name.
+			model (str): Gemini model identifier.
 
 		Returns:
-			Supported tool names for the selected model.
+			List[str]: Tool identifiers supported by the selected model.
 
 		Raises:
-			Error: Re-raised after validation or provider exceptions are wrapped and logged.
-			ValueError: Raised when ``model`` is missing.
+			Error: Raised when validation or tool-option construction fails.
 		"""
 		try:
-			throw_if( "model", model )
+			throw_if( 'model', model )
 			self.model_name = str( model ).strip( ).lower( )
-			self.options = [ "google_search", "url_context", "file_search", "code_execution" ]
-			
+			self.options = [ 'google_search', 'url_context', 'file_search', 'code_execution', ]
 			if self.supports_google_maps( self.model_name ):
-				self.options.append( "google_maps" )
+				self.options.append( 'google_maps' )
 			
 			return self.options
 		except Exception as e:
 			exception = Error( e )
-			exception.module = "gemini"
-			exception.cause = "Chat"
-			exception.method = "get_supported_tools(self, model: str) -> List[str]"
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'get_supported_tools( self, model: str ) -> List[ str ]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -437,75 +490,759 @@ class Chat( Gemini ):
 		"""Return whether a model supports Google Maps grounding.
 
 		Purpose:
-			Centralizes feature gating for Google Maps support.
+			Centralizes model-specific Google Maps feature gating for the Jeni tool controls.
 
 		Args:
-			model (str): Gemini model name.
+			model (str): Gemini model identifier.
 
 		Returns:
-			True when the selected model supports Google Maps grounding; otherwise False.
+			bool: True when Google Maps may be exposed for the model; otherwise False.
 
 		Raises:
-			Error: Re-raised after validation or provider exceptions are wrapped and logged.
-			ValueError: Raised when ``model`` is missing.
+			Error: Raised when validation or model comparison fails.
 		"""
 		try:
-			throw_if( "model", model )
-			self.model_name = model.strip( ).lower( )
-			self.maps_models = { "gemini-3.1-pro-preview", "gemini-3.1-flash-lite-preview",
-				"gemini-3-flash-preview", "gemini-2.5-pro", "gemini-2.5-flash",
-				"gemini-2.5-flash-lite", "gemini-2.0-flash", }
+			throw_if( 'model', model )
+			self.model_name = str( model ).strip( ).lower( )
+			self.maps_models = { 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro-preview',
+				'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview',
+				'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', }
 			return self.model_name in self.maps_models
 		except Exception as e:
 			exception = Error( e )
-			exception.module = "gemini"
-			exception.cause = "Chat"
-			exception.method = "supports_google_maps(self, model: str) -> bool"
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'supports_google_maps( self, model: str ) -> bool'
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_urls( self, urls: List[ str ], max_urls: int=10 ) -> List[ str ]:
-		"""Build the URL context list for a text request.
+	def build_urls( self, urls: List[ str ], max_urls: int = 10 ) -> List[ str ]:
+		"""Build the normalized URL-context list.
 
 		Purpose:
-			Normalizes caller-provided URLs, removes blank values, and limits the list to the
-			configured maximum.
+			Removes blank URL values, preserves their original order, removes duplicates, and
+			applies the caller-provided maximum before the values are appended to the request.
 
 		Args:
-			urls (List[str]): Candidate URL strings.
-			max_urls (int): Maximum number of URLs to include.
+			urls (List[str]): Candidate URL values.
+			max_urls (int): Maximum number of URLs to retain.
 
 		Returns:
-			Normalized URL list.
+			List[str]: Normalized and limited URL values.
 
 		Raises:
-			Error: Re-raised after validation or provider exceptions are wrapped and logged.
-			ValueError: Raised when ``max_urls`` is missing.
+			Error: Raised when URL normalization fails.
 		"""
 		try:
-			throw_if( "max_urls", max_urls )
 			self.urls = [ ]
-			
-			for url in urls or [ ]:
+			self.max_urls = max( 0, int( max_urls or 0 ) )
+			self.url_values = urls if isinstance( urls, list ) else [ ]
+			for url in self.url_values:
 				if url is None:
 					continue
 				
-				self.url = url.strip( )
+				self.url = str( url ).strip( )
 				if not self.url:
 					continue
 				
-				self.urls.append( self.url )
+				if self.url not in self.urls:
+					self.urls.append( self.url )
 			
-			self.max_urls = max_urls
-			if self.max_urls is not None:
+			if self.max_urls > 0:
 				self.urls = self.urls[ : self.max_urls ]
 			
 			return self.urls
 		except Exception as e:
 			exception = Error( e )
-			exception.module = "gemini"
-			exception.cause = "Chat"
-			exception.method = "build_urls(self, urls: List[str], max_urls: int=10) -> List[str]"
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_urls( self,  **kwargs ) -> List[ str ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def normalize_context( self, context: List[ Dict[ str, Any ] ] ) -> List[ Dict[ str, Any ] ]:
+		"""Convert Jeni chat history into Interactions input steps.
+
+		Purpose:
+			Translates the existing ``role`` and ``content`` dictionaries stored by Jeni into
+			``user_input`` and ``model_output`` steps accepted by stateless Interactions requests.
+			Unsupported or empty history entries are ignored without modifying the original list.
+
+		Args:
+			context (List[Dict[str, Any]]): Existing Jeni chat-history records.
+
+		Returns:
+			List[Dict[str, Any]]: Interactions-compatible history steps.
+
+		Raises:
+			Error: Raised when context normalization fails.
+		"""
+		try:
+			self.context = context if isinstance( context, list ) else [ ]
+			self.history_steps: List[ Dict[ str, Any ] ] = [ ]
+			for message in self.context:
+				if not isinstance( message, dict ):
+					continue
+				
+				self.role = str( message.get( 'role', '' ) or '' ).strip( ).lower( )
+				self.message_content = message.get( 'content', '' )
+				if isinstance( self.message_content, list ):
+					self.message_text = '\n'.join(
+						str( value ).strip( ) for value in self.message_content if
+						value is not None and str( value ).strip( ) )
+				else:
+					self.message_text = str( self.message_content or '' ).strip( )
+				
+				if not self.message_text:
+					continue
+				
+				if self.role in ('assistant', 'model'):
+					self.step_type = 'model_output'
+				else:
+					self.step_type = 'user_input'
+				
+				self.history_steps.append( { 'type': self.step_type,
+					'content': [ { 'type': 'text', 'text': self.message_text, }, ], } )
+			
+			return self.history_steps
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'normalize_context( self, **kwargs) -> List[ Dict[ str, Any ] ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_input( self, prompt: str, content: str, context: List[ Dict[ str, Any ] ],
+		urls: List[ str ], max_urls: int ) -> List[ Dict[ str, Any ] ]:
+		"""Build the complete stateless Interactions input timeline.
+
+		Purpose:
+			Combines normalized Jeni history with the current application content, URL references,
+			and user prompt. The resulting list preserves conversation order and appends exactly
+			one current ``user_input`` step.
+
+		Args:
+			prompt (str): Current user prompt.
+			content (str): Optional application content prepended to the current prompt.
+			context (List[Dict[str, Any]]): Existing Jeni chat history.
+			urls (List[str]): Candidate URL-context values.
+			max_urls (int): Maximum URL count.
+
+		Returns:
+			List[Dict[str, Any]]: Complete Interactions input-step list.
+
+		Raises:
+			Error: Raised when input construction fails.
+		"""
+		try:
+			throw_if( 'prompt', prompt )
+			self.prompt = str( prompt ).strip( )
+			self.content_block = str( content or '' ).strip( )
+			self.input_steps = self.normalize_context( context )
+			self.urls = self.build_urls( urls, max_urls )
+			self.current_parts: List[ str ] = [ ]
+			if self.content_block:
+				self.current_parts.append( self.content_block )
+			
+			if self.urls:
+				self.current_parts.append(
+					'Reference URLs:\n' + '\n'.join( f'- {url}' for url in self.urls ) )
+			
+			self.current_parts.append( self.prompt )
+			self.current_text = '\n\n'.join( self.current_parts ).strip( )
+			self.input_steps.append( { 'type': 'user_input',
+				'content': [ { 'type': 'text', 'text': self.current_text, }, ], } )
+			
+			self.contents = self.input_steps
+			return self.input_steps
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_input( self, **kwargs) -> List[ Dict[ str, Any ] ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_generation_config( self, temperature: float, top_p: float, top_k: int,
+		max_tokens: int, stops: List[ str ], reasoning: str ) -> Dict[ str, Any ]:
+		"""Build the Interactions generation configuration.
+
+		Purpose:
+			Converts Jeni inference controls into the generation fields supported by Gemini
+			Interactions. Zero-valued application defaults are treated as unset values rather
+			than overriding model defaults.
+
+		Args:
+			temperature (float): Sampling-temperature value.
+			top_p (float): Top-p sampling value.
+			top_k (int): Top-k sampling value.
+			max_tokens (int): Maximum output-token count.
+			stops (List[str]): Stop sequences.
+			reasoning (str): Thinking-level value.
+
+		Returns:
+			Dict[str, Any]: Interactions generation configuration.
+
+		Raises:
+			Error: Raised when generation configuration construction fails.
+		"""
+		try:
+			self.temperature = float( temperature or 0.0 )
+			self.top_p = float( top_p or 0.0 )
+			self.top_k = int( top_k or 0 )
+			self.max_tokens = int( max_tokens or 0 )
+			self.stops = [ str( value ).strip( ) for value in
+				(stops if isinstance( stops, list ) else [ ]) if
+				value is not None and str( value ).strip( ) ]
+			self.reasoning = str( reasoning or '' ).strip( ).lower( )
+			self.generation_config = { }
+			if self.temperature > 0.0:
+				self.generation_config[ 'temperature' ] = self.temperature
+			
+			if self.top_p > 0.0:
+				self.generation_config[ 'top_p' ] = self.top_p
+			
+			if self.top_k > 0:
+				self.generation_config[ 'top_k' ] = self.top_k
+			
+			if self.max_tokens > 0:
+				self.generation_config[ 'max_output_tokens' ] = self.max_tokens
+			
+			if self.stops:
+				self.generation_config[ 'stop_sequences' ] = self.stops
+			
+			if self.reasoning and self.reasoning not in ('thinking_level_unspecified',
+				'unspecified',):
+				self.generation_config[ 'thinking_level' ] = self.reasoning
+			
+			return self.generation_config
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_generation_config( self, **kwars ) -> Dict[ str, Any ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def parse_response_schema( self, response_schema: Any ) -> Optional[ Dict[ str, Any ] ]:
+		"""Parse a structured-output JSON Schema.
+
+		Purpose:
+			Accepts the existing Jeni response-schema value as a dictionary or JSON string and
+			converts it into the mapping required by the Interactions text response format.
+
+		Args:
+			response_schema (Any): Structured-output schema value.
+
+		Returns:
+			Optional[Dict[str, Any]]: Parsed JSON Schema, or None when no schema is supplied.
+
+		Raises:
+			Error: Raised when a nonblank schema cannot be parsed as a JSON object.
+		"""
+		try:
+			self.response_schema = None
+			if response_schema is None:
+				return None
+			
+			if isinstance( response_schema, dict ):
+				self.response_schema = response_schema
+				return self.response_schema
+			
+			self.schema_text = str( response_schema ).strip( )
+			if not self.schema_text:
+				return None
+			
+			self.schema_value = json.loads( self.schema_text )
+			if not isinstance( self.schema_value, dict ):
+				raise ValueError( 'The response schema must contain a JSON object.' )
+			
+			self.response_schema = self.schema_value
+			return self.response_schema
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'parse_response_schema( self, **kwargs ) -> Dict[ str, Any ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_response_format( self, response_format: str, response_schema: Any,
+		modalities: List[ str ] ) -> List[ Dict[ str, Any ] ]:
+		"""Build Interactions output-format definitions.
+
+		Purpose:
+			Converts Jeni MIME-type, JSON Schema, and modality controls into the polymorphic
+			``response_format`` structure used by the current Interactions API.
+
+		Args:
+			response_format (str): Requested text MIME type.
+			response_schema (Any): Optional JSON Schema dictionary or JSON string.
+			modalities (List[str]): Requested output modalities.
+
+		Returns:
+			List[Dict[str, Any]]: Interactions response-format entries.
+
+		Raises:
+			Error: Raised when response-format construction fails.
+		"""
+		try:
+			self.response_format = str( response_format or '' ).strip( )
+			self.response_mime_type = self.response_format or 'text/plain'
+			self.response_schema = self.parse_response_schema( response_schema )
+			self.response_modalities = [ str( value ).strip( ).lower( ) for value in
+				(modalities if isinstance( modalities, list ) else [ ]) if
+				value is not None and str( value ).strip( ) ]
+			
+			if not self.response_modalities:
+				self.response_modalities = [ 'text' ]
+			
+			self.interaction_response_format = [ ]
+			
+			if 'text' in self.response_modalities:
+				self.text_format: Dict[ str, Any ] = { 'type': 'text',
+					'mime_type': self.response_mime_type, }
+				
+				if self.response_schema is not None:
+					self.text_format[ 'mime_type' ] = 'application/json'
+					self.text_format[ 'schema' ] = self.response_schema
+				
+				self.interaction_response_format.append( self.text_format )
+			
+			if 'image' in self.response_modalities:
+				self.interaction_response_format.append( { 'type': 'image' } )
+			
+			if 'audio' in self.response_modalities:
+				self.interaction_response_format.append( { 'type': 'audio' } )
+			
+			if not self.interaction_response_format:
+				self.interaction_response_format.append(
+					{ 'type': 'text', 'mime_type': self.response_mime_type, } )
+			
+			return self.interaction_response_format
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_response_format( self, **kwargs ) -> List[ Dict[ str, Any ]]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_tools( self, tools: List[ str ], urls: List[ str ],
+		file_search_store_names: List[ str ] ) -> List[ Dict[ str, Any ] ]:
+		"""Build Interactions server-side tool definitions.
+
+		Purpose:
+			Translates Jeni tool names into Interactions API tool dictionaries. URL Context is
+			enabled when selected or when URLs are supplied. File Search is enabled when one or
+			more File Search Store resource names are provided.
+
+		Args:
+			tools (List[str]): Tool identifiers selected by the caller.
+			urls (List[str]): Normalized URL-context values.
+			file_search_store_names (List[str]): File Search Store resource names.
+
+		Returns:
+			List[Dict[str, Any]]: Interactions server-side tool definitions.
+
+		Raises:
+			Error: Raised when tool-definition construction fails.
+		"""
+		try:
+			self.tools = [ str( value ).strip( ).lower( ) for value in
+				(tools if isinstance( tools, list ) else [ ]) if
+				value is not None and str( value ).strip( ) ]
+			self.file_search_store_names = [ str( value ).strip( ) for value in
+				(file_search_store_names if isinstance( file_search_store_names, list ) else [ ])
+				if value is not None and str( value ).strip( ) ]
+			self.tool_objects = [ ]
+			
+			if 'google_search' in self.tools:
+				self.tool_objects.append( { 'type': 'google_search' } )
+			
+			if 'google_maps' in self.tools and self.supports_google_maps( self.model ):
+				self.tool_objects.append( { 'type': 'google_maps' } )
+			
+			if 'url_context' in self.tools or urls:
+				self.tool_objects.append( { 'type': 'url_context' } )
+			
+			if 'code_execution' in self.tools:
+				self.tool_objects.append( { 'type': 'code_execution' } )
+			
+			if self.file_search_store_names:
+				self.tool_objects.append( { 'type': 'file_search',
+					'file_search_store_names': self.file_search_store_names, } )
+			
+			return self.tool_objects
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'build_tools( self, **kwargs) -> List[ Dict[ str, Any ] ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def normalize_value( self, value: Any ) -> Any:
+		"""Convert an SDK value into standard Python data.
+
+		Purpose:
+			Normalizes Pydantic SDK objects, dictionaries, lists, tuples, and scalar values for
+			grounding-source extraction without changing provider response state.
+
+		Args:
+			value (Any): SDK or Python value to normalize.
+
+		Returns:
+			Any: Equivalent standard Python value.
+		"""
+		if value is None or isinstance( value, (str, int, float, bool) ):
+			return value
+		
+		if isinstance( value, dict ):
+			return { key: self.normalize_value( item ) for key, item in value.items( ) }
+		
+		if isinstance( value, (list, tuple) ):
+			return [ self.normalize_value( item ) for item in value ]
+		
+		if hasattr( value, 'model_dump' ):
+			return self.normalize_value( value.model_dump( ) )
+		
+		return str( value )
+	
+	def capture_interaction( self, interaction: Any ) -> None:
+		"""Capture a completed unary Interaction.
+
+		Purpose:
+			Stores the raw Interaction, identifier, steps, output text, and grounding sources on
+			the wrapper members consumed by the Jeni application.
+
+		Args:
+			interaction (Any): Completed Gemini Interaction resource.
+
+		Returns:
+			None: This method updates wrapper state through side effects.
+
+		Raises:
+			Error: Raised when response-state extraction fails.
+		"""
+		try:
+			throw_if( 'interaction', interaction )
+			self.interaction = interaction
+			self.response = interaction
+			self.content_response = interaction
+			self.interaction_id = getattr( interaction, 'id', None )
+			self.steps = list( getattr( interaction, 'steps', None ) or [ ] )
+			self.output_text = str( getattr( interaction, 'output_text', '' ) or '' ).strip( )
+			self.grounding_sources = self.extract_grounding_sources( interaction )
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'capture_interaction( self, interaction: Any ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def extract_grounding_sources( self, interaction: Any ) -> List[ Dict[ str, Any ] ]:
+		"""Extract grounding citations from Interaction steps.
+
+		Purpose:
+			Collects URL citations, File Search citations, and search-result metadata from
+			``model_output`` annotations and server-side tool-result steps. Duplicate sources are
+			removed while preserving provider order.
+
+		Args:
+			interaction (Any): Gemini Interaction containing model-generated steps.
+
+		Returns:
+			List[Dict[str, Any]]: Normalized grounding-source records.
+
+		Raises:
+			Error: Raised when grounding-source extraction fails.
+		"""
+		try:
+			self.source_values: List[ Dict[ str, Any ] ] = [ ]
+			self.source_keys: set[ tuple[ str, str, str ] ] = set( )
+			self.interaction_steps = getattr( interaction, 'steps', None ) or [ ]
+			for step in self.interaction_steps:
+				self.step_type = str( getattr( step, 'type', '' ) or '' ).strip( )
+				
+				if self.step_type == 'model_output':
+					self.step_content = getattr( step, 'content', None ) or [ ]
+					for block in self.step_content:
+						self.annotations = getattr( block, 'annotations', None ) or [ ]
+						for annotation in self.annotations:
+							self.annotation_value = self.normalize_value( annotation )
+							if not isinstance( self.annotation_value, dict ):
+								continue
+							
+							self.append_source( source=self.annotation_value, default_type=str(
+								self.annotation_value.get( 'type', 'citation' ) ), )
+				
+				elif self.step_type in ('google_search_result', 'file_search_result',
+					'url_context_result', 'google_maps_result',):
+					self.result_value = self.normalize_value( getattr( step, 'result', None ) )
+					
+					if isinstance( self.result_value, list ):
+						for source in self.result_value:
+							if isinstance( source, dict ):
+								self.append_source( source=source, default_type=self.step_type, )
+					
+					elif isinstance( self.result_value, dict ):
+						self.append_source( source=self.result_value,
+							default_type=self.step_type, )
+			
+			return self.source_values
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'extract_grounding_sources( self, **kwargs ) -> List[Dict[str, Any]]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def append_source( self, source: Dict[ str, Any ], default_type: str ) -> None:
+		"""Append one normalized grounding source.
+
+		Purpose:
+			Converts provider-specific annotation and tool-result fields into the stable source
+			shape consumed by Jeni and prevents duplicate entries.
+
+		Args:
+			source (Dict[str, Any]): Provider source or annotation mapping.
+			default_type (str): Source type used when the mapping omits one.
+
+		Returns:
+			None: This method updates ``grounding_sources`` construction state.
+		"""
+		self.source_type = str( source.get( 'type', default_type ) or default_type ).strip( )
+		self.source_title = str(
+			source.get( 'title' ) or source.get( 'display_name' ) or source.get(
+				'file_name' ) or source.get( 'name' ) or '' ).strip( )
+		self.source_url = str( source.get( 'url' ) or source.get( 'uri' ) or source.get(
+			'source_url' ) or '' ).strip( )
+		self.source_text = str(
+			source.get( 'text' ) or source.get( 'snippet' ) or source.get( 'quote' ) or source.get(
+				'search_suggestions' ) or '' ).strip( )
+		self.source_file_id = str(
+			source.get( 'file_id' ) or source.get( 'file_name' ) or source.get(
+				'document_name' ) or '' ).strip( )
+		
+		if not any( (self.source_title, self.source_url, self.source_text, self.source_file_id,) ):
+			return
+		
+		self.source_key = (self.source_type, self.source_url or self.source_file_id,
+			self.source_text,)
+		
+		if self.source_key in self.source_keys:
+			return
+		
+		self.source_keys.add( self.source_key )
+		self.source_values.append( { 'type': self.source_type, 'title': self.source_title or None,
+			'snippet': self.source_text or None, 'url': self.source_url or None,
+			'files_id': self.source_file_id or None, 'metadata': source, } )
+	
+	def get_grounding_sources( self ) -> List[ Dict[ str, Any ] ]:
+		"""Return sources from the most recent Interaction.
+
+		Purpose:
+			Restores the application-facing source accessor called by Jeni Text mode after a
+			grounded Gemini response.
+
+		Returns:
+			List[Dict[str, Any]]: Grounding sources extracted from the latest response.
+		"""
+		return list( self.grounding_sources )
+	
+	def generate_text_stream( self ) -> str:
+		"""Execute a streaming Interactions text request.
+
+		Purpose:
+			Submits the validated request using Interactions server-sent events, forwards each text
+			delta to the existing Jeni callback, accumulates the complete answer, and retains the
+			final Interaction metadata used by token accounting.
+
+		Returns:
+			str: Complete generated text accumulated from stream deltas.
+
+		Raises:
+			Error: Raised when streaming execution or event handling fails.
+		"""
+		try:
+			self.stream_response = self.client.interactions.create( model=self.model,
+				input=self.input_steps, system_instruction=self.instructions or None,
+				tools=self.tool_objects or None, generation_config=self.generation_config or None,
+				response_format=self.interaction_response_format,
+				tool_choice=self.tool_choice or None, stream=True, store=self.store, )
+			
+			self.text_chunks: List[ str ] = [ ]
+			self.streaming_interaction = None
+			for event in self.stream_response:
+				self.event_type = str( getattr( event, 'event_type', '' ) or '' ).strip( )
+				if self.event_type == 'step.delta':
+					self.delta = getattr( event, 'delta', None )
+					self.delta_type = str( getattr( self.delta, 'type', '' ) or '' ).strip( )
+					if self.delta_type == 'text':
+						self.delta_text = str( getattr( self.delta, 'text', '' ) or '' )
+						if self.delta_text:
+							self.text_chunks.append( self.delta_text )
+							if callable( self.stream_handler ):
+								self.stream_handler( self.delta_text )
+				
+				elif self.event_type == 'interaction.completed':
+					self.streaming_interaction = getattr( event, 'interaction', None, )
+				
+				elif self.event_type == 'error':
+					self.stream_error = getattr( event, 'error', None )
+					self.stream_message = str( getattr( self.stream_error, 'message',
+						'' ) or self.stream_error or 'Gemini streaming request failed.' )
+					raise RuntimeError( self.stream_message )
+			
+			self.output_text = ''.join( self.text_chunks ).strip( )
+			if self.streaming_interaction is not None:
+				self.interaction = self.streaming_interaction
+				self.response = self.streaming_interaction
+				self.content_response = self.streaming_interaction
+				self.interaction_id = getattr( self.streaming_interaction, 'id', None, )
+				self.steps = list( getattr( self.streaming_interaction, 'steps', None ) or [ ] )
+			else:
+				self.response = self.stream_response
+				self.content_response = self.stream_response
+			
+			self.grounding_sources = [ ]
+			return self.output_text
+		
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'generate_text_stream( self ) -> str'
+			Logger( ).write( exception )
+			raise exception
+	
+	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite', number: int = 1,
+		temperature: float = 0.0, top_p: float = 0.0, top_k: int = 0, frequency: float = 0.0,
+		presence: float = 0.0, max_tokens: int = 0, stops: Optional[ List[ str ] ] = None,
+		instruct: str = '', response_format: str = '', tools: Optional[ List[ str ] ] = None,
+		tool_choice: Optional[ str ] = None, reasoning: str = '',
+		modalities: Optional[ List[ str ] ] = None, media_resolution: str = '',
+		context: Optional[ List[ Dict[ str, Any ] ] ] = None, content: str = '',
+		urls: Optional[ List[ str ] ] = None, max_urls: int = 0, response_schema: Any = '',
+		safety_profile: str = '', file_search_store_names: Optional[ List[ str ] ] = None,
+		stream: bool = False, stream_handler: Optional[ Callable[ [ str ], None ] ] = None ) -> (
+			str):
+		"""Generate text through the Gemini Interactions API.
+
+		Purpose:
+			Preserves the complete ``generate_text`` contract currently called by the Jeni
+			application. The method validates and assigns every argument to wrapper state, builds
+			stateless Interactions input and configuration objects, executes unary or streaming
+			generation, retains the raw response, and returns normalized text.
+
+		Args:
+			prompt (str): Current user prompt.
+			model (str): Gemini model identifier.
+			number (int): Candidate-count value retained for application compatibility.
+			temperature (float): Sampling-temperature value.
+			top_p (float): Top-p sampling value.
+			top_k (int): Top-k sampling value.
+			frequency (float): Frequency-penalty value retained for compatibility.
+			presence (float): Presence-penalty value retained for compatibility.
+			max_tokens (int): Maximum output-token count.
+			stops (Optional[List[str]]): Stop sequences.
+			instruct (str): System instruction text.
+			response_format (str): Requested text MIME type.
+			tools (Optional[List[str]]): Server-side tool identifiers.
+			tool_choice (Optional[str]): Tool-selection mode.
+			reasoning (str): Thinking-level value.
+			modalities (Optional[List[str]]): Requested output modalities.
+			media_resolution (str): Media-resolution value retained for compatibility.
+			context (Optional[List[Dict[str, Any]]]): Existing Jeni chat history.
+			content (str): Additional application content.
+			urls (Optional[List[str]]): URL-context values.
+			max_urls (int): Maximum number of URLs.
+			response_schema (Any): Optional JSON Schema mapping or JSON string.
+			safety_profile (str): Safety-profile value retained for compatibility.
+			file_search_store_names (Optional[List[str]]): File Search Store resource names.
+			stream (bool): Whether to stream text deltas.
+			stream_handler (Optional[Callable[[str], None]]): Text-delta callback.
+
+		Returns:
+			str: Generated response text.
+
+		Raises:
+			Error: Raised when validation, request construction, or provider execution fails.
+		"""
+		try:
+			throw_if( 'prompt', prompt )
+			throw_if( 'model', model )
+			self.prompt = str( prompt ).strip( )
+			self.model = str( model ).strip( )
+			self.number = max( 1, int( number or 1 ) )
+			self.candidate_count = self.number
+			self.temperature = float( temperature or 0.0 )
+			self.top_p = float( top_p or 0.0 )
+			self.top_k = int( top_k or 0 )
+			self.frequency_penalty = float( frequency or 0.0 )
+			self.presence_penalty = float( presence or 0.0 )
+			self.max_tokens = int( max_tokens or 0 )
+			self.stops = stops if isinstance( stops, list ) else [ ]
+			self.instructions = str( instruct or '' ).strip( )
+			self.response_format = str( response_format or '' ).strip( )
+			self.tools = tools if isinstance( tools, list ) else [ ]
+			self.tool_choice = str( tool_choice or '' ).strip( ).lower( ) or None
+			self.reasoning = str( reasoning or '' ).strip( )
+			self.response_modalities = (modalities if isinstance( modalities, list ) else [ ])
+			self.media_resolution = str( media_resolution or '' ).strip( )
+			self.context = context if isinstance( context, list ) else [ ]
+			self.content_block = str( content or '' ).strip( )
+			self.urls = urls if isinstance( urls, list ) else [ ]
+			self.max_urls = max( 0, int( max_urls or 0 ) )
+			self.safety_profile = str( safety_profile or '' ).strip( )
+			self.file_search_store_names = (
+				file_search_store_names if isinstance( file_search_store_names, list ) else [ ])
+			self.stream = bool( stream )
+			self.stream_handler = stream_handler
+			self.store = False
+			self.previous_interaction_id = None
+			self.gemini_api_key =cfg.GEMINI_API_KEY or cfg.GOOGLE_API_KEY
+			self.client = genai.Client( api_key=self.gemini_api_key,
+				http_options=types.HttpOptions( api_version=self.api_version ), )
+			self.input_steps = self.build_input( prompt=self.prompt, content=self.content_block,
+				context=self.context, urls=self.urls, max_urls=self.max_urls, )
+			self.generation_config = self.build_generation_config( temperature=self.temperature,
+				top_p=self.top_p, top_k=self.top_k, max_tokens=self.max_tokens, stops=self.stops,
+				reasoning=self.reasoning, )
+			self.interaction_response_format = self.build_response_format(
+				response_format=self.response_format, response_schema=response_schema,
+				modalities=self.response_modalities, )
+			self.tool_objects = self.build_tools( tools=self.tools, urls=self.urls,
+				file_search_store_names=self.file_search_store_names, )
+			
+			if self.stream:
+				return self.generate_text_stream( )
+			
+			self.interaction = self.client.interactions.create( model=self.model,
+				input=self.input_steps, system_instruction=self.instructions or None,
+				tools=self.tool_objects or None, generation_config=self.generation_config or None,
+				response_format=self.interaction_response_format,
+				tool_choice=self.tool_choice or None, stream=False, store=self.store, )
+			
+			self.capture_interaction( self.interaction )
+			if not self.output_text:
+				raise ValueError( 'Gemini returned an empty Interactions response.' )
+			
+			return self.output_text
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = 'generate_text( self, **Kwargs ) -> str'
 			Logger( ).write( exception )
 			raise exception
 
@@ -3772,8 +4509,7 @@ class CloudBuckets( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'web_search( self, prompt, model ) -> Optional[ str ]'
 			Logger( ).write( exception )
-			error = ErrorDialog( exception )
-			error.show( )
+			raise exception
 	
 	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
 		temperature: float=None, top_p: float=None, frequency: float=None,
@@ -3827,8 +4563,7 @@ class CloudBuckets( Gemini ):
 			exception.cause = 'Chat'
 			exception.method = 'search_maps( self, prompt, model ) -> Optional[ str ]'
 			Logger( ).write( exception )
-			error = ErrorDialog( exception )
-			error.show( )
+			raise exception
 	
 	def delete( self, bucket: str, name: str ):
 		"""Delete.
