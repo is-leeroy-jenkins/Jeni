@@ -7283,7 +7283,7 @@ elif mode == 'Files':
 			st.rerun( )
 
 # ======================================================================================
-# FILE SEARCH STORES MODE
+# FILE SEARCH MODE
 # ======================================================================================
 elif mode == 'File Search Stores':
 	stores_model = st.session_state.get( 'stores_model', '' )
@@ -7553,8 +7553,8 @@ elif mode == 'File Search Stores':
 				raise ValueError( 'Gemini returned an empty File Search response.' )
 			
 			structured_history = chat.get_structured_history( )
-			st.session_state[ 'stores_input' ] = (structured_history if structured_history else
-			                                      [ ])
+			st.session_state[ 'stores_input' ] = (
+				structured_history if structured_history else [ ])
 			update_counters( getattr( chat, 'response', None ) )
 			return response_text
 		except Exception as e:
@@ -7849,8 +7849,8 @@ elif mode == 'File Search Stores':
 		if (stores_prompt is not None and str( stores_prompt ).strip( )):
 			stores_prompt = str( stores_prompt ).strip( )
 			active_store_id = str( st.session_state.get( 'stores_id', '' ) or '' ).strip( )
-			st.session_state[ 'stores_messages' ].append(
-				{ 'role': 'user', 'content': stores_prompt, } )
+			st.session_state[ 'stores_messages' ].append( { 'role': 'user',
+				'content': stores_prompt, } )
 			
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Searching the selected File Search Store…' ):
@@ -7881,8 +7881,8 @@ elif mode == 'File Search Stores':
 						else:
 							st.session_state[ 'last_sources' ] = [ ]
 						
-						st.session_state[ 'stores_messages' ].append(
-							{ 'role': 'assistant', 'content': response_text, } )
+						st.session_state[ 'stores_messages' ].append( { 'role': 'assistant',
+							'content': response_text, } )
 						
 						if st.session_state.get( 'stores_stream', False ):
 							st.session_state[ 'stores_input' ] = [ ]
@@ -9249,11 +9249,11 @@ st.markdown( """
         bottom: 0;
         left: 0;
         width: 100%;
-        background-color: rgba(17, 17, 17, 0.95);
-        border-top: 1px solid #2a2a2a;
+		background-color: rgba(27, 27, 27, 0.95);
+		border-top: 1px solid #4d4d4d;
         padding: 10px 16px;
         font-size: 0.80rem;
-        color: #35618c;
+		color: #4aa2f7;
         z-index: 1000;
     }
     .boo-status-inner {
