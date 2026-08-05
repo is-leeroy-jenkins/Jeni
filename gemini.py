@@ -1393,7 +1393,7 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'generate_text( self, **kwargs ) -> str'
+			exception.method = 'generate_text( self, prompt: str, model: str, number: int, temperature: float, top_p: float, top_k: int, frequency: float, presence: float, max_tokens: int, stops: Optional[List[str]], instruct: str, response_format: str, tools: Optional[List[str]], tool_choice: Optional[str], reasoning: str, modalities: Optional[List[str]], media_resolution: str, context: Optional[List[Dict[str, Any]]], content: str, urls: Optional[List[str]], max_urls: int, response_schema: Any, safety_profile: str, file_search_store_names: Optional[List[str]], stream: bool, stream_handler: Optional[Callable[[str], None]] ) -> str'
 			Logger( ).write( exception )
 			raise exception
 
@@ -1775,7 +1775,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'normalize_response_modalities( self, **kwargs ) -> List[ str ]'
+			exception.method = 'normalize_response_modalities( self, response_modalities: Optional[str], image_only: bool ) -> List[str]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -1855,7 +1855,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'build_image_input( self, **kwargs) -> List[ Dict[ str, Any ] ]'
+			exception.method = 'build_image_input( self, prompt: str, path: Optional[str] ) -> List[Dict[str, Any]]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -1897,7 +1897,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'build_generation_config( self, **kwargs ) -> Dict[ str, Any ]'
+			exception.method = 'build_generation_config( self, temperature: Optional[float], top_p: Optional[float], max_tokens: Optional[int] ) -> Dict[str, Any]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -1959,7 +1959,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'build_response_format( self, **kwargs ) -> Any'
+			exception.method = 'build_response_format( self, response_modalities: Optional[str], image_only: bool, aspect: Optional[str], resolution: Optional[str], output_mime_type: Optional[str] ) -> Any'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -2009,7 +2009,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'build_grounding_tools( self, **kwargs ) -> List[Dict[str, Any]]'
+			exception.method = 'build_grounding_tools( self, grounded: bool, image_search: bool ) -> List[Dict[str, Any]]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -2218,7 +2218,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'execute_interaction( self, **kwargs ) -> Any'
+			exception.method = 'execute_interaction( self, prompt: str, model: str, path: Optional[str], aspect: Optional[str], number: Optional[int], temperature: Optional[float], top_p: Optional[float], frequency: Optional[float], presence: Optional[float], max_tokens: Optional[int], resolution: Optional[str], instruct: Optional[str], output_mime_type: Optional[str], response_modalities: Optional[str], image_only: bool, grounded: bool, image_search: bool ) -> Any'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -2322,7 +2322,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'generate( self, **kwargs ) -> Optional[ PIL.Image.Image ]'
+			exception.method = 'generate( self, prompt: str, model: str, aspect: str, number: int, temperature: float, top_p: float, frequency: float, presence: float, max_tokens: int, resolution: str, instruct: str, output_mime_type: str, response_modalities: str, grounded: bool, image_search: bool ) -> Optional[PIL.Image.Image]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -2378,7 +2378,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'analyze( self, **kwargs ) -> Optional[ str ]'
+			exception.method = 'analyze( self, prompt: str, path: str, model: str, aspect: str, number: int, temperature: float, top_p: float, frequency: float, presence: float, max_tokens: int, resolution: str, instruct: str, output_mime_type: str, response_modalities: str, grounded: bool, image_search: bool ) -> Optional[str]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -2434,7 +2434,7 @@ class Images( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'edit( self, **kwargs ) -> Optional[ PIL.Image.Image ]'
+			exception.method = 'edit( self, prompt: str, path: str, model: str, aspect: str, number: int, temperature: float, top_p: float, frequency: float, presence: float, max_tokens: int, resolution: str, instruct: str, output_mime_type: str, response_modalities: str, grounded: bool, image_search: bool ) -> Optional[PIL.Image.Image]'
 			Logger( ).write( exception )
 			raise exception
 
@@ -2607,7 +2607,7 @@ class Embeddings( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
-			exception.method = 'normalize_contents( self, **kwargs ) -> str | List[ str ]'
+			exception.method = 'normalize_contents( self, text: str | List[str] ) -> str | List[str]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -2654,7 +2654,7 @@ class Embeddings( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
-			exception.method = ('build_embedding_config( self, **kwargs) -> EmbedContentConfig')
+			exception.method = 'build_embedding_config( self, model: str, dimensions: int, task_type: str, title: str ) -> EmbedContentConfig'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -2757,7 +2757,7 @@ class Embeddings( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Embeddings'
-			exception.method = 'create( self, **kwargs)  -> Optional[ List[ float ] ]'
+			exception.method = 'create( self, text: str | List[str], model: str, dimensions: int, task_type: str, title: str, encoding_format: str ) -> Optional[List[float] | List[List[float]]]'
 			Logger( ).write( exception )
 			raise exception
 
@@ -3156,7 +3156,7 @@ class TTS( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'TTS'
-			exception.method = 'create_speech( self, **kwargs ) -> bytes | str | None'
+			exception.method = 'create_speech( self, text: str, filepath: str, model: str, format: str, speed: float, voice: str, frequency: float, presense: float, max_tokens: int, instruct: str, temperature: float, top_p: float ) -> bytes | str | None'
 			Logger( ).write( exception )
 			raise exception
 
@@ -3420,7 +3420,7 @@ class Transcription( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Transcription'
-			exception.method = 'build_generation_config( self, **kwargs ) -> Dict[ str, Any ]'
+			exception.method = 'build_generation_config( self, temperature: float, top_p: float, max_tokens: int ) -> Dict[str, Any]'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -3514,7 +3514,7 @@ class Transcription( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Transcription'
-			exception.method = 'transcribe( self, **kwargsr ) -> str'
+			exception.method = 'transcribe( self, path: str, model: str, language: str, mime_type: str, temperature: float, top_p: float, frequency: float, presence: float, max_tokens: int, start_time: float, end_time: float, instruct: str ) -> str'
 			Logger( ).write( exception )
 			raise exception
 
@@ -3729,7 +3729,7 @@ class Translation( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Translation'
-			exception.method = 'build_prompt( self, **kwargs ) -> str'
+			exception.method = 'build_prompt( self, target_language: str, source_language: str, start_time: float, end_time: float ) -> str'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -3867,7 +3867,7 @@ class Translation( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Translation'
-			exception.method = ('translate( self, **kwargs ) -> str')
+			exception.method = 'translate( self, path: str, target_language: str, model: str, source_language: str, mime_type: str, temperature: float, top_p: float, frequency: float, presence: float, max_tokens: int, start_time: float, end_time: float, instruct: str ) -> str'
 			Logger( ).write( exception )
 			raise exception
 
@@ -3889,8 +3889,7 @@ class Files( Gemini ):
 		display_name (Optional[str]): Uploaded file display name.
 		mime_type (Optional[str]): Active file MIME type.
 		file_path (Optional[str]): Active local file path.
-		file_list (List[str]): Google Cloud Storage object names returned by the latest list
-		operation.
+		file_list (List[str]): Google Cloud Storage object names returned by the latest list operation.
 		file_paths (List[str]): Local paths used by a multi-document request.
 		file_lists (List[File]): Uploaded Gemini file resources used by a multi-document request.
 		response (Optional[Any]): Most recent Files API or Interactions response.
@@ -3899,7 +3898,7 @@ class Files( Gemini ):
 		collections (Dict[str, str]): Compatibility collection mapping.
 		documents (Dict[str, str]): Compatibility document mapping.
 	"""
-	
+
 	client: Optional[ genai.Client ]
 	storage_client: Optional[ storage.Client ]
 	project_id: Optional[ str ]
@@ -3917,7 +3916,7 @@ class Files( Gemini ):
 	use_vertex: bool
 	collections: Dict[ str, str ]
 	documents: Dict[ str, str ]
-	
+
 	def __init__( self, model: str = 'gemini-3.6-flash' ) -> None:
 		"""Initialize the Files wrapper.
 
@@ -3959,7 +3958,7 @@ class Files( Gemini ):
 		self.generation_config = { }
 		self.tool_config = [ ]
 		self.grounding_sources = [ ]
-	
+
 	@property
 	def file_options( self ) -> List[ str ]:
 		"""Return cached file resource names.
@@ -3968,7 +3967,7 @@ class Files( Gemini ):
 			List[str]: Cached Gemini file resource names.
 		"""
 		return list( self.files )
-	
+
 	@property
 	def model_options( self ) -> List[ str ]:
 		"""Return supported document models.
@@ -3976,11 +3975,11 @@ class Files( Gemini ):
 		Returns:
 			List[str]: Supported Gemini model identifiers.
 		"""
-		return [ 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite',
-			'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-2.5-pro',
-			'gemini-2.5-flash',
-			'gemini-2.5-flash-lite' ]
-	
+		return [ 'gemini-3.6-flash', 'gemini-3.5-flash',
+			'gemini-3.5-flash-lite', 'gemini-3.1-pro-preview',
+			'gemini-3.1-flash-lite', 'gemini-2.5-pro',
+			'gemini-2.5-flash', 'gemini-2.5-flash-lite' ]
+
 	@property
 	def include_options( self ) -> List[ str ]:
 		"""Return compatibility include options.
@@ -3990,7 +3989,7 @@ class Files( Gemini ):
 		"""
 		return [ 'file_search_call.results', 'message.input_image.image_url',
 			'message.output_text.logprobs', 'reasoning.encrypted_content' ]
-	
+
 	@property
 	def reasoning_options( self ) -> List[ str ]:
 		"""Return supported thinking levels.
@@ -3999,7 +3998,7 @@ class Files( Gemini ):
 			List[str]: Supported thinking-level values.
 		"""
 		return [ 'THINKING_LEVEL_UNSPECIFIED', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH' ]
-	
+
 	@property
 	def choice_options( self ) -> List[ str ]:
 		"""Return supported tool-choice values.
@@ -4008,7 +4007,7 @@ class Files( Gemini ):
 			List[str]: Supported tool-choice values.
 		"""
 		return [ 'AUTO', 'ANY', 'NONE', 'VALIDATED' ]
-	
+
 	@property
 	def tool_options( self ) -> List[ str ]:
 		"""Return supported Interactions tools.
@@ -4017,7 +4016,7 @@ class Files( Gemini ):
 			List[str]: Supported tool identifiers.
 		"""
 		return [ 'google_search', 'google_maps', 'url_context', 'code_execution' ]
-	
+
 	@property
 	def modality_options( self ) -> List[ str ]:
 		"""Return supported response modalities.
@@ -4026,7 +4025,7 @@ class Files( Gemini ):
 			List[str]: Supported response modality values.
 		"""
 		return [ 'TEXT' ]
-	
+
 	@property
 	def media_options( self ) -> List[ str ]:
 		"""Return supported media-resolution values.
@@ -4034,8 +4033,9 @@ class Files( Gemini ):
 		Returns:
 			List[str]: Supported media-resolution values.
 		"""
-		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
-	
+		return [ 'media_resolution_high', 'media_resolution_medium',
+			'media_resolution_low' ]
+
 	def create_client( self ) -> genai.Client:
 		"""Create the Google Gen AI client.
 
@@ -4046,8 +4046,15 @@ class Files( Gemini ):
 			Error: Raised when API-key validation or client creation fails.
 		"""
 		try:
-			self.api_key = self.gemini_api_key or self.google_api_key
-			self.client = genai.Client( api_key=self.api_key, http_options=self.http_options )
+			self.api_key = (
+				os.getenv( 'GEMINI_API_KEY' )
+				or os.getenv( 'GOOGLE_API_KEY' )
+				or self.gemini_api_key
+				or self.google_api_key)
+			throw_if( 'api_key', self.api_key )
+			self.client = genai.Client(
+				api_key=self.api_key,
+				http_options=self.http_options )
 			return self.client
 		except Exception as e:
 			exception = Error( e )
@@ -4056,7 +4063,7 @@ class Files( Gemini ):
 			exception.method = 'create_client( self ) -> genai.Client'
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def normalize_mime_type( self, filepath: str ) -> str:
 		"""Resolve the MIME type for a local file.
 
@@ -4071,29 +4078,38 @@ class Files( Gemini ):
 		"""
 		try:
 			import mimetypes
-			
+
 			throw_if( 'filepath', filepath )
 			self.file_path = filepath
 			self.mime_type = mimetypes.guess_type( self.file_path )[ 0 ]
-			
+
 			if self.mime_type:
 				return self.mime_type
-			
+
 			self.suffix = Path( self.file_path ).suffix.lower( )
-			self.mime_types = { '.pdf': 'application/pdf', '.txt': 'text/plain',
+			self.mime_types = {
+				'.pdf': 'application/pdf',
+				'.txt': 'text/plain',
 				'.md': 'text/markdown',
 				'.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-				'.csv': 'text/csv', '.json': 'application/json', '.png': 'image/png',
-				'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', }
-			return self.mime_types.get( self.suffix, 'application/octet-stream' )
+				'.csv': 'text/csv',
+				'.json': 'application/json',
+				'.png': 'image/png',
+				'.jpg': 'image/jpeg',
+				'.jpeg': 'image/jpeg',
+				'.webp': 'image/webp',
+			}
+			return self.mime_types.get(
+				self.suffix, 'application/octet-stream' )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'normalize_mime_type( self, filepath: str ) -> str'
+			exception.method = (
+				'normalize_mime_type( self, filepath: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def upload( self, filepath: str, name: str = None ) -> File:
 		"""Upload a local file through the Gemini Files API.
 
@@ -4113,29 +4129,37 @@ class Files( Gemini ):
 			self.display_name = name
 			self.client = self.create_client( )
 			self.upload_config = None
-			if self.display_name is not None and str( self.display_name ).strip( ):
+
+			if self.display_name is not None and str(
+					self.display_name ).strip( ):
 				self.upload_config = types.UploadFileConfig(
 					display_name=str( self.display_name ).strip( ) )
-			
+
 			if self.upload_config is None:
-				self.response = self.client.files.upload( file=self.file_path )
+				self.response = self.client.files.upload(
+					file=self.file_path )
 			else:
-				self.response = self.client.files.upload( file=self.file_path,
+				self.response = self.client.files.upload(
+					file=self.file_path,
 					config=self.upload_config )
-			
+
 			return self.response
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'upload( self, filepath: str, name: str ) -> File'
+			exception.method = (
+				'upload( self, filepath: str, name: str ) -> File')
 			Logger( ).write( exception )
 			raise exception
-	
-	def list( self, model: str = 'gemini-3.6-flash', top_p: float = 0.8, top_k: int = 50,
-		temperature: float = 0.5, frequency: float = 0.0, presence: float = 0.0,
-		max_tokens: int = 8192, tool_choice: str = 'auto', stops: List[ str ] = None,
-		tools: List[ str ] = None, domains: List[ str ] = None, modalities: List[ str ] = None,
+
+	def list( self, model: str = 'gemini-3.6-flash',
+		top_p: float = 0.8, top_k: int = 50,
+		temperature: float = 0.5, frequency: float = 0.0,
+		presence: float = 0.0, max_tokens: int = 8192,
+		tool_choice: str = 'auto', stops: List[ str ] = None,
+		tools: List[ str ] = None, domains: List[ str ] = None,
+		modalities: List[ str ] = None,
 		media_resolution: str = 'media_resolution_medium' ) -> List[ str ]:
 		"""List configured Google Cloud Storage document objects.
 
@@ -4179,13 +4203,19 @@ class Files( Gemini ):
 			self.stops = stops if isinstance( stops, list ) else [ ]
 			self.tools = tools if isinstance( tools, list ) else [ ]
 			self.domains = domains if isinstance( domains, list ) else [ ]
-			self.response_modalities = (modalities if isinstance( modalities, list ) else [ ])
+			self.response_modalities = (
+				modalities if isinstance( modalities, list ) else [ ])
 			self.media_resolution = media_resolution
 			self.bucket_id = 'jeni-financial'
 			self.prefix = 'regulations'
 			self.storage_client = storage.Client( )
-			self.bucket = self.storage_client.bucket( bucket_name=self.bucket_id )
-			self.files = [ blob.name for blob in self.bucket.list_blobs( prefix=self.prefix ) ]
+			self.bucket = self.storage_client.bucket(
+				bucket_name=self.bucket_id )
+			self.files = [
+				blob.name
+				for blob in self.bucket.list_blobs(
+					prefix=self.prefix )
+			]
 			self.file_list = list( self.files )
 			self.response = self.file_list
 			return self.file_list
@@ -4193,10 +4223,17 @@ class Files( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'list( self, **kwargs) -> List[ str ]'
+			exception.method = (
+				'list( self, model: str, top_p: float, top_k: int, '
+				'temperature: float, frequency: float, presence: float, '
+				'max_tokens: int, tool_choice: str, stops: List[ str ], '
+				'tools: List[ str ], domains: List[ str ], '
+				'modalities: List[ str ], media_resolution: str ) '
+				'-> List[ str ]')
 			Logger( ).write( exception )
 			raise exception
-	
+
+
 	def retrieve( self, file_id: str ) -> File:
 		"""Retrieve a Gemini file resource.
 
@@ -4213,18 +4250,21 @@ class Files( Gemini ):
 			throw_if( 'file_id', file_id )
 			self.file_id = file_id
 			self.client = self.create_client( )
-			self.response = self.client.files.get( name=self.file_id )
+			self.response = self.client.files.get(
+				name=self.file_id )
 			return self.response
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = ('retrieve( self, file_id: str ) -> File')
+			exception.method = (
+				'retrieve( self, file_id: str ) -> File')
 			Logger( ).write( exception )
 			raise exception
-	
-	def build_generation_config( self, temperature: float = None, top_p: float = None,
-		max_tokens: int = None, stops: List[ str ] = None ) -> Dict[ str, Any ]:
+
+	def build_generation_config( self, temperature: float = None,
+		top_p: float = None, max_tokens: int = None,
+		stops: List[ str ] = None ) -> Dict[ str, Any ]:
 		"""Build an Interactions generation configuration.
 
 		Args:
@@ -4241,23 +4281,29 @@ class Files( Gemini ):
 		self.max_tokens = max_tokens
 		self.stops = stops if isinstance( stops, list ) else [ ]
 		self.generation_config = { }
+
 		if self.temperature is not None:
 			self.generation_config[ 'temperature' ] = self.temperature
-		
+
 		if self.top_p is not None:
 			self.generation_config[ 'top_p' ] = self.top_p
-		
+
 		if self.max_tokens is not None and self.max_tokens > 0:
-			self.generation_config[ 'max_output_tokens' ] = (self.max_tokens)
-		
-		self.stop_sequences = [ str( item ).strip( ) for item in self.stops if
-			item is not None and str( item ).strip( ) ]
-		
+			self.generation_config[ 'max_output_tokens' ] = (
+				self.max_tokens)
+
+		self.stop_sequences = [
+			str( item ).strip( )
+			for item in self.stops
+			if item is not None and str( item ).strip( )
+		]
+
 		if self.stop_sequences:
-			self.generation_config[ 'stop_sequences' ] = (self.stop_sequences)
-		
+			self.generation_config[ 'stop_sequences' ] = (
+				self.stop_sequences)
+
 		return self.generation_config
-	
+
 	def build_document_block( self, filepath: str ) -> Dict[ str, Any ]:
 		"""Build an inline Interactions document block.
 
@@ -4273,22 +4319,33 @@ class Files( Gemini ):
 		try:
 			throw_if( 'filepath', filepath )
 			self.file_path = filepath
-			self.mime_type = self.normalize_mime_type( self.file_path )
-			self.file_bytes = Path( self.file_path ).read_bytes( )
+			self.mime_type = self.normalize_mime_type(
+				self.file_path )
+			self.file_bytes = Path(
+				self.file_path ).read_bytes( )
 			throw_if( 'file_bytes', self.file_bytes )
-			self.file_data = base64.b64encode( self.file_bytes ).decode( 'utf-8' )
-			return { 'type': 'document', 'data': self.file_data, 'mime_type': self.mime_type, }
+			self.file_data = base64.b64encode(
+				self.file_bytes ).decode( 'utf-8' )
+			return {
+				'type': 'document',
+				'data': self.file_data,
+				'mime_type': self.mime_type,
+			}
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'build_document_block( self, filepath: str ) -> Dict[ str, Any ]'
+			exception.method = (
+				'build_document_block( self, filepath: str ) '
+				'-> Dict[ str, Any ]')
 			Logger( ).write( exception )
 			raise exception
-	
-	def execute_document_interaction( self, prompt: str, filepaths: List[ str ], model: str,
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+
+	def execute_document_interaction( self, prompt: str,
+		filepaths: List[ str ], model: str,
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
 		instruct: str = None ) -> str:
 		"""Execute a document Interaction.
 
@@ -4324,94 +4381,159 @@ class Files( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops if isinstance( stops, list ) else [ ]
 			self.instructions = instruct
-			self.contents = [ { 'type': 'text', 'text': self.prompt }, ]
-			
+			self.contents = [
+				{ 'type': 'text', 'text': self.prompt },
+			]
+
 			for filepath in self.file_paths:
-				self.contents.append( self.build_document_block( filepath ) )
-			
-			self.generation_config = self.build_generation_config( temperature=self.temperature,
-				top_p=self.top_p, max_tokens=self.max_tokens, stops=self.stops )
+				self.contents.append(
+					self.build_document_block( filepath ) )
+
+			self.generation_config = self.build_generation_config(
+				temperature=self.temperature,
+				top_p=self.top_p,
+				max_tokens=self.max_tokens,
+				stops=self.stops )
 			self.client = self.create_client( )
-			self.request = { 'model': self.model, 'input': self.contents,
-				'response_format': { 'type': 'text' }, 'store': False, }
-			
-			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.request[ 'system_instruction' ] = str( self.instructions ).strip( )
-			
+			self.request = {
+				'model': self.model,
+				'input': self.contents,
+				'response_format': { 'type': 'text' },
+				'store': False,
+			}
+
+			if self.instructions is not None and str(
+					self.instructions ).strip( ):
+				self.request[ 'system_instruction' ] = str(
+					self.instructions ).strip( )
+
 			if self.generation_config:
-				self.request[ 'generation_config' ] = (self.generation_config)
-			
-			self.interaction = self.client.interactions.create( **self.request )
+				self.request[ 'generation_config' ] = (
+					self.generation_config)
+
+			self.interaction = self.client.interactions.create(
+				**self.request )
 			self.response = self.interaction
 			self.content_response = self.interaction
-			self.output_text = str( getattr( self.interaction, 'output_text', '' ) or '' ).strip( )
+			self.output_text = str(
+				getattr( self.interaction, 'output_text', '' )
+				or '' ).strip( )
 			throw_if( 'output_text', self.output_text )
 			return self.output_text
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'execute_document_interaction( self, **kwargsr ) -> str'
+			exception.method = (
+				'execute_document_interaction( self, prompt: str, '
+				'filepaths: List[ str ], model: str, temperature: float, '
+				'top_p: float, frequency: float, presence: float, '
+				'max_tokens: int, stops: List[ str ], instruct: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
-	def summarize( self, prompt: str, filepath: str, model: str = 'gemini-3.6-flash',
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+
+	def summarize( self, prompt: str, filepath: str,
+		model: str = 'gemini-3.6-flash',
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
 		instruct: str = None ) -> str:
 		"""Summarize a local document through Interactions."""
 		try:
 			throw_if( 'filepath', filepath )
 			self.file_path = filepath
-			return self.execute_document_interaction( prompt=prompt, filepaths=[ self.file_path ],
-				model=model, temperature=temperature, top_p=top_p, frequency=frequency,
-				presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct )
+			return self.execute_document_interaction(
+				prompt=prompt,
+				filepaths=[ self.file_path ],
+				model=model,
+				temperature=temperature,
+				top_p=top_p,
+				frequency=frequency,
+				presence=presence,
+				max_tokens=max_tokens,
+				stops=stops,
+				instruct=instruct )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'summarize( self, **kwargs ) -> str'
+			exception.method = (
+				'summarize( self, prompt: str, filepath: str, model: str, '
+				'temperature: float, top_p: float, frequency: float, '
+				'presence: float, max_tokens: int, stops: List[ str ], '
+				'instruct: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
-	def search( self, prompt: str, filepath: str, model: str = 'gemini-3.6-flash',
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+
+	def search( self, prompt: str, filepath: str,
+		model: str = 'gemini-3.6-flash',
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
 		instruct: str = None ) -> str:
 		"""Answer a question about a local document through Interactions."""
 		try:
 			throw_if( 'filepath', filepath )
 			self.file_path = filepath
-			return self.execute_document_interaction( prompt=prompt, filepaths=[ self.file_path ],
-				model=model, temperature=temperature, top_p=top_p, frequency=frequency,
-				presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct )
+			return self.execute_document_interaction(
+				prompt=prompt,
+				filepaths=[ self.file_path ],
+				model=model,
+				temperature=temperature,
+				top_p=top_p,
+				frequency=frequency,
+				presence=presence,
+				max_tokens=max_tokens,
+				stops=stops,
+				instruct=instruct )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'search( self, **kwarrgs ) -> str'
+			exception.method = (
+				'search( self, prompt: str, filepath: str, model: str, '
+				'temperature: float, top_p: float, frequency: float, '
+				'presence: float, max_tokens: int, stops: List[ str ], '
+				'instruct: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
-	def survey( self, prompt: str, filepaths: List[ str ], model: str = 'gemini-3.6-flash',
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None ) -> str:
+
+	def survey( self, prompt: str, filepaths: List[ str ],
+		model: str = 'gemini-3.6-flash',
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None,
+		stops: List[ str ] = None ) -> str:
 		"""Analyze multiple local documents through Interactions."""
 		try:
-			return self.execute_document_interaction( prompt=prompt, filepaths=filepaths,
-				model=model, temperature=temperature, top_p=top_p, frequency=frequency,
-				presence=presence, max_tokens=max_tokens, stops=stops, instruct=None )
+			return self.execute_document_interaction(
+				prompt=prompt,
+				filepaths=filepaths,
+				model=model,
+				temperature=temperature,
+				top_p=top_p,
+				frequency=frequency,
+				presence=presence,
+				max_tokens=max_tokens,
+				stops=stops,
+				instruct=None )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'survey( self, **kwargs ) -> str'
+			exception.method = (
+				'survey( self, prompt: str, filepaths: List[ str ], '
+				'model: str, temperature: float, top_p: float, '
+				'frequency: float, presence: float, max_tokens: int, '
+				'stops: List[ str ] ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
-	def execute_grounded_interaction( self, prompt: str, model: str, tool_type: str,
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+
+	def execute_grounded_interaction( self, prompt: str,
+		model: str, tool_type: str,
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
 		instruct: str = None ) -> str:
 		"""Execute a Google Search or Google Maps Interaction."""
 		try:
@@ -4428,69 +4550,118 @@ class Files( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops if isinstance( stops, list ) else [ ]
 			self.instructions = instruct
-			if self.tool_type not in ('google_search', 'google_maps'):
-				raise ValueError( f'Unsupported grounding tool: {self.tool_type}' )
-			
-			self.generation_config = self.build_generation_config( temperature=self.temperature,
-				top_p=self.top_p, max_tokens=self.max_tokens, stops=self.stops )
+
+			if self.tool_type not in (
+					'google_search', 'google_maps' ):
+				raise ValueError(
+					f'Unsupported grounding tool: {self.tool_type}' )
+
+			self.generation_config = self.build_generation_config(
+				temperature=self.temperature,
+				top_p=self.top_p,
+				max_tokens=self.max_tokens,
+				stops=self.stops )
 			self.client = self.create_client( )
-			self.request = { 'model': self.model, 'input': self.prompt,
-				'tools': [ { 'type': self.tool_type } ], 'response_format': { 'type': 'text' },
-				'store': False, }
-			
-			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.request[ 'system_instruction' ] = str( self.instructions ).strip( )
-			
+			self.request = {
+				'model': self.model,
+				'input': self.prompt,
+				'tools': [ { 'type': self.tool_type } ],
+				'response_format': { 'type': 'text' },
+				'store': False,
+			}
+
+			if self.instructions is not None and str(
+					self.instructions ).strip( ):
+				self.request[ 'system_instruction' ] = str(
+					self.instructions ).strip( )
+
 			if self.generation_config:
-				self.request[ 'generation_config' ] = (self.generation_config)
-			
-			self.interaction = self.client.interactions.create( **self.request )
+				self.request[ 'generation_config' ] = (
+					self.generation_config)
+
+			self.interaction = self.client.interactions.create(
+				**self.request )
 			self.response = self.interaction
 			self.content_response = self.interaction
-			self.output_text = str( getattr( self.interaction, 'output_text', '' ) or '' ).strip( )
+			self.output_text = str(
+				getattr( self.interaction, 'output_text', '' )
+				or '' ).strip( )
 			throw_if( 'output_text', self.output_text )
 			return self.output_text
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'execute_grounded_interaction( self, **kwargs ) -> str'
+			exception.method = (
+				'execute_grounded_interaction( self, prompt: str, model: str, '
+				'tool_type: str, temperature: float, top_p: float, '
+				'frequency: float, presence: float, max_tokens: int, '
+				'stops: List[ str ], instruct: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
-	def web_search( self, prompt: str, model: str = 'gemini-3.6-flash', temperature: float = None,
-		top_p: float = None, frequency: float = None, presence: float = None,
-		max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str:
+
+	def web_search( self, prompt: str,
+		model: str = 'gemini-3.6-flash',
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str:
 		"""Generate a Google Search-grounded response."""
 		try:
-			return self.execute_grounded_interaction( prompt=prompt, model=model,
-				tool_type='google_search', temperature=temperature, top_p=top_p,
-				frequency=frequency, presence=presence, max_tokens=max_tokens, stops=stops,
+			return self.execute_grounded_interaction(
+				prompt=prompt,
+				model=model,
+				tool_type='google_search',
+				temperature=temperature,
+				top_p=top_p,
+				frequency=frequency,
+				presence=presence,
+				max_tokens=max_tokens,
+				stops=stops,
 				instruct=instruct )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'web_search( self, **kwargs ) -> str'
+			exception.method = (
+				'web_search( self, prompt: str, model: str, '
+				'temperature: float, top_p: float, frequency: float, '
+				'presence: float, max_tokens: int, stops: List[ str ], '
+				'instruct: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
-	def search_maps( self, prompt: str, model: str = 'gemini-3.6-flash', temperature: float = None,
-		top_p: float = None, frequency: float = None, presence: float = None,
-		max_tokens: int = None, stops: List[ str ] = None, instruct: str = None ) -> str:
+
+	def search_maps( self, prompt: str,
+		model: str = 'gemini-3.6-flash',
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str:
 		"""Generate a Google Maps-grounded response."""
 		try:
-			return self.execute_grounded_interaction( prompt=prompt, model=model,
-				tool_type='google_maps', temperature=temperature, top_p=top_p, frequency=frequency,
-				presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct )
+			return self.execute_grounded_interaction(
+				prompt=prompt,
+				model=model,
+				tool_type='google_maps',
+				temperature=temperature,
+				top_p=top_p,
+				frequency=frequency,
+				presence=presence,
+				max_tokens=max_tokens,
+				stops=stops,
+				instruct=instruct )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = 'search_maps( self, **kwargs ) -> str'
+			exception.method = (
+				'search_maps( self, prompt: str, model: str, '
+				'temperature: float, top_p: float, frequency: float, '
+				'presence: float, max_tokens: int, stops: List[ str ], '
+				'instruct: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def delete( self, file_id: str ) -> bool:
 		"""Delete a Gemini file resource.
 
@@ -4507,15 +4678,18 @@ class Files( Gemini ):
 			throw_if( 'file_id', file_id )
 			self.file_id = file_id
 			self.client = self.create_client( )
-			self.response = self.client.files.delete( name=self.file_id )
+			self.response = self.client.files.delete(
+				name=self.file_id )
 			return True
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Files'
-			exception.method = ('delete( self, file_id: str ) -> bool')
+			exception.method = (
+				'delete( self, file_id: str ) -> bool')
 			Logger( ).write( exception )
 			raise exception
+
 
 class FileSearch( Gemini ):
 	"""Gemini File Search Store wrapper.
@@ -4533,14 +4707,14 @@ class FileSearch( Gemini ):
 		collections (Dict[str, str]): Display-name to resource-name mapping.
 		stores (List[FileSearchStore]): Cached File Search Store resources.
 	"""
-	
+
 	client: Optional[ genai.Client ]
 	response: Optional[ Any ]
 	store_id: Optional[ str ]
 	store_name: Optional[ str ]
 	collections: Dict[ str, str ]
 	stores: List[ FileSearchStore ]
-	
+
 	def __init__( self ) -> None:
 		"""Initialize the File Search Store wrapper.
 
@@ -4558,7 +4732,7 @@ class FileSearch( Gemini ):
 		self.store_name = None
 		self.collections = { }
 		self.stores = [ ]
-	
+
 	def create_client( self ) -> genai.Client:
 		"""Create the Google Gen AI client.
 
@@ -4569,7 +4743,12 @@ class FileSearch( Gemini ):
 			Error: Raised when API-key validation or client creation fails.
 		"""
 		try:
-			self.api_key = self.gemini_api_key or self.google_api_key
+			self.api_key = (
+				os.getenv( 'GEMINI_API_KEY' )
+				or os.getenv( 'GOOGLE_API_KEY' )
+				or self.gemini_api_key
+				or self.google_api_key)
+			throw_if( 'api_key', self.api_key )
 			self.client = genai.Client( api_key=self.api_key )
 			return self.client
 		except Exception as e:
@@ -4579,7 +4758,7 @@ class FileSearch( Gemini ):
 			exception.method = 'create_client( self ) -> genai.Client'
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def refresh_collections( self ) -> Dict[ str, str ]:
 		"""Refresh the File Search Store mapping.
 
@@ -4592,26 +4771,35 @@ class FileSearch( Gemini ):
 		try:
 			self.client = self.create_client( )
 			self.collections = { }
-			self.stores = list( self.client.file_search_stores.list( ) )
+			self.stores = list(
+				self.client.file_search_stores.list( ) )
+
 			for store in self.stores:
-				self.display_name = getattr( store, 'display_name', None )
-				self.resource_name = getattr( store, 'name', None )
+				self.display_name = getattr(
+					store, 'display_name', None )
+				self.resource_name = getattr(
+					store, 'name', None )
+
 				if not self.resource_name:
 					continue
-				
-				self.label = (str( self.display_name ).strip( ) if self.display_name else str(
-					self.resource_name ).strip( ))
-				self.collections[ self.label ] = str( self.resource_name ).strip( )
-			
+
+				self.label = (
+					str( self.display_name ).strip( )
+					if self.display_name
+					else str( self.resource_name ).strip( ))
+				self.collections[ self.label ] = str(
+					self.resource_name ).strip( )
+
 			return self.collections
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
-			exception.method = ('refresh_collections( self ) -> Dict[ str, str ]')
+			exception.method = (
+				'refresh_collections( self ) -> Dict[ str, str ]')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def create( self, name: str ) -> FileSearchStore:
 		"""Create a File Search Store.
 
@@ -4636,10 +4824,11 @@ class FileSearch( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
-			exception.method = ('create( self, name: str ) -> FileSearchStore')
+			exception.method = (
+				'create( self, name: str ) -> FileSearchStore')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def retrieve( self, store_id: str ) -> FileSearchStore:
 		"""Retrieve a File Search Store.
 
@@ -4656,16 +4845,18 @@ class FileSearch( Gemini ):
 			throw_if( 'store_id', store_id )
 			self.store_id = str( store_id ).strip( )
 			self.client = self.create_client( )
-			self.response = self.client.file_search_stores.get( name=self.store_id )
+			self.response = self.client.file_search_stores.get(
+				name=self.store_id )
 			return self.response
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
-			exception.method = ('retrieve( self, store_id: str ) -> FileSearchStore')
+			exception.method = (
+				'retrieve( self, store_id: str ) -> FileSearchStore')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def list( self ) -> List[ FileSearchStore ]:
 		"""List File Search Stores.
 
@@ -4682,10 +4873,11 @@ class FileSearch( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
-			exception.method = ('list( self ) -> List[ FileSearchStore ]')
+			exception.method = (
+				'list( self ) -> List[ FileSearchStore ]')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def delete( self, store_id: str, force: bool = True ) -> bool:
 		"""Delete a File Search Store.
 
@@ -4704,7 +4896,8 @@ class FileSearch( Gemini ):
 			self.store_id = str( store_id ).strip( )
 			self.force = force
 			self.client = self.create_client( )
-			self.client.file_search_stores.delete( name=self.store_id,
+			self.client.file_search_stores.delete(
+				name=self.store_id,
 				config={ 'force': bool( self.force ) } )
 			self.refresh_collections( )
 			return True
@@ -4712,9 +4905,11 @@ class FileSearch( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'FileSearch'
-			exception.method = ('delete( self, store_id: str, force: bool ) -> bool')
+			exception.method = (
+				'delete( self, store_id: str, force: bool ) -> bool')
 			Logger( ).write( exception )
 			raise exception
+
 
 class CloudBuckets( Gemini ):
 	"""Google Cloud Storage bucket wrapper.
@@ -4737,7 +4932,7 @@ class CloudBuckets( Gemini ):
 		collections (Dict[str, str]): Named bucket and prefix mappings.
 		documents (Dict[str, str]): Named document mappings.
 	"""
-	
+
 	project_id: Optional[ str ]
 	bucket_name: Optional[ str ]
 	object_name: Optional[ str ]
@@ -4750,7 +4945,7 @@ class CloudBuckets( Gemini ):
 	interaction: Optional[ Any ]
 	collections: Dict[ str, str ]
 	documents: Dict[ str, str ]
-	
+
 	def __init__( self ) -> None:
 		"""Initialize the Google Cloud Storage wrapper.
 
@@ -4772,16 +4967,20 @@ class CloudBuckets( Gemini ):
 		self.bucket = None
 		self.response = None
 		self.interaction = None
-		self.collections = { 'Federal Financial Data': 'jeni-financial/data',
+		self.collections = {
+			'Federal Financial Data': 'jeni-financial/data',
 			'Federal Financial Regulations': 'jeni-financial/regulations',
 			'DoW Financial Data': 'jeni-dow/budget/data',
 			'DoW Financial Regulations': 'jeni-dow/budget/regulations',
-			'DoA Financial Data': 'jenni-doa/Financial Data', }
-		self.documents = { 'Account_Balances.csv': 'file-U6wFeRGSeg38Db5uJzo5sj',
+			'DoA Financial Data': 'jenni-doa/Financial Data',
+		}
+		self.documents = {
+			'Account_Balances.csv': 'file-U6wFeRGSeg38Db5uJzo5sj',
 			'SF133.csv': 'file-32s641QK1Xb5QUatY3zfWF',
 			'Authority.csv': 'file-Qi2rw2QsdxKBX1iiaQxY3m',
-			'Outlays.csv': 'file-GHEwSWR7ezMvHrQ3X648wn', }
-	
+			'Outlays.csv': 'file-GHEwSWR7ezMvHrQ3X648wn',
+		}
+
 	@property
 	def model_options( self ) -> List[ str ]:
 		"""Return supported grounded-generation models.
@@ -4789,9 +4988,10 @@ class CloudBuckets( Gemini ):
 		Returns:
 			List[str]: Supported Gemini model identifiers.
 		"""
-		return [ 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro-preview',
-			'gemini-2.5-flash', 'gemini-2.5-flash-lite' ]
-	
+		return [ 'gemini-3.6-flash', 'gemini-3.5-flash',
+			'gemini-3.1-pro-preview', 'gemini-2.5-flash',
+			'gemini-2.5-flash-lite' ]
+
 	@property
 	def media_options( self ) -> List[ str ]:
 		"""Return supported media-resolution values.
@@ -4799,8 +4999,9 @@ class CloudBuckets( Gemini ):
 		Returns:
 			List[str]: Supported media-resolution values.
 		"""
-		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
-	
+		return [ 'media_resolution_high', 'media_resolution_medium',
+			'media_resolution_low' ]
+
 	def create_storage_client( self ) -> storage.Client:
 		"""Create the Google Cloud Storage client.
 
@@ -4811,16 +5012,18 @@ class CloudBuckets( Gemini ):
 			Error: Raised when client creation fails.
 		"""
 		try:
-			self.client = storage.Client( project=self.project_id )
+			self.client = storage.Client(
+				project=self.project_id )
 			return self.client
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'CloudBuckets'
-			exception.method = ('create_storage_client( self ) -> storage.Client')
+			exception.method = (
+				'create_storage_client( self ) -> storage.Client')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def create( self, bucket: str, name: str ) -> Blob:
 		"""Create an empty object in a bucket.
 
@@ -4840,8 +5043,10 @@ class CloudBuckets( Gemini ):
 			self.bucket_name = bucket
 			self.object_name = name
 			self.client = self.create_storage_client( )
-			self.bucket = self.client.bucket( self.bucket_name )
-			self.blob = self.bucket.blob( self.object_name )
+			self.bucket = self.client.bucket(
+				self.bucket_name )
+			self.blob = self.bucket.blob(
+				self.object_name )
 			self.blob.upload_from_string( b'' )
 			self.response = self.blob
 			return self.blob
@@ -4849,11 +5054,13 @@ class CloudBuckets( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'CloudBuckets'
-			exception.method = ('create( self, bucket: str, name: str ) -> Blob')
+			exception.method = (
+				'create( self, bucket: str, name: str ) -> Blob')
 			Logger( ).write( exception )
 			raise exception
-	
-	def upload( self, path: str, bucket: str, name: str = None ) -> Blob:
+
+	def upload( self, path: str, bucket: str,
+		name: str = None ) -> Blob:
 		"""Upload a local file to a bucket.
 
 		Args:
@@ -4872,22 +5079,28 @@ class CloudBuckets( Gemini ):
 			throw_if( 'bucket', bucket )
 			self.file_path = path
 			self.bucket_name = bucket
-			self.object_name = (name if name else Path( self.file_path ).name)
+			self.object_name = (
+				name if name else Path(
+					self.file_path ).name)
 			self.client = self.create_storage_client( )
-			self.bucket = self.client.bucket( self.bucket_name )
-			self.blob = self.bucket.blob( self.object_name )
-			self.blob.upload_from_filename( self.file_path )
+			self.bucket = self.client.bucket(
+				self.bucket_name )
+			self.blob = self.bucket.blob(
+				self.object_name )
+			self.blob.upload_from_filename(
+				self.file_path )
 			self.response = self.blob
 			return self.blob
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'CloudBuckets'
-			exception.method = ('upload( self, path: str, bucket: str, '
-			                    'name: str ) -> Blob')
+			exception.method = (
+				'upload( self, path: str, bucket: str, '
+				'name: str ) -> Blob')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def retrieve( self, bucket: str, name: str ) -> Optional[ Blob ]:
 		"""Retrieve object metadata.
 
@@ -4907,18 +5120,21 @@ class CloudBuckets( Gemini ):
 			self.bucket_name = bucket
 			self.object_name = name
 			self.client = self.create_storage_client( )
-			self.bucket = self.client.bucket( self.bucket_name )
-			self.response = self.bucket.get_blob( self.object_name )
+			self.bucket = self.client.bucket(
+				self.bucket_name )
+			self.response = self.bucket.get_blob(
+				self.object_name )
 			return self.response
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'CloudBuckets'
-			exception.method = ('retrieve( self, bucket: str, name: str ) '
-			                    '-> Optional[ Blob ]')
+			exception.method = (
+				'retrieve( self, bucket: str, name: str ) '
+				'-> Optional[ Blob ]')
 			Logger( ).write( exception )
 			raise exception
-	
+
 	def list( self, bucket: str ) -> List[ Blob ]:
 		"""List bucket objects.
 
@@ -4935,22 +5151,30 @@ class CloudBuckets( Gemini ):
 			throw_if( 'bucket', bucket )
 			self.bucket_name = bucket
 			self.client = self.create_storage_client( )
-			self.bucket = self.client.bucket( self.bucket_name )
-			self.blobs = list( self.bucket.list_blobs( ) )
-			self.documents = { blob.name: blob.id for blob in self.blobs }
+			self.bucket = self.client.bucket(
+				self.bucket_name )
+			self.blobs = list(
+				self.bucket.list_blobs( ) )
+			self.documents = {
+				blob.name: blob.id
+				for blob in self.blobs
+			}
 			self.response = self.blobs
 			return self.blobs
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'CloudBuckets'
-			exception.method = ('list( self, bucket: str ) -> List[ Blob ]')
+			exception.method = (
+				'list( self, bucket: str ) -> List[ Blob ]')
 			Logger( ).write( exception )
 			raise exception
-	
-	def execute_grounded_interaction( self, prompt: str, model: str, tool_type: str,
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+
+	def execute_grounded_interaction( self, prompt: str,
+		model: str, tool_type: str,
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
 		instruct: str = None ) -> str:
 		"""Execute a grounded Interactions request.
 
@@ -4984,80 +5208,127 @@ class CloudBuckets( Gemini ):
 			self.frequency_penalty = frequency
 			self.presence_penalty = presence
 			self.max_tokens = max_tokens
-			self.stops = stops if isinstance( stops, list ) else [ ]
+			self.stops = stops if isinstance(
+				stops, list ) else [ ]
 			self.instructions = instruct
-			
-			if self.tool_type not in ('google_search', 'google_maps'):
-				raise ValueError( f'Unsupported grounding tool: {self.tool_type}' )
-			
+
+			if self.tool_type not in (
+					'google_search', 'google_maps' ):
+				raise ValueError(
+					f'Unsupported grounding tool: {self.tool_type}' )
+
 			self.generation_config = { }
-			
+
 			if self.temperature is not None:
-				self.generation_config[ 'temperature' ] = self.temperature
-			
+				self.generation_config[
+					'temperature' ] = self.temperature
+
 			if self.top_p is not None:
-				self.generation_config[ 'top_p' ] = self.top_p
-			
+				self.generation_config[
+					'top_p' ] = self.top_p
+
 			if self.max_tokens is not None and self.max_tokens > 0:
-				self.generation_config[ 'max_output_tokens' ] = self.max_tokens
-			
-			self.stop_sequences = [ str( item ).strip( ) for item in self.stops if
-				item is not None and str( item ).strip( ) ]
-			
+				self.generation_config[
+					'max_output_tokens' ] = self.max_tokens
+
+			self.stop_sequences = [
+				str( item ).strip( )
+				for item in self.stops
+				if item is not None and str(
+					item ).strip( )
+			]
+
 			if self.stop_sequences:
-				self.generation_config[ 'stop_sequences' ] = self.stop_sequences
-			
-			self.api_key = (os.getenv( 'GEMINI_API_KEY' ) or os.getenv(
-				'GOOGLE_API_KEY' ) or self.gemini_api_key or self.google_api_key)
+				self.generation_config[
+					'stop_sequences' ] = self.stop_sequences
+
+			self.api_key = (
+				os.getenv( 'GEMINI_API_KEY' )
+				or os.getenv( 'GOOGLE_API_KEY' )
+				or self.gemini_api_key
+				or self.google_api_key)
 			throw_if( 'api_key', self.api_key )
-			self.genai_client = genai.Client( api_key=self.api_key,
-				http_options=types.HttpOptions( api_version='v1beta' ) )
-			self.request = { 'model': self.model, 'input': self.prompt,
-				'tools': [ { 'type': self.tool_type } ], 'response_format': { 'type': 'text' },
-				'store': False, }
-			
-			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.request[ 'system_instruction' ] = str( self.instructions ).strip( )
-			
+			self.genai_client = genai.Client(
+				api_key=self.api_key,
+				http_options=types.HttpOptions(
+					api_version='v1beta' ) )
+			self.request = {
+				'model': self.model,
+				'input': self.prompt,
+				'tools': [ { 'type': self.tool_type } ],
+				'response_format': { 'type': 'text' },
+				'store': False,
+			}
+
+			if self.instructions is not None and str(
+					self.instructions ).strip( ):
+				self.request[ 'system_instruction' ] = str(
+					self.instructions ).strip( )
+
 			if self.generation_config:
-				self.request[ 'generation_config' ] = (self.generation_config)
-			
-			self.interaction = self.genai_client.interactions.create( **self.request )
+				self.request[ 'generation_config' ] = (
+					self.generation_config)
+
+			self.interaction = self.genai_client.interactions.create(
+				**self.request )
 			self.response = self.interaction
 			self.content_response = self.interaction
-			self.output_text = str( getattr( self.interaction, 'output_text', '' ) or '' ).strip( )
+			self.output_text = str(
+				getattr( self.interaction, 'output_text', '' )
+				or '' ).strip( )
 			throw_if( 'output_text', self.output_text )
 			return self.output_text
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'CloudBuckets'
-			exception.method = ('execute_grounded_interaction( self, prompt: str, '
-			                    'model: str, tool_type: str, temperature: float, '
-			                    'top_p: float, frequency: float, presence: float, '
-			                    'max_tokens: int, stops: List[ str ], '
-			                    'instruct: str ) -> str')
+			exception.method = (
+				'execute_grounded_interaction( self, prompt: str, '
+				'model: str, tool_type: str, temperature: float, '
+				'top_p: float, frequency: float, presence: float, '
+				'max_tokens: int, stops: List[ str ], '
+				'instruct: str ) -> str')
 			Logger( ).write( exception )
 			raise exception
-	
-	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+
+	def web_search( self, prompt: str,
+		model: str = 'gemini-2.5-flash-lite',
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
 		instruct: str = None ) -> str:
 		"""Generate a Google Search-grounded response."""
-		return self.execute_grounded_interaction( prompt=prompt, model=model,
-			tool_type='google_search', temperature=temperature, top_p=top_p, frequency=frequency,
-			presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct )
-	
-	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
-		temperature: float = None, top_p: float = None, frequency: float = None,
-		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+		return self.execute_grounded_interaction(
+			prompt=prompt,
+			model=model,
+			tool_type='google_search',
+			temperature=temperature,
+			top_p=top_p,
+			frequency=frequency,
+			presence=presence,
+			max_tokens=max_tokens,
+			stops=stops,
+			instruct=instruct )
+
+	def search_maps( self, prompt: str,
+		model: str = 'gemini-2.5-flash-lite',
+		temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None,
+		max_tokens: int = None, stops: List[ str ] = None,
 		instruct: str = None ) -> str:
 		"""Generate a Google Maps-grounded response."""
-		return self.execute_grounded_interaction( prompt=prompt, model=model,
-			tool_type='google_maps', temperature=temperature, top_p=top_p, frequency=frequency,
-			presence=presence, max_tokens=max_tokens, stops=stops, instruct=instruct )
-	
+		return self.execute_grounded_interaction(
+			prompt=prompt,
+			model=model,
+			tool_type='google_maps',
+			temperature=temperature,
+			top_p=top_p,
+			frequency=frequency,
+			presence=presence,
+			max_tokens=max_tokens,
+			stops=stops,
+			instruct=instruct )
+
 	def delete( self, bucket: str, name: str ) -> bool:
 		"""Delete a bucket object.
 
@@ -5077,14 +5348,18 @@ class CloudBuckets( Gemini ):
 			self.bucket_name = bucket
 			self.object_name = name
 			self.client = self.create_storage_client( )
-			self.bucket = self.client.bucket( self.bucket_name )
-			self.blob = self.bucket.blob( self.object_name )
+			self.bucket = self.client.bucket(
+				self.bucket_name )
+			self.blob = self.bucket.blob(
+				self.object_name )
 			self.blob.delete( )
 			return True
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'CloudBuckets'
-			exception.method = ('delete( self, bucket: str, name: str ) -> bool')
+			exception.method = (
+				'delete( self, bucket: str, name: str ) -> bool')
 			Logger( ).write( exception )
 			raise exception
+

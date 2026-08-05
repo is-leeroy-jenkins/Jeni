@@ -588,6 +588,9 @@ if 'docqna_uploaded' not in st.session_state:
 if 'docqna_messages' not in st.session_state:
 	st.session_state.docqna_messages = [ ]
 
+if 'docqna_gemini_history' not in st.session_state:
+	st.session_state[ 'docqna_gemini_history' ] = [ ]
+
 if 'docqna_active_docs' not in st.session_state:
 	st.session_state.docqna_active_docs = [ ]
 
@@ -866,10 +869,6 @@ if 'bucket_include' not in st.session_state:
 if 'bucket_id' not in st.session_state:
 	st.session_state[ 'bucket_id' ] = ''
 	
-# -------- INTERACTIONS API CONVERSATION STATE --------
-
-if 'interaction_ids' not in st.session_state:
-	st.session_state[ 'interaction_ids' ] = { 'text': '', 'docqna': '', 'stores': '', 'bucket': '' }
 	
 # ------ System Instruction Category Policies ------
 
@@ -1049,65 +1048,6 @@ def update_counters( resp: Any ) -> None:
 		exception.module = 'app'
 		exception.cause = 'update_counters'
 		exception.method = 'update_counters( resp: Any ) -> None'
-		Logger( ).write( exception )
-		raise exception
-
-INTERACTION_MODES: Tuple[ str, ... ] = ( 'text', 'docqna', 'stores', 'bucket' )
-
-def get_previous_interaction_id( mode: str ) -> str:
-	try:
-		throw_if( 'mode', mode )
-		interaction_mode = str( mode ).strip( ).lower( )
-		if interaction_mode not in INTERACTION_MODES:
-			raise ValueError( f'Unsupported Interaction mode: {interaction_mode}' )
-		interaction_ids = st.session_state.get( 'interaction_ids', { } )
-		if not isinstance( interaction_ids, dict ):
-			interaction_ids = { }
-		return str( interaction_ids.get( interaction_mode, '' ) or '' ).strip( )
-	except Exception as e:
-		exception = Error( e )
-		exception.module = 'app'
-		exception.cause = 'get_previous_interaction_id'
-		exception.method = 'get_previous_interaction_id( mode: str ) -> str'
-		Logger( ).write( exception )
-		raise exception
-
-def commit_interaction( mode: str, chat: Chat ) -> None:
-	try:
-		throw_if( 'mode', mode )
-		throw_if( 'chat', chat )
-		interaction_mode = str( mode ).strip( ).lower( )
-		if interaction_mode not in INTERACTION_MODES:
-			raise ValueError( f'Unsupported Interaction mode: {interaction_mode}' )
-		interaction_ids = st.session_state.get( 'interaction_ids', { } )
-		if not isinstance( interaction_ids, dict ):
-			interaction_ids = { }
-		interaction_ids[ interaction_mode ] = str( chat.interaction_id or '' ).strip( )
-		st.session_state[ 'interaction_ids' ] = interaction_ids
-	except Exception as e:
-		exception = Error( e )
-		exception.module = 'app'
-		exception.cause = 'commit_interaction'
-		exception.method = 'commit_interaction( mode: str, chat: Chat ) -> None'
-		Logger( ).write( exception )
-		raise exception
-
-def clear_interaction( mode: str ) -> None:
-	try:
-		throw_if( 'mode', mode )
-		interaction_mode = str( mode ).strip( ).lower( )
-		if interaction_mode not in INTERACTION_MODES:
-			raise ValueError( f'Unsupported Interaction mode: {interaction_mode}' )
-		interaction_ids = st.session_state.get( 'interaction_ids', { } )
-		if not isinstance( interaction_ids, dict ):
-			interaction_ids = { }
-		interaction_ids[ interaction_mode ] = ''
-		st.session_state[ 'interaction_ids' ] = interaction_ids
-	except Exception as e:
-		exception = Error( e )
-		exception.module = 'app'
-		exception.cause = 'clear_interaction'
-		exception.method = 'clear_interaction( mode: str ) -> None'
 		Logger( ).write( exception )
 		raise exception
 
@@ -1541,116 +1481,6 @@ def save_temp( upload ) -> str | None:
 			pass
 		return None
 
-def extract_usage( resp: Any ) -> Dict[ str, int ]:
-	"""Extract usage.
-    
-    Purpose:
-        Extracts usage for downstream application use. The function normalizes provider or
-        file-system data into a stable shape that the Streamlit interface and helper workflows
-        can consume safely.
-    
-    Args:
-        resp (Any): Resp value used by this workflow.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
-	usage = { 'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, }
-	if not resp:
-		return usage
-	
-	raw = None
-	try:
-		raw = getattr( resp, "usage", None )
-	except Exception as _logged_exception:
-		try:
-			error = Error( _logged_exception )
-			error.module = 'app'
-			error.cause = 'extract_usage'
-			error.method = 'extract_usage( resp: Any )'
-			Logger( ).write( error )
-		except Exception:
-			pass
-		raw = None
-	
-	if not raw and isinstance( resp, dict ):
-		raw = resp.get( 'usage' )
-	
-	if not raw:
-		return usage
-	
-	try:
-		if isinstance( raw, dict ):
-			usage[ 'prompt_tokens' ] = int( raw.get( 'prompt_tokens', 0 ) )
-			usage[ 'completion_tokens' ] = int(
-				raw.get( 'completion_tokens', raw.get( 'output_tokens', 0 ) ) )
-			usage[ 'total_tokens' ] = int( raw.get( 'total_tokens',
-				usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ], ) )
-		else:
-			usage[ "prompt_tokens" ] = int( getattr( raw, "prompt_tokens", 0 ) )
-			usage[ "completion_tokens" ] = int(
-				getattr( raw, "completion_tokens", getattr( raw, "output_tokens", 0 ) ) )
-			usage[ "total_tokens" ] = int( getattr( raw, "total_tokens",
-				usage[ "prompt_tokens" ] + usage[ "completion_tokens" ], ) )
-	except Exception as _logged_exception:
-		try:
-			error = Error( _logged_exception )
-			error.module = 'app'
-			error.cause = 'extract_usage'
-			error.method = 'extract_usage( resp: Any )'
-			Logger( ).write( error )
-		except Exception:
-			pass
-		usage[ "total_tokens" ] = (usage[ "prompt_tokens" ] + usage[ "completion_tokens" ])
-	
-	return usage
-
-def update_counters( resp: Any ) -> None:
-	"""Update counters.
-    
-    Purpose:
-        Updates application state or persistent storage for the update counters operation. The
-        function performs the requested mutation while keeping database and session-state
-        handling centralized.
-    
-    Args:
-        resp (Any): Resp value used by this workflow.
-    """
-	usage = extract_usage( resp )
-	st.session_state.last_call_usage = usage
-	st.session_state.token_usage[ 'prompt_tokens' ] += usage.get( 'prompt_tokens', 0 )
-	st.session_state.token_usage[ 'completion_tokens' ] += usage.get( 'completion_tokens', 0 )
-	st.session_state.token_usage[ 'total_tokens' ] += usage.get( 'total_tokens', 0 )
-
-def display_value( val: Any ) -> str:
-	"""Display value.
-    
-    Purpose:
-        Renders or applies display value behavior in the Streamlit user interface. The function
-        centralizes presentation logic so visual output remains consistent across the
-        application.
-    
-    Args:
-        val (Any): Val value used by this workflow.
-    
-    Returns:
-        Result produced by the operation.
-    """
-	if val is None:
-		return "—"
-	try:
-		return str( val )
-	except Exception as _logged_exception:
-		try:
-			error = Error( _logged_exception )
-			error.module = 'app'
-			error.cause = 'display_value'
-			error.method = 'display_value( val: Any )'
-			Logger( ).write( error )
-		except Exception:
-			pass
-		return "—"
-
 def build_intent_prefix( mode: str ) -> str:
 	"""Build intent prefix.
     
@@ -2012,12 +1842,16 @@ def route_document_query( prompt: str ) -> str:
 		if not isinstance( modalities, list ):
 			modalities = [ ]
 		
-		context = st.session_state.get( 'docqna_messages', [ ], )
+		context = st.session_state.get( 'docqna_gemini_history', [ ] )
 		if not isinstance( context, list ):
 			context = [ ]
 		
-		if context:
-			context = context[ :-1 ]
+		if not context:
+			context = st.session_state.get( 'docqna_messages', [ ] )
+			if not isinstance( context, list ):
+				context = [ ]
+			if context:
+				context = context[ :-1 ]
 		
 		apply_gemini_runtime_config( )
 		chat = Chat( )
@@ -2028,8 +1862,7 @@ def route_document_query( prompt: str ) -> str:
 			tool_choice=None, reasoning=reasoning, modalities=modalities,
 			media_resolution=media_resolution, context=context, content='', urls=[ ], max_urls=0,
 			response_schema='', safety_profile='', file_search_store_names=[ ], stream=False,
-			stream_handler=None, previous_interaction_id=get_previous_interaction_id( 'docqna' ),
-			store=True, )
+			stream_handler=None )
 		
 		if response is None:
 			raise ValueError( 'Gemini returned no Document Q&A response.' )
@@ -2038,7 +1871,7 @@ def route_document_query( prompt: str ) -> str:
 		if not answer:
 			raise ValueError( 'Gemini returned an empty Document Q&A response.' )
 		
-		commit_interaction( 'docqna', chat )
+		st.session_state[ 'docqna_gemini_history' ] = chat.get_structured_history( )
 		update_counters( getattr( chat, 'response', None ) )
 		return answer
 	
@@ -6923,7 +6756,7 @@ elif mode == 'Document Q&A':
 		if st.button( label='Clear Messages', key='docqna_clear_messages', width='content',
 				icon='🧹' ):
 			st.session_state[ 'docqna_messages' ] = [ ]
-			clear_interaction( 'docqna' )
+			st.session_state[ 'docqna_gemini_history' ] = [ ]
 			st.session_state[ 'docqna_context' ] = [ ]
 			st.session_state[ 'last_answer' ] = ''
 			st.session_state[ 'last_sources' ] = [ ]
@@ -7773,7 +7606,7 @@ elif mode == 'File Search Stores':
 									exception = Error( e )
 									exception.module = 'app'
 									exception.cause = ('File Search Store deletion')
-									exception.method = ('searcher.delete( store_id: str )')
+									exception.method = 'searcher.delete( store_id: str )'
 									Logger( ).write( exception )
 									st.error( f'Delete failed: {exception.info}' )
 				
@@ -8020,7 +7853,6 @@ elif mode == 'Google Cloud Buckets':
 		try:
 			st.session_state[ 'bucket_messages' ] = [ ]
 			st.session_state[ 'bucket_input' ] = [ ]
-			clear_interaction( 'bucket' )
 			st.session_state[ 'last_answer' ] = ''
 			st.session_state[ 'last_sources' ] = [ ]
 		
@@ -8177,8 +8009,7 @@ elif mode == 'Google Cloud Buckets':
 				tool_choice=tool_choice or None, reasoning=reasoning, modalities=[ 'text' ],
 				media_resolution='', context=context, content='', urls=[ ], max_urls=0,
 				response_schema='', safety_profile='', file_search_store_names=[ ], stream=stream,
-				stream_handler=None, previous_interaction_id=get_previous_interaction_id( 'bucket' ),
-				store=True, )
+				stream_handler=None )
 			
 			if response is None:
 				raise ValueError( 'Gemini returned no Google Cloud Buckets response.' )
@@ -8187,14 +8018,14 @@ elif mode == 'Google Cloud Buckets':
 			if not response_text:
 				raise ValueError( 'Gemini returned an empty Google Cloud Buckets response.' )
 	
-			commit_interaction( 'bucket', chat )
+			st.session_state[ 'bucket_input' ] = chat.get_structured_history( )
 			update_counters( getattr( chat, 'response', None ) )
 			return response_text
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'app'
 			exception.cause = 'run_bucket_chat_query'
-			exception.method = 'run_bucket_chat_query( prompt: str, **kwargs ) -> str'
+			exception.method = 'run_bucket_chat_query( prompt: str, selected_bucket_id: str, selected_bucket_label: str ) -> str'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -8313,7 +8144,7 @@ elif mode == 'Google Cloud Buckets':
 						st.warning( 'Enter a Cloud Bucket Name.' )
 					else:
 						try:
-							result = searcher.create( str( new_bucket_name ).strip( ) )
+							result = searcher.create( bucket=str( new_bucket_name ).strip( ) )
 							created_name = (getattr( result, 'name', None ) or str(
 								new_bucket_name ).strip( ))
 							
@@ -8323,7 +8154,7 @@ elif mode == 'Google Cloud Buckets':
 							exception = Error( e )
 							exception.module = 'app'
 							exception.cause = 'Cloud Bucket creation'
-							exception.method = ('searcher.create( new_bucket_name: str )')
+							exception.method = ('searcher.create( bucket: str )')
 							Logger( ).write( exception )
 							st.error( f'Create bucket failed: {exception.info}' )
 			
@@ -8367,20 +8198,17 @@ elif mode == 'Google Cloud Buckets':
 								st.warning( 'No Cloud Bucket Selected.' )
 							else:
 								try:
-									bucket_result = searcher.retrieve( store_id=active_bucket_id )
+									bucket_result = searcher.retrieve( bucket=active_bucket_id )
 									st.write( 'Name:', getattr( bucket_result, 'name', '—' ) )
-									st.write( 'Files:',
-										getattr( bucket_result, 'file_counts', '—' ) )
-									usage_bytes = getattr( bucket_result, 'usage_bytes', 0 )
-									
-									st.write( 'Size (MB):',
-										round( float( usage_bytes or 0 ) / 1_048_576, 2 ) )
+									st.write( 'Location:', getattr( bucket_result, 'location', '—' ) )
+									st.write( 'Storage Class:',
+										getattr( bucket_result, 'storage_class', '—' ) )
 								
 								except Exception as e:
 									exception = Error( e )
 									exception.module = 'app'
 									exception.cause = ('Cloud Bucket retrieval')
-									exception.method = 'searcher.retrieve( store_id: str )'
+									exception.method = 'searcher.retrieve( bucket: str )'
 									Logger( ).write( exception )
 									st.error( 'retrieve() failed: '
 									          f'{exception.info}' )
@@ -8395,7 +8223,7 @@ elif mode == 'Google Cloud Buckets':
 								st.warning( 'No Cloud Bucket Selected.' )
 							else:
 								try:
-									searcher.delete( store_id=active_bucket_id )
+									searcher.delete( bucket=active_bucket_id, force=True )
 									
 									st.session_state[ 'bucket_id' ] = ''
 									
