@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/architecture/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/configuration/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/getting-started/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/user-guide/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/api/app/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/api/config/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+    <url>
+         <loc>https://is-leeroy-jenkins.github.io/Jeni/api/gemini/</loc>
+         <lastmod>2026-08-05</lastmod>
+    </url>
+</urlset>

@@ -1,0 +1,88 @@
+:root
+{
+	--jeni-blue: #024FA3;
+	--jeni-bg: #141414;
+	--jeni-surface: #414141;
+	--jeni-border: #565557;
+	--jeni-table-border: #00254C;
+	--jeni-table-header: #023770;
+	--jeni-radius: 14px;
+}
+
+.md-typeset
+{
+	font-size: 0.82rem;
+	line-height: 1.65;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3
+{
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+
+[data-md-color-scheme='slate']
+{
+	--md-default-bg-color: var(--jeni-bg);
+	--md-primary-fg-color: var(--jeni-blue);
+	--md-accent-fg-color: var(--jeni-blue);
+	--md-typeset-a-color: #4DA3FF;
+}
+
+.md-header,
+.md-tabs
+{
+	background-color: var(--jeni-blue);
+}
+
+.md-main__inner
+{
+	max-width: 92rem;
+}
+
+.md-content__inner
+{
+	max-width: none;
+}
+
+.md-typeset table:not([class])
+{
+	border-radius: var(--jeni-radius);
+	overflow: hidden;
+	border: 1px solid var(--jeni-border);
+}
+
+.md-typeset table:not([class]) th
+{
+	background-color: var(--jeni-table-header);
+	color: #FFFFFF;
+}
+
+.md-typeset table:not([class]) td
+{
+	border-top: 1px solid var(--jeni-table-border);
+}
+
+.md-typeset code
+{
+	border-radius: 6px;
+}
+
+.md-typeset pre > code
+{
+	font-size: 0.78rem;
+}
+
+.md-typeset .admonition,
+.md-typeset details
+{
+	border-radius: var(--jeni-radius);
+}
+
+.md-typeset .grid.cards > ul > li,
+.md-typeset .md-button
+{
+	border-radius: var(--jeni-radius);
+}
