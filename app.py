@@ -76,8 +76,8 @@ try:
 except Exception:
 	fitz = None
 
-from gemini import (Chat, Images, Embeddings, Transcription, Translation, TTS, Files, FileSearch,
-                    CloudBuckets)
+from gemini import ( Chat, Images, Embeddings, Transcription, Translation, TTS, Files, FileSearch,
+                    CloudBuckets )
 
 # ======================================================================================
 # SESSION STATE INITIALIZATION
@@ -5639,7 +5639,6 @@ elif mode == 'Audio':
 		try:
 			message_role = str( role or '' ).strip( )
 			message_content = str( content or '' ).strip( )
-			
 			if not message_role or not message_content:
 				return
 			
@@ -5804,8 +5803,8 @@ elif mode == 'Audio':
 					end_time=st.session_state.get( 'audio_end_time' ), instruct=instructions )
 			
 			if selected_task == 'Translate':
-				return translator.translate( source_path, model=selected_model,
-					language=st.session_state.get( 'audio_language' ),
+				return translator.translate( source_path,
+					target_language=st.session_state.get( 'audio_language' ), model=selected_model,
 					mime_type=st.session_state.get( 'audio_format' ),
 					temperature=st.session_state.get( 'audio_temperature' ),
 					top_p=st.session_state.get( 'audio_top_percent' ),
@@ -5940,10 +5939,8 @@ elif mode == 'Audio':
 				with aud_c5:
 					format_options: List[ str ] = [ ]
 					
-					if audio_task == 'Transcribe':
-						format_options = list( transcriber.format_options )
-					elif audio_task == 'Translate':
-						format_options = list( translator.format_options )
+					if audio_task in ('Transcribe', 'Translate'):
+						format_options = list( transcriber.mime_options )
 					elif audio_task == 'Text-to-Speech':
 						format_options = list( tts.format_options )
 					
@@ -6101,10 +6098,9 @@ elif mode == 'Audio':
 							st.audio( audio_bytes, format='audio/wav', loop=audio_loop,
 								autoplay=audio_autoplay )
 							
-							try:
-								update_counters( getattr( tts, 'response', None ) )
-							except Exception:
-								pass
+							provider_response = getattr( tts, 'response', None )
+							if provider_response is not None:
+								update_counters( provider_response )
 						
 						except Exception as e:
 							st.error( f'Text-to-speech failed: {e}' )
@@ -6258,10 +6254,9 @@ elif mode == 'Audio':
 							st.markdown( response_message )
 							append_audio_message( role='assistant', content=response_message )
 							
-							try:
-								update_counters( getattr( tts, 'response', None ) )
-							except Exception:
-								pass
+							provider_response = getattr( tts, 'response', None )
+							if provider_response is not None:
+								update_counters( provider_response )
 						
 						except Exception as e:
 							st.error( f'Text-to-speech failed: {e}' )
@@ -6309,12 +6304,40 @@ elif mode == 'Audio':
 # ======================================================================================
 elif mode == 'Embedding':
 	embedding_model = st.session_state.get( 'embedding_model', '' )
-	embeddings_dimensions = st.session_state.get( 'embeddings_dimensions', )
+	embeddings_dimensions = st.session_state.get( 'embeddings_dimensions', 0 )
 	embeddings_chunk_size = st.session_state.get( 'embeddings_chunk_size', 0 )
 	embeddings_overlap_amount = st.session_state.get( 'embeddings_overlap_amount', 0 )
 	embeddings_encoding = st.session_state.get( 'embeddings_encoding_format', '' )
 	embeddings_input = st.session_state.get( 'embeddings_input_text', '' )
 	embedding = Embeddings( )
+	
+	def reset_embedding_configuration( ) -> None:
+		"""Reset Embeddings Mode configuration.
+
+		Purpose:
+			Removes the model, dimensions, encoding, chunking, overlap, and input widget values
+			so their defaults are restored during the next Streamlit rerun.
+
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		"""
+		for key in [ 'embedding_model', 'embeddings_dimensions', 'embeddings_encoding_format',
+			'embeddings_input_text', 'embeddings_overlap_amount', 'embeddings_chunk_size' ]:
+			st.session_state.pop( key, None )
+	
+	def reset_embedding_results( ) -> None:
+		"""Reset Embeddings Mode results.
+
+		Purpose:
+			Removes generated vectors, source chunks, tabular results, metrics, and input text
+			from Streamlit session state.
+
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		"""
+		for key in [ 'embeddings', 'embeddings_chunks', 'embeddings_df', 'embeddings_input_text',
+			'embedding_metrics' ]:
+			st.session_state.pop( key, None )
 	
 	# ------------------------------------------------------------------
 	# Main Chat UI
@@ -6331,130 +6354,134 @@ elif mode == 'Embedding':
 			# ---------  Model --------
 			with emb_c1:
 				embedding_models = list( embedding.model_options )
-				set_embedding_model = st.selectbox( label='Embedding Model:',
-					options=embedding_models, help='REQUIRED. Embedding model used by the AI',
-					key='embedding_model', index=None, placeholder='Options' )
+				st.selectbox( label='Embedding Model:', options=embedding_models,
+					help='REQUIRED. Embedding model used by the AI', key='embedding_model',
+					index=None, placeholder='Options' )
 				
-				embedding_model = st.session_state[ 'embedding_model' ]
+				embedding_model = st.session_state.get( 'embedding_model', '' )
 			
 			# ---------  Encoding --------
 			with emb_c2:
 				encoding_options = list( embedding.encoding_options )
-				set_encoding_format = st.selectbox( label='Encoding Format:',
-					options=encoding_options, key='embeddings_encoding_format',
-					help='REQUIRED: The format to return the embeddings in. float or base64',
-					index=None, placeholder='Options' )
+				st.selectbox( label='Encoding Format:', options=encoding_options,
+					key='embeddings_encoding_format',
+					help='REQUIRED. The format returned by the embeddings API.', index=None,
+					placeholder='Options' )
 				
-				embeddings_encoding = st.session_state[ 'embeddings_encoding_format' ]
+				embeddings_encoding = st.session_state.get( 'embeddings_encoding_format', '' )
 			
 			# ---------  Dimensions --------
 			with emb_c3:
-				set_embedding_dimensions = st.slider( label='Dimensions', min_value=0,
-					max_value=2048, value=int( st.session_state.get( 'embeddings_dimensions' ) ),
-					step=1, key='embeddings_dimensions',
-					help='Optional (large llm only): An integer between 1 and 2048',
-					width='stretch' )
+				st.slider( label='Dimensions', min_value=0, max_value=2048,
+					value=int( st.session_state.get( 'embeddings_dimensions', 0 ) ), step=1,
+					key='embeddings_dimensions',
+					help='Optional. Zero uses the model default dimensionality.', width='stretch' )
 				
-				embeddings_dimensions = st.session_state[ 'embeddings_dimensions' ]
+				embeddings_dimensions = st.session_state.get( 'embeddings_dimensions', 0 )
 			
 			# ---------  Size --------
 			with emb_c4:
-				set_chunk_size = st.slider( label='Chunk Size', min_value=0, max_value=2000,
-					step=50, key='embeddings_chunk_size',
-					value=int( st.session_state.get( 'embeddings_chunk_size' ) ),
-					help='Maximum tokens per chunk for embedding segmentation.' )
+				st.slider( label='Chunk Size', min_value=0, max_value=2000, step=50,
+					key='embeddings_chunk_size',
+					value=int( st.session_state.get( 'embeddings_chunk_size', 0 ) ),
+					help='Maximum tokens per chunk. Zero embeds the complete text.' )
 				
-				embeddings_chunk_size = st.session_state[ 'embeddings_chunk_size' ]
+				embeddings_chunk_size = st.session_state.get( 'embeddings_chunk_size', 0 )
 			
 			# ---------  Overlap --------
 			with emb_c5:
-				set_overlap_amount = st.slider( label='Overlap Amount', min_value=0,
-					max_value=1000,
-					step=50, key='embeddings_overlap_amount',
-					help='The number of tokens spanning two chunks for embedding segmentation.' )
+				st.slider( label='Overlap Amount', min_value=0, max_value=1000,
+					value=int( st.session_state.get( 'embeddings_overlap_amount', 0 ) ), step=50,
+					key='embeddings_overlap_amount',
+					help='The number of tokens spanning two chunks for embedding '
+					     'segmentation.' )
 				
-				embeddings_overlap_amount = st.session_state[ 'embeddings_overlap_amount' ]
+				embeddings_overlap_amount = st.session_state.get( 'embeddings_overlap_amount', 0 )
 			
 			# ---------  Reset --------
 			if st.button( label='Reset', key='embedding_reset', width='stretch', icon='🔄' ):
-				for key in [ 'embedding_model', 'embeddings_dimensions',
-					'embeddings_encoding_format', 'embeddings_input_text',
-					'embeddings_overlap_amount', 'embeddings_chunk_size' ]:
-					if key in st.session_state:
-						del st.session_state[ key ]
-				
+				reset_embedding_configuration( )
 				st.rerun( )
 		
 		# ------------------------------------------------------------------
-		# Main UI — Embedding execution (unchanged behavior)
+		# Main UI — Embedding execution
 		# ------------------------------------------------------------------
 		embeddings_input = st.text_area( 'Text to embed', key='embeddings_input_text' )
+		
 		btn_left, btn_right = st.columns( [ 0.50, 0.50 ] )
 		
 		with btn_left:
 			embed_clicked = st.button( 'Embed', width='stretch', key='embedding_set', icon='⚡' )
-			if embed_clicked and embeddings_input and embeddings_input.strip( ):
-				with st.spinner( 'Embedding…' ):
-					try:
-						# ----------------------------------------------------------
-						# Normalize + Chunk
-						# ----------------------------------------------------------
-						chunk_size = st.session_state.get( 'embeddings_chunk_size' )
-						normalized_text = normalize_text( embeddings_input )
-						chunks = chunk_text( normalized_text, max_tokens=chunk_size )
-						
-						# ----------------------------------------------------------
-						# Create Embeddings
-						# ----------------------------------------------------------
-						vectors = embedding.create( text=chunks, model=embedding_model,
-							dimensions=st.session_state.get( 'embeddings_dimensions' ),
-							encoding_format=st.session_state.get( 'embeddings_encoding_format' ),
-							task_type='RETRIEVAL_DOCUMENT' )
-						
-						# ----------------------------------------------------------
-						# Persist Results
-						# ----------------------------------------------------------
-						st.session_state[ 'embeddings' ] = vectors
-						st.session_state[ 'embeddings_chunks' ] = chunks
-						
-						# ----------------------------------------------------------
-						# Display Summary
-						# ----------------------------------------------------------
+			
+			if embed_clicked:
+				if not embeddings_input or not embeddings_input.strip( ):
+					st.warning( 'Enter text before creating embeddings.' )
+				
+				elif not embedding_model:
+					st.warning( 'Select an embedding model.' )
+				
+				elif not embeddings_encoding:
+					st.warning( 'Select an encoding format.' )
+				
+				else:
+					with st.spinner( 'Embedding…' ):
 						try:
-							if isinstance( vectors, list ) and vectors and isinstance( vectors[
-								0 ],
-									list ):
+							# ----------------------------------------------------------
+							# Normalize + Chunk
+							# ----------------------------------------------------------
+							normalized_text = normalize_text( embeddings_input )
+							
+							if embeddings_chunk_size > 0:
+								chunks = chunk_text( normalized_text,
+									max_tokens=embeddings_chunk_size )
+							else:
+								chunks = [ normalized_text ]
+							
+							# ----------------------------------------------------------
+							# Create Embeddings
+							# ----------------------------------------------------------
+							vectors = embedding.create( text=chunks, model=embedding_model,
+								dimensions=embeddings_dimensions,
+								encoding_format=embeddings_encoding,
+								task_type='RETRIEVAL_DOCUMENT' )
+							
+							if (vectors is None or not isinstance( vectors, list ) or not vectors):
+								raise ValueError( 'Gemini returned no embedding vectors.' )
+							
+							# ----------------------------------------------------------
+							# Persist Results
+							# ----------------------------------------------------------
+							st.session_state[ 'embeddings' ] = vectors
+							st.session_state[ 'embeddings_chunks' ] = chunks
+							
+							# ----------------------------------------------------------
+							# Display Summary
+							# ----------------------------------------------------------
+							if isinstance( vectors[ 0 ], list ):
 								vector_dimension = len( vectors[ 0 ] )
 								st.write( 'Chunks:', len( vectors ) )
 								st.write( 'Vector dimension:', vector_dimension )
-							elif isinstance( vectors, list ):
-								st.write( 'Vector dimension:', len( vectors ) )
 							else:
-								st.write( 'Vector result type:', type( vectors ) )
-						except Exception:
-							st.write( 'Vector length:', len( vectors ) )
+								st.write( 'Chunks:', 1 )
+								st.write( 'Vector dimension:', len( vectors ) )
+							
+							# ----------------------------------------------------------
+							# Token Counters
+							# ----------------------------------------------------------
+							if embedding.response is not None:
+								update_counters( embedding.response )
 						
-						# ----------------------------------------------------------
-						# Token Counters
-						# ----------------------------------------------------------
-						try:
-							update_counters( getattr( embedding, 'response', None ) )
-						except Exception:
-							pass
-					
-					except Exception as exc:
-						st.error( f'Embedding failed: {exc}' )
+						except Exception as e:
+							exception = Error( e )
+							exception.module = 'app'
+							exception.cause = 'Embeddings Mode'
+							exception.method = 'Embedding execution workflow'
+							Logger( ).write( exception )
+							st.error( f'Embedding failed: {exception.info}' )
 		
 		with btn_right:
 			if st.button( 'Reset', width='stretch', key='input_text_reset', icon='🔄' ):
-				# ----------------------------------------------------------
-				# Clear Embedding State
-				# ----------------------------------------------------------
-				for key in [ 'embeddings', 'embeddings_chunks', 'embeddings_df',
-					'embeddings_input_text' ]:
-					if key in st.session_state:
-						del st.session_state[ key ]
-				
+				reset_embedding_results( )
 				st.rerun( )
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
@@ -6462,41 +6489,43 @@ elif mode == 'Embedding':
 		# ------------------------------------------------------------------
 		# TEXT METRICS
 		# ------------------------------------------------------------------
-		if st.session_state.get( 'embeddings_input_text' ):
-			embeddings_input = st.session_state.get( 'embeddings_input_text', '' ).strip( )
-		
+		embeddings_input = str( st.session_state.get( 'embeddings_input_text', '' ) or '' ).strip( )
 		if embeddings_input:
 			words = embeddings_input.split( )
 			total_words = len( words )
 			unique_words = len( set( words ) )
 			char_count = len( embeddings_input )
 			token_count = count_tokens( embeddings_input )
-			ttr = (unique_words / total_words) if total_words > 0 else 0.0
+			ttr = (unique_words / total_words if total_words > 0 else 0.0)
+			
 			col_m1, col_m2, col_m3, col_m4, col_m5 = st.columns( 5, border=True )
 			col_m1.metric( 'Tokens', token_count )
 			col_m2.metric( 'Words', total_words )
 			col_m3.metric( 'Unique Words', unique_words )
-			col_m4.metric( 'TTR', f"{ttr:.3f}" )
+			col_m4.metric( 'TTR', f'{ttr:.3f}' )
 			col_m5.metric( 'Characters', char_count )
 			
 			st.session_state[ 'embedding_metrics' ] = { 'tokens': token_count, 'words':
-				total_words,
-				'unique_words': unique_words, 'ttr': ttr, 'characters': char_count }
+				total_words, 'unique_words': unique_words, 'ttr': ttr, 'characters': char_count, }
 		
 		# ------------------------------------------------------------------
 		# EMBEDDING DATAFRAME (Dimension-Safe)
 		# ------------------------------------------------------------------
 		if 'embeddings' in st.session_state:
 			embedding_vectors = st.session_state[ 'embeddings' ]
+			
 			if isinstance( embedding_vectors, list ) and embedding_vectors:
-				if isinstance( embedding_vectors[ 0 ], float ):
+				if not isinstance( embedding_vectors[ 0 ], list ):
 					embedding_vectors = [ embedding_vectors ]
 				
 				df_embedding = pd.DataFrame( embedding_vectors,
-					columns=[ f"dim_{i}" for i in range( len( embedding_vectors[ 0 ] ) ) ] )
+					columns=[ f'dim_{index}' for index in range( len( embedding_vectors[ 0 ] ) ) ] )
+				
+				st.session_state[ 'embeddings_df' ] = df_embedding
 				
 				st.data_editor( df_embedding, use_container_width=True, hide_index=True,
 					key='embedding_vectors' )
+
 
 # ======================================================================================
 # DOCUMENTS MODE
@@ -7374,7 +7403,6 @@ elif mode == 'File Search Stores':
 		try:
 			st.session_state[ 'stores_messages' ] = [ ]
 			st.session_state[ 'stores_input' ] = [ ]
-			clear_interaction( 'stores' )
 			st.session_state[ 'last_answer' ] = ''
 			st.session_state[ 'last_sources' ] = [ ]
 		
@@ -7515,8 +7543,7 @@ elif mode == 'File Search Stores':
 				tools=[ 'file_search' ], tool_choice=tool_choice or None, reasoning=reasoning,
 				modalities=[ 'text' ], media_resolution='', context=context, content='', urls=[ ],
 				max_urls=0, response_schema='', safety_profile='',
-				file_search_store_names=[ selected_store ], stream=stream, stream_handler=None, previous_interaction_id=get_previous_interaction_id( 'stores' ),
-				store=True, )
+				file_search_store_names=[ selected_store ], stream=stream, stream_handler=None, )
 			
 			if response is None:
 				raise ValueError( 'Gemini returned no File Search response.' )
@@ -7525,7 +7552,9 @@ elif mode == 'File Search Stores':
 			if not response_text:
 				raise ValueError( 'Gemini returned an empty File Search response.' )
 			
-			commit_interaction( 'stores', chat )
+			structured_history = chat.get_structured_history( )
+			st.session_state[ 'stores_input' ] = (structured_history if structured_history else
+			                                      [ ])
 			update_counters( getattr( chat, 'response', None ) )
 			return response_text
 		except Exception as e:
@@ -7820,8 +7849,8 @@ elif mode == 'File Search Stores':
 		if (stores_prompt is not None and str( stores_prompt ).strip( )):
 			stores_prompt = str( stores_prompt ).strip( )
 			active_store_id = str( st.session_state.get( 'stores_id', '' ) or '' ).strip( )
-			st.session_state[ 'stores_messages' ].append( { 'role': 'user',
-				'content': stores_prompt, } )
+			st.session_state[ 'stores_messages' ].append(
+				{ 'role': 'user', 'content': stores_prompt, } )
 			
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Searching the selected File Search Store…' ):
@@ -7852,8 +7881,8 @@ elif mode == 'File Search Stores':
 						else:
 							st.session_state[ 'last_sources' ] = [ ]
 						
-						st.session_state[ 'stores_messages' ].append( { 'role': 'assistant',
-							'content': response_text, } )
+						st.session_state[ 'stores_messages' ].append(
+							{ 'role': 'assistant', 'content': response_text, } )
 						
 						if st.session_state.get( 'stores_stream', False ):
 							st.session_state[ 'stores_input' ] = [ ]
