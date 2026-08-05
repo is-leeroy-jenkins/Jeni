@@ -38,11 +38,12 @@ from google.genai.file_search_stores import FileSearchStores
 import config as cfg
 import base64
 from boogr import Error, Logger
+import io
 import json
 import os
 import requests
 import PIL.Image
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Set, Tuple
 from pathlib import Path
 from google.cloud.storage.blob import Blob
 from google import genai
@@ -98,66 +99,65 @@ def encode_image( image_path: str ) -> str:
 	with open( image_path, "rb" ) as image_file:
 		return base64.b64encode( image_file.read( ) ).decode( "utf-8" )
 
-class Gemini:
-	"""Shared base class for Gemini wrapper configuration and runtime state.
+class Gemini( ):
+	"""Shared configuration state for Gemini provider wrappers.
 
 	Purpose:
-		Provides common configuration fields used by the Gemini wrapper classes. The base class
-		centralizes API keys, model settings, sampling options, modality settings, tool settings,
-		and response placeholders used by chat, image, embedding, audio, file, file-search, and
-		storage workflows.
+		Initializes the API credentials, model parameters, generation settings, response
+		configuration, and tool selections shared by the specialized Gemini wrapper classes.
+		The base class performs no provider requests and contains no workflow-specific processing.
 
 	Attributes:
-		number (Optional[int]): Candidate or response-count setting.
-		google_api_key (Optional[str]): Google API key loaded from configuration.
-		gemini_api_key (Optional[str]): Gemini API key loaded from configuration.
-		instructions (Optional[str]): System instruction text for model requests.
-		prompt (Optional[str]): Prompt text for model requests.
-		model (Optional[str]): Active Gemini model name.
-		api_version (Optional[str]): Optional API version setting.
-		max_tokens (Optional[int]): Maximum output-token setting.
+		google_api_key (Optional[str]): Google API key loaded from application configuration.
+		gemini_api_key (Optional[str]): Gemini API key loaded from application configuration.
+		model (Optional[str]): Active Gemini model identifier.
+		api_version (Optional[str]): API version selected by a specialized wrapper.
 		temperature (Optional[float]): Sampling temperature.
 		top_p (Optional[float]): Top-p sampling value.
 		top_k (Optional[int]): Top-k sampling value.
-		candidate_count (Optional[int]): Candidate count for supported requests.
-		media_resolution (Optional[str]): Requested media-resolution option.
-		response_modalities (Optional[List[str]]): Requested response modalities.
-		stops (Optional[List[str]]): Stop sequences.
-		domains (Optional[List[str]]): Domain constraints for supported workflows.
-		frequency_penalty (Optional[float]): Frequency penalty for supported requests.
-		presence_penalty (Optional[float]): Presence penalty for supported requests.
-		response_format (Optional[str]): Requested response MIME type.
-		content_response (Optional[GenerateContentResponse]): Last content-generation response.
-		image_response (Optional[GenerateImagesResponse]): Last image-generation response.
-		content_config (Optional[GenerateContentConfig]): Last content-generation config.
+		candidate_count (Optional[int]): Requested candidate count.
+		frequency_penalty (Optional[float]): Frequency-penalty value.
+		presence_penalty (Optional[float]): Presence-penalty value.
+		max_tokens (Optional[int]): Maximum output-token count.
+		instructions (Optional[str]): System instruction text.
+		prompt (Optional[str]): Active user prompt.
+		response_format (Optional[str]): Requested response format.
+		number (Optional[int]): Requested number of generated results.
+		response_modalities (List[str]): Requested response modalities.
+		stops (List[str]): Stop sequences.
+		domains (List[str]): Domain restrictions used by supported search workflows.
+		tools (List[str]): Selected provider tools.
+		tool_choice (Optional[str]): Tool-selection behavior.
+		content_response (Optional[GenerateContentResponse]): Latest content response.
+		image_response (Optional[GenerateImagesResponse]): Latest image-generation response.
+		content_config (Optional[GenerateContentConfig]): Content-generation configuration.
 		function_config (Optional[FunctionCallingConfig]): Function-calling configuration.
 		thought_config (Optional[ThinkingConfig]): Thinking configuration.
 		genimg_config (Optional[GenerateImagesConfig]): Image-generation configuration.
-		image_config (Optional[ImageConfig]): Image-specific configuration.
-		tool_config (Optional[List[types.Tool]]): Tool configuration.
-		tool_choice (Optional[str]): Tool-choice mode.
-		tools (Optional[List[str]]): Tool names selected by the caller.
+		image_config (Optional[ImageConfig]): Image-output configuration.
+		tool_config (Optional[List[types.Tool]]): Provider tool configuration.
 	"""
-	
-	number: Optional[ int ]
+
 	google_api_key: Optional[ str ]
 	gemini_api_key: Optional[ str ]
-	instructions: Optional[ str ]
-	prompt: Optional[ str ]
 	model: Optional[ str ]
 	api_version: Optional[ str ]
-	max_tokens: Optional[ int ]
 	temperature: Optional[ float ]
 	top_p: Optional[ float ]
 	top_k: Optional[ int ]
 	candidate_count: Optional[ int ]
-	media_resolution: Optional[ str ]
-	response_modalities: Optional[ List[ str ] ]
-	stops: Optional[ List[ str ] ]
-	domains: Optional[ List[ str ] ]
 	frequency_penalty: Optional[ float ]
 	presence_penalty: Optional[ float ]
+	max_tokens: Optional[ int ]
+	instructions: Optional[ str ]
+	prompt: Optional[ str ]
 	response_format: Optional[ str ]
+	number: Optional[ int ]
+	response_modalities: List[ str ]
+	stops: List[ str ]
+	domains: List[ str ]
+	tools: List[ str ]
+	tool_choice: Optional[ str ]
 	content_response: Optional[ GenerateContentResponse ]
 	image_response: Optional[ GenerateImagesResponse ]
 	content_config: Optional[ GenerateContentConfig ]
@@ -166,16 +166,17 @@ class Gemini:
 	genimg_config: Optional[ GenerateImagesConfig ]
 	image_config: Optional[ ImageConfig ]
 	tool_config: Optional[ List[ types.Tool ] ]
-	tool_choice: Optional[ str ]
-	tools: Optional[ List[ str ] ]
-	
+
 	def __init__( self ) -> None:
-		"""Initialize the shared Gemini wrapper state.
+		"""Initialize shared Gemini wrapper state.
 
 		Purpose:
-			Initializes provider keys, model settings, sampling fields, request placeholders, and
-			response placeholders used by child wrapper classes. The constructor performs local
-			state assignment only and does not submit provider requests.
+			Initializes common credentials, model parameters, request configuration, tool
+			selections, and response placeholders used by the specialized Gemini wrappers. The
+			constructor performs local state assignment only.
+
+		Returns:
+			None: This method initializes object state through side effects.
 		"""
 		self.google_api_key = cfg.GOOGLE_API_KEY
 		self.gemini_api_key = cfg.GEMINI_API_KEY
@@ -194,55 +195,62 @@ class Gemini:
 		self.number = None
 		self.response_modalities = [ ]
 		self.stops = [ ]
+		self.domains = [ ]
 		self.tools = [ ]
-
+		self.tool_choice = None
+		self.content_response = None
+		self.image_response = None
+		self.content_config = None
+		self.function_config = None
+		self.thought_config = None
+		self.genimg_config = None
+		self.image_config = None
+		self.tool_config = None
 
 class Chat( Gemini ):
-	"""Gemini Interactions API text-generation wrapper.
+	"""Gemini text-generation wrapper.
 
 	Purpose:
-		Provides the application-facing text-generation contract used by the Jeni Streamlit
-		interface. The class translates existing Jeni prompt, history, tool, structured-output,
-		reasoning, URL-context, File Search, and streaming values into Gemini Interactions API
-		requests while preserving the return values and runtime members consumed by ``app.py``.
+		Executes text-generation, grounding, structured-output, streaming, URL Context,
+		File Search, Google Search, Google Maps, and Code Execution workflows through the
+		Gemini Interactions API. The class preserves the application-facing contract used by
+		Jeni while maintaining conversation history through the existing client-managed
+		application state.
 
 	Attributes:
-		use_vertex (Optional[bool]): Whether Vertex AI configuration is active.
-		http_options (Optional[Dict[str, Any]]): HTTP client configuration.
+		use_vertex (bool): Whether Vertex AI configuration is enabled.
+		http_options (HttpOptions): Gemini client HTTP configuration.
 		client (Optional[genai.Client]): Gemini SDK client.
 		storage_client (Optional[storage.Client]): Optional Google Cloud Storage client.
-		contents (Optional[List[Dict[str, Any]]]): Interactions API input steps.
-		input_steps (List[Dict[str, Any]]): Normalized Interactions API input timeline.
-		image_uri (Optional[str]): Optional image URI retained for compatibility.
-		audio_uri (Optional[str]): Optional audio URI retained for compatibility.
+		contents (Optional[List[Dict[str, Any]]]): Complete Interactions input timeline.
+		input_steps (List[Dict[str, Any]]): Interactions input steps submitted to Gemini.
+		image_uri (Optional[str]): Optional image URI retained for interface compatibility.
+		audio_uri (Optional[str]): Optional audio URI retained for interface compatibility.
 		file_path (Optional[str]): Optional local file path retained for compatibility.
-		files (List[str]): File identifiers retained for compatibility.
-		content_block (Optional[str]): Additional application content prepended to the prompt.
-		context (List[Dict[str, Any]]): Existing Jeni chat history.
-		urls (List[str]): Normalized URL-context values.
-		max_urls (int): Maximum number of URL values included in a request.
-		response_schema (Optional[Dict[str, Any]]): Parsed structured-output JSON Schema.
-		safety_profile (Optional[str]): UI safety-profile value retained for compatibility.
-		safety_settings (Optional[List[SafetySetting]]): Legacy safety configuration placeholder.
+		files (List[str]): File identifiers retained for interface compatibility.
+		content_block (str): Additional content prepended to the active prompt.
+		context (List[Dict[str, Any]]): Existing application-managed conversation history.
+		urls (List[str]): URL-context values.
+		max_urls (int): Maximum URL values included in the prompt.
+		response_schema (Optional[Dict[str, Any]]): Parsed structured-output schema.
+		safety_profile (str): Safety-profile value retained for UI compatibility.
+		safety_settings (Optional[List[SafetySetting]]): Optional Gemini safety settings.
 		file_search_store_names (List[str]): File Search Store resource names.
-		interaction (Optional[Any]): Most recent completed Interaction resource.
+		interaction (Optional[Any]): Most recent Gemini Interaction.
 		interaction_id (Optional[str]): Identifier of the most recent Interaction.
-		previous_interaction_id (Optional[str]): Optional server-side conversation predecessor.
-		steps (List[Any]): Model-generated steps returned by the Interactions API.
-		response (Optional[Any]): Raw response retained for application usage accounting.
-		output_text (str): Extracted text returned to the application.
-		grounding_sources (List[Dict[str, Any]]): Sources extracted from annotations and tool
-		steps.
+		steps (List[Any]): Steps returned by the most recent Interaction.
+		response (Optional[Any]): Raw response used by application token accounting.
+		output_text (str): Generated response text.
+		grounding_sources (List[Dict[str, Any]]): Normalized grounding citations.
 		generation_config (Dict[str, Any]): Interactions generation configuration.
-		interaction_response_format (Optional[List[Dict[str, Any]]]): Output-format definitions.
+		interaction_response_format (Optional[Any]): Interactions response-format value.
 		tool_objects (List[Dict[str, Any]]): Interactions server-side tool definitions.
-		stream (bool): Whether the request uses server-sent event streaming.
-		stream_handler (Optional[Callable[[str], None]]): Application text-delta callback.
-		store (bool): Whether Google stores the Interaction resource.
+		stream (bool): Whether streaming is enabled.
+		stream_handler (Optional[Callable[[str], None]]): Text-delta callback.
 	"""
 	
-	use_vertex: Optional[ bool ]
-	http_options: Optional[ Dict[ str, Any ] ]
+	use_vertex: bool
+	http_options: HttpOptions
 	client: Optional[ genai.Client ]
 	storage_client: Optional[ storage.Client ]
 	contents: Optional[ List[ Dict[ str, Any ] ] ]
@@ -251,35 +259,33 @@ class Chat( Gemini ):
 	audio_uri: Optional[ str ]
 	file_path: Optional[ str ]
 	files: List[ str ]
-	content_block: Optional[ str ]
+	content_block: str
 	context: List[ Dict[ str, Any ] ]
 	urls: List[ str ]
 	max_urls: int
 	response_schema: Optional[ Dict[ str, Any ] ]
-	safety_profile: Optional[ str ]
+	safety_profile: str
 	safety_settings: Optional[ List[ SafetySetting ] ]
 	file_search_store_names: List[ str ]
 	interaction: Optional[ Any ]
 	interaction_id: Optional[ str ]
-	previous_interaction_id: Optional[ str ]
 	steps: List[ Any ]
 	response: Optional[ Any ]
 	output_text: str
 	grounding_sources: List[ Dict[ str, Any ] ]
 	generation_config: Dict[ str, Any ]
-	interaction_response_format: Optional[ List[ Dict[ str, Any ] ] ]
+	interaction_response_format: Optional[ Any ]
 	tool_objects: List[ Dict[ str, Any ] ]
 	stream: bool
 	stream_handler: Optional[ Callable[ [ str ], None ] ]
-	store: bool
 	
 	def __init__( self, model: str = 'gemini-2.5-flash-lite' ) -> None:
-		"""Initialize the Gemini Interactions text wrapper.
+		"""Initialize the Chat wrapper.
 
 		Purpose:
-			Initializes the complete compatibility state required by the Jeni application and
-			the Gemini Interactions API. The constructor performs local state assignment only and
-			does not execute a provider request.
+			Initializes text-generation configuration, Interactions request state, grounding
+			state, conversation-history state, and response placeholders. The constructor
+			performs local state assignment only.
 
 		Args:
 			model (str): Default Gemini text-generation model.
@@ -290,11 +296,11 @@ class Chat( Gemini ):
 		super( ).__init__( )
 		self.gemini_api_key = cfg.GEMINI_API_KEY
 		self.google_api_key = cfg.GOOGLE_API_KEY
-		self.api_version = 'v1'
+		self.api_version = 'v1beta'
+		self.http_options = types.HttpOptions( api_version=self.api_version )
+		self.use_vertex = False
 		self.client = None
 		self.storage_client = None
-		self.http_options = { 'api_version': self.api_version }
-		self.use_vertex = False
 		self.model = model
 		self.prompt = None
 		self.instructions = None
@@ -308,7 +314,6 @@ class Chat( Gemini ):
 		self.max_tokens = 0
 		self.stops = [ ]
 		self.response_format = None
-		self.response_mime_type = None
 		self.response_schema = None
 		self.response_modalities = [ ]
 		self.media_resolution = None
@@ -317,12 +322,11 @@ class Chat( Gemini ):
 		self.tool_objects = [ ]
 		self.generation_config = { }
 		self.interaction_response_format = None
-		self.safety_profile = None
+		self.safety_profile = ''
 		self.safety_settings = None
-		self.include_server_side_tool_invocations = True
 		self.contents = None
 		self.input_steps = [ ]
-		self.content_block = None
+		self.content_block = ''
 		self.context = [ ]
 		self.urls = [ ]
 		self.max_urls = 0
@@ -333,55 +337,48 @@ class Chat( Gemini ):
 		self.file_path = None
 		self.interaction = None
 		self.interaction_id = None
-		self.previous_interaction_id = None
 		self.steps = [ ]
 		self.response = None
 		self.content_response = None
-		self.image_response = None
 		self.output_text = ''
 		self.grounding_metadata = None
 		self.grounding_sources = [ ]
 		self.stream = False
 		self.stream_handler = None
-		self.store = False
 	
 	@property
 	def model_options( self ) -> List[ str ]:
-		"""Return supported Gemini Interactions text models.
+		"""Return supported Gemini text-generation models.
 
 		Purpose:
-			Provides the model identifiers displayed by the Jeni Text, Document Q&A, File Search
-			Stores, and Google Cloud Buckets controls. Existing model identifiers are retained for
-			compatibility while currently supported Interactions models are added.
+			Provides the text-generation model identifiers exposed by the Jeni Text,
+			Document Q&A, File Search Stores, and Google Cloud Buckets interfaces.
 
 		Returns:
 			List[str]: Supported Gemini text-generation model identifiers.
 		"""
-		return [ 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite',
-			'gemini-3.1-pro-preview', 'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview',
-			'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash',
-			'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-lite', ]
+		return [ 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro',
+			'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3.5-flash',
+			'gemini-3.6-flash', ]
 	
 	@property
 	def tool_options( self ) -> List[ str ]:
-		"""Return supported Interactions server-side tool names.
+		"""Return supported Interactions server-side tools.
 
 		Purpose:
-			Provides the tool identifiers consumed by the Jeni Text mode controls and translated
-			by ``build_tools`` into Interactions API tool definitions.
+			Provides the server-side tools exposed by the Jeni Text interface.
 
 		Returns:
-			List[str]: Supported server-side tool identifiers.
+			List[str]: Supported Interactions tool identifiers.
 		"""
 		return [ 'google_search', 'google_maps', 'url_context', 'file_search', 'code_execution', ]
 	
 	@property
 	def reasoning_options( self ) -> List[ str ]:
-		"""Return supported Interactions thinking levels.
+		"""Return supported thinking levels.
 
 		Purpose:
-			Provides the reasoning-level values displayed by Jeni and accepted by the
-			Interactions API generation configuration.
+			Provides the thinking-level values exposed by the Jeni model controls.
 
 		Returns:
 			List[str]: Supported thinking-level values.
@@ -393,9 +390,7 @@ class Chat( Gemini ):
 		"""Return supported media-resolution values.
 
 		Purpose:
-			Retains the media-resolution options used by the existing Jeni controls. Text-only
-			Interactions requests preserve this value without sending it as an unsupported
-			top-level parameter.
+			Preserves the media-resolution option contract used by the Jeni interface.
 
 		Returns:
 			List[str]: Supported media-resolution values.
@@ -404,62 +399,60 @@ class Chat( Gemini ):
 	
 	@property
 	def choice_options( self ) -> List[ str ]:
-		"""Return supported Interactions tool-choice modes.
+		"""Return supported tool-choice values.
 
 		Purpose:
-			Provides values accepted by the Interactions API ``tool_choice`` parameter.
+			Provides the tool-selection values accepted by the Interactions API.
 
 		Returns:
-			List[str]: Supported tool-choice modes.
+			List[str]: Supported tool-choice values.
 		"""
-		return [ 'auto', 'any', 'none', 'validated' ]
+		return [ 'auto', 'any', 'none', 'validated', ]
 	
 	@property
 	def include_options( self ) -> List[ str ]:
-		"""Return legacy include options retained for UI compatibility.
+		"""Return compatibility include options.
 
 		Purpose:
-			Preserves the option-list contract currently exposed by the Jeni wrapper. Interactions
-			tool calls and citations are returned through typed steps and content annotations
-			instead of the legacy include mechanism.
+			Preserves the option values consumed by existing Jeni controls while citations
+			and tool execution are retrieved from typed Interaction steps.
 
 		Returns:
-			List[str]: Existing application include-option identifiers.
+			List[str]: Existing Jeni include-option values.
 		"""
 		return [ 'file_search_call.results', 'message.input_image.image_url',
 			'message.output_text.logprobs', 'reasoning.encrypted_content', ]
 	
 	@property
 	def modality_options( self ) -> List[ str ]:
-		"""Return supported output-modality values.
+		"""Return supported response modalities.
 
 		Purpose:
-			Provides modality names used to construct Interactions ``response_format`` entries.
+			Provides response-modality values used by the Jeni Text interface.
 
 		Returns:
-			List[str]: Supported output modalities.
+			List[str]: Supported response modalities.
 		"""
-		return [ '', 'text', 'image', 'audio' ]
+		return [ '', 'text', ]
 	
 	@property
 	def format_options( self ) -> List[ str ]:
 		"""Return supported text response MIME types.
 
 		Purpose:
-			Provides MIME types used by Jeni's response-format control and structured-output
-			configuration.
+			Provides text and structured-output MIME types used by the Text interface.
 
 		Returns:
-			List[str]: Supported text response MIME types.
+			List[str]: Supported response MIME types.
 		"""
-		return [ 'text/plain', 'application/json', 'text/x.enum' ]
+		return [ 'text/plain', 'application/json', 'text/x.enum', ]
 	
 	def get_supported_tools( self, model: str ) -> List[ str ]:
 		"""Return tools supported by the selected model.
 
 		Purpose:
-			Builds the model-specific tool list consumed by the Jeni interface while preserving
-			the existing helper contract.
+			Builds the tool list consumed by the Jeni Text controls and conditionally includes
+			Google Maps for models that expose that capability.
 
 		Args:
 			model (str): Gemini model identifier.
@@ -468,13 +461,15 @@ class Chat( Gemini ):
 			List[str]: Tool identifiers supported by the selected model.
 
 		Raises:
-			Error: Raised when validation or tool-option construction fails.
+			Error: Raised when validation or tool-list construction fails.
+			ValueError: Raised when ``model`` is missing.
 		"""
 		try:
 			throw_if( 'model', model )
-			self.model_name = str( model ).strip( ).lower( )
+			self.model = model
 			self.options = [ 'google_search', 'url_context', 'file_search', 'code_execution', ]
-			if self.supports_google_maps( self.model_name ):
+			
+			if self.supports_google_maps( self.model ):
 				self.options.append( 'google_maps' )
 			
 			return self.options
@@ -490,23 +485,23 @@ class Chat( Gemini ):
 		"""Return whether a model supports Google Maps grounding.
 
 		Purpose:
-			Centralizes model-specific Google Maps feature gating for the Jeni tool controls.
+			Centralizes Google Maps feature gating for the Jeni Text controls.
 
 		Args:
 			model (str): Gemini model identifier.
 
 		Returns:
-			bool: True when Google Maps may be exposed for the model; otherwise False.
+			bool: True when Google Maps may be exposed; otherwise False.
 
 		Raises:
 			Error: Raised when validation or model comparison fails.
+			ValueError: Raised when ``model`` is missing.
 		"""
 		try:
 			throw_if( 'model', model )
-			self.model_name = str( model ).strip( ).lower( )
-			self.maps_models = { 'gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.1-pro-preview',
-				'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview', 'gemini-3-flash-preview',
-				'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', }
+			self.model = model
+			self.model_name = self.model.strip( ).lower( )
+			self.maps_models = { 'gemini-3.5-flash', 'gemini-3.6-flash', }
 			return self.model_name in self.maps_models
 		except Exception as e:
 			exception = Error( e )
@@ -516,87 +511,98 @@ class Chat( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_urls( self, urls: List[ str ], max_urls: int = 10 ) -> List[ str ]:
-		"""Build the normalized URL-context list.
+	def normalize_value( self, value: Any ) -> Any:
+		"""Convert an SDK value into standard Python data.
 
 		Purpose:
-			Removes blank URL values, preserves their original order, removes duplicates, and
-			applies the caller-provided maximum before the values are appended to the request.
+			Recursively converts SDK response models, dictionaries, and sequences into
+			ordinary Python values used by history and citation processing.
 
 		Args:
-			urls (List[str]): Candidate URL values.
-			max_urls (int): Maximum number of URLs to retain.
+			value (Any): SDK or Python value to normalize.
 
 		Returns:
-			List[str]: Normalized and limited URL values.
+			Any: Equivalent standard Python value.
 
 		Raises:
-			Error: Raised when URL normalization fails.
+			Error: Raised when value normalization fails.
 		"""
 		try:
-			self.urls = [ ]
-			self.max_urls = max( 0, int( max_urls or 0 ) )
-			self.url_values = urls if isinstance( urls, list ) else [ ]
-			for url in self.url_values:
-				if url is None:
-					continue
-				
-				self.url = str( url ).strip( )
-				if not self.url:
-					continue
-				
-				if self.url not in self.urls:
-					self.urls.append( self.url )
+			self.value = value
 			
-			if self.max_urls > 0:
-				self.urls = self.urls[ : self.max_urls ]
+			if self.value is None or isinstance( self.value, (str, int, float, bool) ):
+				return self.value
 			
-			return self.urls
+			if isinstance( self.value, dict ):
+				return { key: self.normalize_value( item ) for key, item in self.value.items( ) }
+			
+			if isinstance( self.value, (list, tuple, set) ):
+				return [ self.normalize_value( item ) for item in self.value ]
+			
+			if hasattr( self.value, 'model_dump' ):
+				self.value_data = self.value.model_dump( exclude_none=True )
+				return self.normalize_value( self.value_data )
+			
+			if hasattr( self.value, 'to_dict' ):
+				self.value_data = self.value.to_dict( )
+				return self.normalize_value( self.value_data )
+			
+			return str( self.value )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'build_urls( self,  **kwargs ) -> List[ str ]'
+			exception.method = 'normalize_value( self, value: Any ) -> Any'
 			Logger( ).write( exception )
 			raise exception
 	
-	def normalize_context( self, context: List[ Dict[ str, Any ] ] ) -> List[ Dict[ str, Any ] ]:
-		"""Convert Jeni chat history into Interactions input steps.
+	def normalize_context( self,
+		context: Optional[ List[ Dict[ str, Any ] ] ] = None ) -> List[ Dict[ str, Any ] ]:
+		"""Convert application history into Interactions steps.
 
 		Purpose:
-			Translates the existing ``role`` and ``content`` dictionaries stored by Jeni into
-			``user_input`` and ``model_output`` steps accepted by stateless Interactions requests.
-			Unsupported or empty history entries are ignored without modifying the original list.
+			Preserves existing Interactions steps and converts Jeni role/content dictionaries
+			into ``user_input`` and ``model_output`` steps for stateless conversation history.
 
 		Args:
-			context (List[Dict[str, Any]]): Existing Jeni chat-history records.
+			context (Optional[List[Dict[str, Any]]]): Existing conversation history.
 
 		Returns:
 			List[Dict[str, Any]]: Interactions-compatible history steps.
 
 		Raises:
-			Error: Raised when context normalization fails.
+			Error: Raised when conversation history cannot be normalized.
 		"""
 		try:
 			self.context = context if isinstance( context, list ) else [ ]
 			self.history_steps: List[ Dict[ str, Any ] ] = [ ]
+			
 			for message in self.context:
 				if not isinstance( message, dict ):
 					continue
 				
-				self.role = str( message.get( 'role', '' ) or '' ).strip( ).lower( )
+				self.context_type = str( message.get( 'type', '' ) or '' ).strip( )
+				if self.context_type:
+					self.context_step = self.normalize_value( message )
+					if isinstance( self.context_step, dict ) and self.context_step:
+						self.history_steps.append( self.context_step )
+					
+					continue
+				
+				self.message_role = str( message.get( 'role', '' ) or '' ).strip( ).lower( )
 				self.message_content = message.get( 'content', '' )
+				
 				if isinstance( self.message_content, list ):
 					self.message_text = '\n'.join(
-						str( value ).strip( ) for value in self.message_content if
-						value is not None and str( value ).strip( ) )
+						str( item ).strip( ) for item in self.message_content if
+						item is not None and str( item ).strip( ) )
 				else:
 					self.message_text = str( self.message_content or '' ).strip( )
 				
 				if not self.message_text:
 					continue
 				
-				if self.role in ('assistant', 'model'):
+				if self.message_role in ('assistant', 'model'):
 					self.step_type = 'model_output'
 				else:
 					self.step_type = 'user_input'
@@ -604,53 +610,109 @@ class Chat( Gemini ):
 				self.history_steps.append( { 'type': self.step_type,
 					'content': [ { 'type': 'text', 'text': self.message_text, }, ], } )
 			
-			return self.history_steps
+			self.context = self.history_steps
+			return self.context
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'normalize_context( self, **kwargs) -> List[ Dict[ str, Any ] ]'
+			exception.method = (
+				'normalize_context( self, context: Optional[ List[ Dict[ str, Any ] ] ] ) '
+				'-> List[ Dict[ str, Any ] ]')
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_input( self, prompt: str, content: str, context: List[ Dict[ str, Any ] ],
-		urls: List[ str ], max_urls: int ) -> List[ Dict[ str, Any ] ]:
-		"""Build the complete stateless Interactions input timeline.
+	def build_urls( self, urls: Optional[ List[ str ] ] = None, max_urls: int = 0 ) -> List[ str ]:
+		"""Build the normalized URL list.
 
 		Purpose:
-			Combines normalized Jeni history with the current application content, URL references,
-			and user prompt. The resulting list preserves conversation order and appends exactly
-			one current ``user_input`` step.
+			Removes blank and duplicate URL values while preserving order and applies the
+			configured maximum before URL values are supplied to the active request.
+
+		Args:
+			urls (Optional[List[str]]): Candidate URL values.
+			max_urls (int): Maximum URLs to retain; zero retains all values.
+
+		Returns:
+			List[str]: Normalized URL values.
+
+		Raises:
+			Error: Raised when URL normalization fails.
+		"""
+		try:
+			self.urls = urls if isinstance( urls, list ) else [ ]
+			self.max_urls = max_urls
+			self.normalized_urls: List[ str ] = [ ]
+			
+			for url in self.urls:
+				if url is None:
+					continue
+				
+				self.url = str( url ).strip( )
+				if not self.url:
+					continue
+				
+				if self.url not in self.normalized_urls:
+					self.normalized_urls.append( self.url )
+			
+			if self.max_urls > 0:
+				self.normalized_urls = self.normalized_urls[ :self.max_urls ]
+			
+			self.urls = self.normalized_urls
+			return self.urls
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('build_urls( self, urls: Optional[ List[ str ] ], max_urls: int ) '
+			                    '-> List[ str ]')
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_input( self, prompt: str, content: str = '',
+		context: Optional[ List[ Dict[ str, Any ] ] ] = None, urls: Optional[ List[ str ] ] = None,
+		max_urls: int = 0 ) -> List[ Dict[ str, Any ] ]:
+		"""Build the complete Interactions input timeline.
+
+		Purpose:
+			Combines existing client-managed conversation history with optional content,
+			reference URLs, and the current user prompt.
 
 		Args:
 			prompt (str): Current user prompt.
-			content (str): Optional application content prepended to the current prompt.
-			context (List[Dict[str, Any]]): Existing Jeni chat history.
-			urls (List[str]): Candidate URL-context values.
-			max_urls (int): Maximum URL count.
+			content (str): Optional content prepended to the prompt.
+			context (Optional[List[Dict[str, Any]]]): Existing conversation history.
+			urls (Optional[List[str]]): URL-context values.
+			max_urls (int): Maximum number of URLs.
 
 		Returns:
-			List[Dict[str, Any]]: Complete Interactions input-step list.
+			List[Dict[str, Any]]: Complete Interactions input timeline.
 
 		Raises:
-			Error: Raised when input construction fails.
+			Error: Raised when validation or input construction fails.
+			ValueError: Raised when ``prompt`` is missing.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
-			self.prompt = str( prompt ).strip( )
-			self.content_block = str( content or '' ).strip( )
-			self.input_steps = self.normalize_context( context )
-			self.urls = self.build_urls( urls, max_urls )
+			self.prompt = prompt
+			self.content_block = content
+			self.context = context if isinstance( context, list ) else [ ]
+			self.urls = urls if isinstance( urls, list ) else [ ]
+			self.max_urls = max_urls
+			self.input_steps = self.normalize_context( self.context )
+			self.urls = self.build_urls( self.urls, self.max_urls )
 			self.current_parts: List[ str ] = [ ]
-			if self.content_block:
-				self.current_parts.append( self.content_block )
+			
+			if self.content_block and self.content_block.strip( ):
+				self.current_parts.append( self.content_block.strip( ) )
 			
 			if self.urls:
 				self.current_parts.append(
 					'Reference URLs:\n' + '\n'.join( f'- {url}' for url in self.urls ) )
 			
-			self.current_parts.append( self.prompt )
-			self.current_text = '\n\n'.join( self.current_parts ).strip( )
+			self.current_parts.append( self.prompt.strip( ) )
+			self.current_text = '\n\n'.join( part for part in self.current_parts if part ).strip( )
+			
 			self.input_steps.append( { 'type': 'user_input',
 				'content': [ { 'type': 'text', 'text': self.current_text, }, ], } )
 			
@@ -660,26 +722,31 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'build_input( self, **kwargs) -> List[ Dict[ str, Any ] ]'
+			exception.method = ('build_input( self, prompt: str, content: str, '
+			                    'context: Optional[ List[ Dict[ str, Any ] ] ], '
+			                    'urls: Optional[ List[ str ] ], max_urls: int ) '
+			                    '-> List[ Dict[ str, Any ] ]')
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_generation_config( self, temperature: float, top_p: float, top_k: int,
-		max_tokens: int, stops: List[ str ], reasoning: str ) -> Dict[ str, Any ]:
+	def build_generation_config( self, temperature: float = 0.0, top_p: float = 0.0, top_k: int
+	= 0,
+		max_tokens: int = 0, stops: Optional[ List[ str ] ] = None, reasoning: str = '',
+		tool_choice: Optional[ str ] = None ) -> Dict[ str, Any ]:
 		"""Build the Interactions generation configuration.
 
 		Purpose:
-			Converts Jeni inference controls into the generation fields supported by Gemini
-			Interactions. Zero-valued application defaults are treated as unset values rather
-			than overriding model defaults.
+			Converts supported Jeni inference controls into the Interactions generation
+			configuration without submitting blank or zero-valued optional controls.
 
 		Args:
-			temperature (float): Sampling-temperature value.
+			temperature (float): Sampling temperature.
 			top_p (float): Top-p sampling value.
 			top_k (int): Top-k sampling value.
 			max_tokens (int): Maximum output-token count.
-			stops (List[str]): Stop sequences.
+			stops (Optional[List[str]]): Stop sequences.
 			reasoning (str): Thinking-level value.
+			tool_choice (Optional[str]): Tool-selection behavior.
 
 		Returns:
 			Dict[str, Any]: Interactions generation configuration.
@@ -688,15 +755,15 @@ class Chat( Gemini ):
 			Error: Raised when generation configuration construction fails.
 		"""
 		try:
-			self.temperature = float( temperature or 0.0 )
-			self.top_p = float( top_p or 0.0 )
-			self.top_k = int( top_k or 0 )
-			self.max_tokens = int( max_tokens or 0 )
-			self.stops = [ str( value ).strip( ) for value in
-				(stops if isinstance( stops, list ) else [ ]) if
-				value is not None and str( value ).strip( ) ]
-			self.reasoning = str( reasoning or '' ).strip( ).lower( )
+			self.temperature = temperature
+			self.top_p = top_p
+			self.top_k = top_k
+			self.max_tokens = max_tokens
+			self.stops = stops if isinstance( stops, list ) else [ ]
+			self.reasoning = reasoning
+			self.tool_choice = tool_choice
 			self.generation_config = { }
+			
 			if self.temperature > 0.0:
 				self.generation_config[ 'temperature' ] = self.temperature
 			
@@ -709,49 +776,62 @@ class Chat( Gemini ):
 			if self.max_tokens > 0:
 				self.generation_config[ 'max_output_tokens' ] = self.max_tokens
 			
-			if self.stops:
-				self.generation_config[ 'stop_sequences' ] = self.stops
+			self.stop_sequences = [ str( value ).strip( ) for value in self.stops if
+				value is not None and str( value ).strip( ) ]
 			
-			if self.reasoning and self.reasoning not in ('thinking_level_unspecified',
-				'unspecified',):
-				self.generation_config[ 'thinking_level' ] = self.reasoning
+			if self.stop_sequences:
+				self.generation_config[ 'stop_sequences' ] = self.stop_sequences
+			
+			self.thinking_level = str( self.reasoning or '' ).strip( ).lower( )
+			
+			if self.thinking_level not in ('', 'thinking_level_unspecified', 'unspecified',):
+				self.generation_config[ 'thinking_level' ] = self.thinking_level
+			
+			self.tool_choice_value = str( self.tool_choice or '' ).strip( ).lower( )
+			
+			if self.tool_choice_value:
+				self.generation_config[ 'tool_choice' ] = self.tool_choice_value
 			
 			return self.generation_config
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'build_generation_config( self, **kwars ) -> Dict[ str, Any ]'
+			exception.method = ('build_generation_config( self, temperature: float, top_p: float, '
+			                    'top_k: int, max_tokens: int, stops: Optional[ List[ str ] ], '
+			                    'reasoning: str, tool_choice: Optional[ str ] ) '
+			                    '-> Dict[ str, Any ]')
 			Logger( ).write( exception )
 			raise exception
 	
-	def parse_response_schema( self, response_schema: Any ) -> Optional[ Dict[ str, Any ] ]:
-		"""Parse a structured-output JSON Schema.
+	def parse_response_schema( self, response_schema: Any = None ) -> Optional[ Dict[ str, Any ] ]:
+		"""Parse an optional structured-output schema.
 
 		Purpose:
-			Accepts the existing Jeni response-schema value as a dictionary or JSON string and
-			converts it into the mapping required by the Interactions text response format.
+			Accepts a dictionary or JSON string and converts it into the JSON Schema mapping
+			required by the Interactions API.
 
 		Args:
-			response_schema (Any): Structured-output schema value.
+			response_schema (Any): Optional JSON Schema dictionary or JSON string.
 
 		Returns:
-			Optional[Dict[str, Any]]: Parsed JSON Schema, or None when no schema is supplied.
+			Optional[Dict[str, Any]]: Parsed JSON Schema, or None when absent.
 
 		Raises:
-			Error: Raised when a nonblank schema cannot be parsed as a JSON object.
+			Error: Raised when a nonblank schema cannot be parsed.
 		"""
 		try:
-			self.response_schema = None
-			if response_schema is None:
+			self.response_schema = response_schema
+			
+			if self.response_schema is None:
 				return None
 			
-			if isinstance( response_schema, dict ):
-				self.response_schema = response_schema
+			if isinstance( self.response_schema, dict ):
 				return self.response_schema
 			
-			self.schema_text = str( response_schema ).strip( )
+			self.schema_text = str( self.response_schema ).strip( )
 			if not self.schema_text:
+				self.response_schema = None
 				return None
 			
 			self.schema_value = json.loads( self.schema_text )
@@ -760,249 +840,127 @@ class Chat( Gemini ):
 			
 			self.response_schema = self.schema_value
 			return self.response_schema
-		
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'parse_response_schema( self, **kwargs ) -> Dict[ str, Any ]'
+			exception.method = ('parse_response_schema( self, response_schema: Any ) '
+			                    '-> Optional[ Dict[ str, Any ] ]')
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_response_format( self, response_format: str, response_schema: Any,
-		modalities: List[ str ] ) -> List[ Dict[ str, Any ] ]:
-		"""Build Interactions output-format definitions.
+	def build_response_format( self, response_format: str = '', response_schema: Any = None,
+		modalities: Optional[ List[ str ] ] = None ) -> Optional[ Any ]:
+		"""Build the Interactions response format.
 
 		Purpose:
-			Converts Jeni MIME-type, JSON Schema, and modality controls into the polymorphic
-			``response_format`` structure used by the current Interactions API.
+			Converts the Jeni MIME type, response modalities, and optional JSON Schema into
+			the polymorphic response-format structure used by the current Interactions API.
 
 		Args:
 			response_format (str): Requested text MIME type.
-			response_schema (Any): Optional JSON Schema dictionary or JSON string.
-			modalities (List[str]): Requested output modalities.
+			response_schema (Any): Optional JSON Schema mapping or JSON string.
+			modalities (Optional[List[str]]): Requested response modalities.
 
 		Returns:
-			List[Dict[str, Any]]: Interactions response-format entries.
+			Optional[Any]: Interactions response-format value.
 
 		Raises:
 			Error: Raised when response-format construction fails.
 		"""
 		try:
-			self.response_format = str( response_format or '' ).strip( )
-			self.response_mime_type = self.response_format or 'text/plain'
-			self.response_schema = self.parse_response_schema( response_schema )
-			self.response_modalities = [ str( value ).strip( ).lower( ) for value in
-				(modalities if isinstance( modalities, list ) else [ ]) if
-				value is not None and str( value ).strip( ) ]
+			self.response_format = response_format
+			self.response_schema = response_schema
+			self.response_modalities = (modalities if isinstance( modalities, list ) else [ ])
+			self.response_schema = self.parse_response_schema( self.response_schema )
+			self.response_mime_type = str( self.response_format or '' ).strip( )
+			self.normalized_modalities = [ str( value ).strip( ).lower( ) for value in
+				self.response_modalities if value is not None and str( value ).strip( ) ]
 			
-			if not self.response_modalities:
-				self.response_modalities = [ 'text' ]
+			if self.normalized_modalities and 'text' not in self.normalized_modalities:
+				self.interaction_response_format = None
+				return None
 			
-			self.interaction_response_format = [ ]
+			if self.response_schema is not None:
+				self.interaction_response_format = [
+					{ 'type': 'text', 'mime_type': 'application/json',
+						'schema': self.response_schema, }, ]
+				return self.interaction_response_format
 			
-			if 'text' in self.response_modalities:
-				self.text_format: Dict[ str, Any ] = { 'type': 'text',
-					'mime_type': self.response_mime_type, }
-				
-				if self.response_schema is not None:
-					self.text_format[ 'mime_type' ] = 'application/json'
-					self.text_format[ 'schema' ] = self.response_schema
-				
-				self.interaction_response_format.append( self.text_format )
+			if self.response_mime_type in ('application/json', 'text/x.enum'):
+				self.interaction_response_format = [
+					{ 'type': 'text', 'mime_type': self.response_mime_type, }, ]
+				return self.interaction_response_format
 			
-			if 'image' in self.response_modalities:
-				self.interaction_response_format.append( { 'type': 'image' } )
-			
-			if 'audio' in self.response_modalities:
-				self.interaction_response_format.append( { 'type': 'audio' } )
-			
-			if not self.interaction_response_format:
-				self.interaction_response_format.append(
-					{ 'type': 'text', 'mime_type': self.response_mime_type, } )
-			
-			return self.interaction_response_format
-		
+			self.interaction_response_format = None
+			return None
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'build_response_format( self, **kwargs ) -> List[ Dict[ str, Any ]]'
+			exception.method = ('build_response_format( self, response_format: str, '
+			                    'response_schema: Any, modalities: Optional[ List[ str ] ] ) '
+			                    '-> Optional[ Any ]')
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_tools( self, tools: List[ str ], urls: List[ str ],
-		file_search_store_names: List[ str ] ) -> List[ Dict[ str, Any ] ]:
-		"""Build Interactions server-side tool definitions.
+	def build_tools( self, tools: Optional[ List[ str ] ] = None,
+		urls: Optional[ List[ str ] ] = None,
+		file_search_store_names: Optional[ List[ str ] ] = None ) -> List[ Dict[ str, Any ] ]:
+		"""Build Interactions server-side tools.
 
 		Purpose:
-			Translates Jeni tool names into Interactions API tool dictionaries. URL Context is
-			enabled when selected or when URLs are supplied. File Search is enabled when one or
-			more File Search Store resource names are provided.
+			Translates Jeni tool identifiers into Interactions tool declarations. URL Context
+			is enabled when selected or when URLs are supplied. File Search is enabled when
+			File Search Store resource names are supplied.
 
 		Args:
-			tools (List[str]): Tool identifiers selected by the caller.
-			urls (List[str]): Normalized URL-context values.
-			file_search_store_names (List[str]): File Search Store resource names.
+			tools (Optional[List[str]]): Selected tool identifiers.
+			urls (Optional[List[str]]): Normalized URL-context values.
+			file_search_store_names (Optional[List[str]]): File Search Store names.
 
 		Returns:
-			List[Dict[str, Any]]: Interactions server-side tool definitions.
+			List[Dict[str, Any]]: Interactions server-side tool declarations.
 
 		Raises:
-			Error: Raised when tool-definition construction fails.
+			Error: Raised when tool construction fails.
 		"""
 		try:
-			self.tools = [ str( value ).strip( ).lower( ) for value in
-				(tools if isinstance( tools, list ) else [ ]) if
+			self.tools = tools if isinstance( tools, list ) else [ ]
+			self.urls = urls if isinstance( urls, list ) else [ ]
+			self.file_search_store_names = (
+				file_search_store_names if isinstance( file_search_store_names, list ) else [ ])
+			self.selected_tools = [ str( value ).strip( ).lower( ) for value in self.tools if
 				value is not None and str( value ).strip( ) ]
 			self.file_search_store_names = [ str( value ).strip( ) for value in
-				(file_search_store_names if isinstance( file_search_store_names, list ) else [ ])
-				if value is not None and str( value ).strip( ) ]
+				self.file_search_store_names if value is not None and str( value ).strip( ) ]
 			self.tool_objects = [ ]
 			
-			if 'google_search' in self.tools:
-				self.tool_objects.append( { 'type': 'google_search' } )
+			if 'google_search' in self.selected_tools:
+				self.tool_objects.append( { 'type': 'google_search', } )
 			
-			if 'google_maps' in self.tools and self.supports_google_maps( self.model ):
-				self.tool_objects.append( { 'type': 'google_maps' } )
+			if ('google_maps' in self.selected_tools and self.supports_google_maps( self.model )):
+				self.tool_objects.append( { 'type': 'google_maps', } )
 			
-			if 'url_context' in self.tools or urls:
-				self.tool_objects.append( { 'type': 'url_context' } )
+			if 'url_context' in self.selected_tools or self.urls:
+				self.tool_objects.append( { 'type': 'url_context', } )
 			
-			if 'code_execution' in self.tools:
-				self.tool_objects.append( { 'type': 'code_execution' } )
+			if 'code_execution' in self.selected_tools:
+				self.tool_objects.append( { 'type': 'code_execution', } )
 			
 			if self.file_search_store_names:
 				self.tool_objects.append( { 'type': 'file_search',
 					'file_search_store_names': self.file_search_store_names, } )
 			
 			return self.tool_objects
-		
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'build_tools( self, **kwargs) -> List[ Dict[ str, Any ] ]'
-			Logger( ).write( exception )
-			raise exception
-	
-	def normalize_value( self, value: Any ) -> Any:
-		"""Convert an SDK value into standard Python data.
-
-		Purpose:
-			Normalizes Pydantic SDK objects, dictionaries, lists, tuples, and scalar values for
-			grounding-source extraction without changing provider response state.
-
-		Args:
-			value (Any): SDK or Python value to normalize.
-
-		Returns:
-			Any: Equivalent standard Python value.
-		"""
-		if value is None or isinstance( value, (str, int, float, bool) ):
-			return value
-		
-		if isinstance( value, dict ):
-			return { key: self.normalize_value( item ) for key, item in value.items( ) }
-		
-		if isinstance( value, (list, tuple) ):
-			return [ self.normalize_value( item ) for item in value ]
-		
-		if hasattr( value, 'model_dump' ):
-			return self.normalize_value( value.model_dump( ) )
-		
-		return str( value )
-	
-	def capture_interaction( self, interaction: Any ) -> None:
-		"""Capture a completed unary Interaction.
-
-		Purpose:
-			Stores the raw Interaction, identifier, steps, output text, and grounding sources on
-			the wrapper members consumed by the Jeni application.
-
-		Args:
-			interaction (Any): Completed Gemini Interaction resource.
-
-		Returns:
-			None: This method updates wrapper state through side effects.
-
-		Raises:
-			Error: Raised when response-state extraction fails.
-		"""
-		try:
-			throw_if( 'interaction', interaction )
-			self.interaction = interaction
-			self.response = interaction
-			self.content_response = interaction
-			self.interaction_id = getattr( interaction, 'id', None )
-			self.steps = list( getattr( interaction, 'steps', None ) or [ ] )
-			self.output_text = str( getattr( interaction, 'output_text', '' ) or '' ).strip( )
-			self.grounding_sources = self.extract_grounding_sources( interaction )
-		
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = 'capture_interaction( self, interaction: Any ) -> None'
-			Logger( ).write( exception )
-			raise exception
-	
-	def extract_grounding_sources( self, interaction: Any ) -> List[ Dict[ str, Any ] ]:
-		"""Extract grounding citations from Interaction steps.
-
-		Purpose:
-			Collects URL citations, File Search citations, and search-result metadata from
-			``model_output`` annotations and server-side tool-result steps. Duplicate sources are
-			removed while preserving provider order.
-
-		Args:
-			interaction (Any): Gemini Interaction containing model-generated steps.
-
-		Returns:
-			List[Dict[str, Any]]: Normalized grounding-source records.
-
-		Raises:
-			Error: Raised when grounding-source extraction fails.
-		"""
-		try:
-			self.source_values: List[ Dict[ str, Any ] ] = [ ]
-			self.source_keys: set[ tuple[ str, str, str ] ] = set( )
-			self.interaction_steps = getattr( interaction, 'steps', None ) or [ ]
-			for step in self.interaction_steps:
-				self.step_type = str( getattr( step, 'type', '' ) or '' ).strip( )
-				
-				if self.step_type == 'model_output':
-					self.step_content = getattr( step, 'content', None ) or [ ]
-					for block in self.step_content:
-						self.annotations = getattr( block, 'annotations', None ) or [ ]
-						for annotation in self.annotations:
-							self.annotation_value = self.normalize_value( annotation )
-							if not isinstance( self.annotation_value, dict ):
-								continue
-							
-							self.append_source( source=self.annotation_value, default_type=str(
-								self.annotation_value.get( 'type', 'citation' ) ), )
-				
-				elif self.step_type in ('google_search_result', 'file_search_result',
-					'url_context_result', 'google_maps_result',):
-					self.result_value = self.normalize_value( getattr( step, 'result', None ) )
-					
-					if isinstance( self.result_value, list ):
-						for source in self.result_value:
-							if isinstance( source, dict ):
-								self.append_source( source=source, default_type=self.step_type, )
-					
-					elif isinstance( self.result_value, dict ):
-						self.append_source( source=self.result_value,
-							default_type=self.step_type, )
-			
-			return self.source_values
-		
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Chat'
-			exception.method = 'extract_grounding_sources( self, **kwargs ) -> List[Dict[str, Any]]'
+			exception.method = ('build_tools( self, tools: Optional[ List[ str ] ], '
+			                    'urls: Optional[ List[ str ] ], '
+			                    'file_search_store_names: Optional[ List[ str ] ] ) '
+			                    '-> List[ Dict[ str, Any ] ]')
 			Logger( ).write( exception )
 			raise exception
 	
@@ -1010,92 +968,260 @@ class Chat( Gemini ):
 		"""Append one normalized grounding source.
 
 		Purpose:
-			Converts provider-specific annotation and tool-result fields into the stable source
-			shape consumed by Jeni and prevents duplicate entries.
+			Converts provider citation and tool-result fields into the stable source shape
+			consumed by Jeni and prevents duplicate records.
 
 		Args:
-			source (Dict[str, Any]): Provider source or annotation mapping.
-			default_type (str): Source type used when the mapping omits one.
+			source (Dict[str, Any]): Provider citation or result mapping.
+			default_type (str): Source type used when omitted by the mapping.
 
 		Returns:
-			None: This method updates ``grounding_sources`` construction state.
+			None: This method updates source state through side effects.
+
+		Raises:
+			Error: Raised when validation or source normalization fails.
+			ValueError: Raised when a required argument is missing.
 		"""
-		self.source_type = str( source.get( 'type', default_type ) or default_type ).strip( )
-		self.source_title = str(
-			source.get( 'title' ) or source.get( 'display_name' ) or source.get(
-				'file_name' ) or source.get( 'name' ) or '' ).strip( )
-		self.source_url = str( source.get( 'url' ) or source.get( 'uri' ) or source.get(
-			'source_url' ) or '' ).strip( )
-		self.source_text = str(
-			source.get( 'text' ) or source.get( 'snippet' ) or source.get( 'quote' ) or source.get(
-				'search_suggestions' ) or '' ).strip( )
-		self.source_file_id = str(
-			source.get( 'file_id' ) or source.get( 'file_name' ) or source.get(
-				'document_name' ) or '' ).strip( )
-		
-		if not any( (self.source_title, self.source_url, self.source_text, self.source_file_id,) ):
-			return
-		
-		self.source_key = (self.source_type, self.source_url or self.source_file_id,
-			self.source_text,)
-		
-		if self.source_key in self.source_keys:
-			return
-		
-		self.source_keys.add( self.source_key )
-		self.source_values.append( { 'type': self.source_type, 'title': self.source_title or None,
-			'snippet': self.source_text or None, 'url': self.source_url or None,
-			'files_id': self.source_file_id or None, 'metadata': source, } )
+		try:
+			throw_if( 'source', source )
+			throw_if( 'default_type', default_type )
+			self.source = source
+			self.default_type = default_type
+			self.source_type = str(
+				self.source.get( 'type', self.default_type ) or self.default_type ).strip( )
+			self.source_title = str(
+				self.source.get( 'title' ) or self.source.get( 'display_name' ) or self.source.get(
+					'file_name' ) or self.source.get( 'name' ) or '' ).strip( )
+			self.source_url = str(
+				self.source.get( 'uri' ) or self.source.get( 'url' ) or self.source.get(
+					'source_url' ) or '' ).strip( )
+			self.source_text = str(
+				self.source.get( 'text' ) or self.source.get( 'snippet' ) or self.source.get(
+					'quote' ) or self.source.get( 'search_suggestions' ) or '' ).strip( )
+			self.source_file_id = str(
+				self.source.get( 'file_id' ) or self.source.get( 'file_name' ) or self.source.get(
+					'document_name' ) or '' ).strip( )
+			
+			if not any( [ self.source_title, self.source_url, self.source_text,
+				self.source_file_id, ] ):
+				return
+			
+			self.source_key = (self.source_type, self.source_url or self.source_file_id,
+				self.source_text,)
+			
+			if self.source_key in self.source_keys:
+				return
+			
+			self.source_keys.add( self.source_key )
+			self.source_values.append(
+				{ 'type': self.source_type, 'title': self.source_title or None,
+					'snippet': self.source_text or None, 'url': self.source_url or None,
+					'files_id': self.source_file_id or None, 'metadata': self.source, } )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('append_source( self, source: Dict[ str, Any ], '
+			                    'default_type: str ) -> None')
+			Logger( ).write( exception )
+			raise exception
+	
+	def extract_grounding_sources( self, interaction: Any ) -> List[ Dict[ str, Any ] ]:
+		"""Extract grounding citations from an Interaction.
+
+		Purpose:
+			Collects model-output annotations and supported server-side tool-result data
+			from the current Interaction steps.
+
+		Args:
+			interaction (Any): Completed Gemini Interaction.
+
+		Returns:
+			List[Dict[str, Any]]: Normalized grounding-source records.
+
+		Raises:
+			Error: Raised when validation or citation extraction fails.
+			ValueError: Raised when ``interaction`` is missing.
+		"""
+		try:
+			throw_if( 'interaction', interaction )
+			self.source_interaction = interaction
+			self.source_values: List[ Dict[ str, Any ] ] = [ ]
+			self.source_keys: Set[ Tuple[ str, str, str ] ] = set( )
+			self.source_steps = getattr( self.source_interaction, 'steps', None ) or [ ]
+			
+			for step in self.source_steps:
+				self.source_step_type = str( getattr( step, 'type', '' ) or '' ).strip( )
+				
+				if self.source_step_type == 'model_output':
+					self.source_content = getattr( step, 'content', None ) or [ ]
+					
+					for block in self.source_content:
+						self.annotations = getattr( block, 'annotations', None ) or [ ]
+						
+						for annotation in self.annotations:
+							self.annotation_value = self.normalize_value( annotation )
+							
+							if not isinstance( self.annotation_value, dict ):
+								continue
+							
+							self.append_source( self.annotation_value, str(
+								self.annotation_value.get( 'type', 'citation' ) or 'citation' ) )
+				
+				elif self.source_step_type in ('google_search_result', 'file_search_result',
+					'url_context_result', 'google_maps_result', 'code_execution_result',):
+					self.result_value = self.normalize_value( getattr( step, 'result', None ) )
+					
+					if isinstance( self.result_value, list ):
+						for result in self.result_value:
+							if isinstance( result, dict ) and result:
+								self.append_source( result, self.source_step_type )
+					
+					elif isinstance( self.result_value, dict ) and self.result_value:
+						self.append_source( self.result_value, self.source_step_type )
+			
+			return self.source_values
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('extract_grounding_sources( self, interaction: Any ) '
+			                    '-> List[ Dict[ str, Any ] ]')
+			Logger( ).write( exception )
+			raise exception
+	
+	def capture_interaction( self, interaction: Any ) -> None:
+		"""Capture a completed Gemini Interaction.
+
+		Purpose:
+			Stores the raw response, identifier, output steps, generated text, and grounding
+			sources on the members consumed by the Jeni application.
+
+		Args:
+			interaction (Any): Completed Gemini Interaction.
+
+		Returns:
+			None: This method updates response state through side effects.
+
+		Raises:
+			Error: Raised when validation or response extraction fails.
+			ValueError: Raised when ``interaction`` is missing.
+		"""
+		try:
+			throw_if( 'interaction', interaction )
+			self.interaction = interaction
+			self.response = self.interaction
+			self.content_response = self.interaction
+			self.interaction_id = getattr( self.interaction, 'id', None )
+			self.steps = list( getattr( self.interaction, 'steps', None ) or [ ] )
+			self.output_text = str( getattr( self.interaction, 'output_text', '' ) or '' ).strip( )
+			self.grounding_sources = self.extract_grounding_sources( self.interaction )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('capture_interaction( self, interaction: Any ) -> None')
+			Logger( ).write( exception )
+			raise exception
 	
 	def get_grounding_sources( self ) -> List[ Dict[ str, Any ] ]:
 		"""Return sources from the most recent Interaction.
 
 		Purpose:
-			Restores the application-facing source accessor called by Jeni Text mode after a
-			grounded Gemini response.
+			Provides normalized grounding-source records consumed by Jeni response renderers.
 
 		Returns:
-			List[Dict[str, Any]]: Grounding sources extracted from the latest response.
+			List[Dict[str, Any]]: Grounding sources from the latest response.
 		"""
 		return list( self.grounding_sources )
 	
-	def generate_text_stream( self ) -> str:
-		"""Execute a streaming Interactions text request.
+	def get_structured_history( self ) -> List[ Dict[ str, Any ] ]:
+		"""Return the complete stateless conversation history.
 
 		Purpose:
-			Submits the validated request using Interactions server-sent events, forwards each text
-			delta to the existing Jeni callback, accumulates the complete answer, and retains the
-			final Interaction metadata used by token accounting.
+			Combines the submitted input timeline with the output steps returned by the latest
+			Interaction so Jeni can preserve client-managed conversation state.
 
 		Returns:
-			str: Complete generated text accumulated from stream deltas.
+			List[Dict[str, Any]]: Complete Interactions-compatible history.
+
+		Raises:
+			Error: Raised when output steps cannot be normalized.
+		"""
+		try:
+			self.structured_history: List[ Dict[ str, Any ] ] = [ ]
+			
+			for step in self.input_steps:
+				self.input_step = self.normalize_value( step )
+				if isinstance( self.input_step, dict ) and self.input_step:
+					self.structured_history.append( self.input_step )
+			
+			for step in self.steps:
+				self.output_step = self.normalize_value( step )
+				if isinstance( self.output_step, dict ) and self.output_step:
+					self.structured_history.append( self.output_step )
+			
+			return self.structured_history
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Chat'
+			exception.method = ('get_structured_history( self ) '
+			                    '-> List[ Dict[ str, Any ] ]')
+			Logger( ).write( exception )
+			raise exception
+	
+	def generate_text_stream( self ) -> str:
+		"""Execute the prepared streaming Interactions request.
+
+		Purpose:
+			Submits the active request, forwards text deltas to the application callback,
+			accumulates the complete generated text, and captures final usage metadata.
+
+		Returns:
+			str: Complete generated text.
 
 		Raises:
 			Error: Raised when streaming execution or event handling fails.
 		"""
 		try:
-			self.stream_response = self.client.interactions.create( model=self.model,
-				input=self.input_steps, system_instruction=self.instructions or None,
-				tools=self.tool_objects or None, generation_config=self.generation_config or None,
-				response_format=self.interaction_response_format,
-				tool_choice=self.tool_choice or None, stream=True, store=self.store, )
+			self.request = { 'model': self.model, 'input': self.input_steps, 'stream': True,
+				'store': False, }
 			
+			if self.instructions:
+				self.request[ 'system_instruction' ] = self.instructions
+			
+			if self.tool_objects:
+				self.request[ 'tools' ] = self.tool_objects
+			
+			if self.generation_config:
+				self.request[ 'generation_config' ] = self.generation_config
+			
+			if self.interaction_response_format is not None:
+				self.request[ 'response_format' ] = (self.interaction_response_format)
+			
+			self.stream_response = self.client.interactions.create( **self.request )
 			self.text_chunks: List[ str ] = [ ]
-			self.streaming_interaction = None
+			self.completed_interaction = None
+			
 			for event in self.stream_response:
 				self.event_type = str( getattr( event, 'event_type', '' ) or '' ).strip( )
+				
 				if self.event_type == 'step.delta':
 					self.delta = getattr( event, 'delta', None )
 					self.delta_type = str( getattr( self.delta, 'type', '' ) or '' ).strip( )
+					
 					if self.delta_type == 'text':
 						self.delta_text = str( getattr( self.delta, 'text', '' ) or '' )
+						
 						if self.delta_text:
 							self.text_chunks.append( self.delta_text )
+							
 							if callable( self.stream_handler ):
 								self.stream_handler( self.delta_text )
 				
 				elif self.event_type == 'interaction.completed':
-					self.streaming_interaction = getattr( event, 'interaction', None, )
+					self.completed_interaction = getattr( event, 'interaction', None )
 				
 				elif self.event_type == 'error':
 					self.stream_error = getattr( event, 'error', None )
@@ -1104,19 +1230,27 @@ class Chat( Gemini ):
 					raise RuntimeError( self.stream_message )
 			
 			self.output_text = ''.join( self.text_chunks ).strip( )
-			if self.streaming_interaction is not None:
-				self.interaction = self.streaming_interaction
-				self.response = self.streaming_interaction
-				self.content_response = self.streaming_interaction
-				self.interaction_id = getattr( self.streaming_interaction, 'id', None, )
-				self.steps = list( getattr( self.streaming_interaction, 'steps', None ) or [ ] )
+			self.steps = [ ]
+			
+			if self.output_text:
+				self.steps.append( { 'type': 'model_output',
+					'content': [ { 'type': 'text', 'text': self.output_text, }, ], } )
+			
+			if self.completed_interaction is not None:
+				self.interaction = self.completed_interaction
+				self.response = self.completed_interaction
+				self.content_response = self.completed_interaction
+				self.interaction_id = getattr( self.completed_interaction, 'id', None )
 			else:
 				self.response = self.stream_response
 				self.content_response = self.stream_response
 			
 			self.grounding_sources = [ ]
+			
+			if not self.output_text:
+				raise ValueError( 'Gemini returned an empty streaming response.' )
+			
 			return self.output_text
-		
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -1125,115 +1259,131 @@ class Chat( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def generate_text( self, prompt: str, model: str = 'gemini-2.5-flash-lite', number: int = 1,
-		temperature: float = 0.0, top_p: float = 0.0, top_k: int = 0, frequency: float = 0.0,
-		presence: float = 0.0, max_tokens: int = 0, stops: Optional[ List[ str ] ] = None,
-		instruct: str = '', response_format: str = '', tools: Optional[ List[ str ] ] = None,
+	def generate_text( self, prompt: str, model: str, number: int = 1, temperature: float = 0.0,
+		top_p: float = 0.0, top_k: int = 0, frequency: float = 0.0, presence: float = 0.0,
+		max_tokens: int = 0, stops: Optional[ List[ str ] ] = None, instruct: str = '',
+		response_format: str = '', tools: Optional[ List[ str ] ] = None,
 		tool_choice: Optional[ str ] = None, reasoning: str = '',
 		modalities: Optional[ List[ str ] ] = None, media_resolution: str = '',
 		context: Optional[ List[ Dict[ str, Any ] ] ] = None, content: str = '',
 		urls: Optional[ List[ str ] ] = None, max_urls: int = 0, response_schema: Any = '',
 		safety_profile: str = '', file_search_store_names: Optional[ List[ str ] ] = None,
-		stream: bool = False, stream_handler: Optional[ Callable[ [ str ], None ] ] = None ) -> (
-			str):
+		stream: bool = False,
+		stream_handler: Optional[ Callable[ [ str ], None ] ] = None ) -> str:
 		"""Generate text through the Gemini Interactions API.
 
 		Purpose:
-			Preserves the complete ``generate_text`` contract currently called by the Jeni
-			application. The method validates and assigns every argument to wrapper state, builds
-			stateless Interactions input and configuration objects, executes unary or streaming
-			generation, retains the raw response, and returns normalized text.
+			Preserves Jeni's text-generation method contract while routing model execution
+			through the Interactions API. Existing client-managed history is converted into
+			Interactions steps and returned through ``get_structured_history()`` after the call.
 
 		Args:
 			prompt (str): Current user prompt.
 			model (str): Gemini model identifier.
-			number (int): Candidate-count value retained for application compatibility.
-			temperature (float): Sampling-temperature value.
+			number (int): Candidate-count value retained for compatibility.
+			temperature (float): Sampling temperature.
 			top_p (float): Top-p sampling value.
 			top_k (int): Top-k sampling value.
-			frequency (float): Frequency-penalty value retained for compatibility.
-			presence (float): Presence-penalty value retained for compatibility.
+			frequency (float): Frequency penalty retained for compatibility.
+			presence (float): Presence penalty retained for compatibility.
 			max_tokens (int): Maximum output-token count.
 			stops (Optional[List[str]]): Stop sequences.
 			instruct (str): System instruction text.
-			response_format (str): Requested text MIME type.
+			response_format (str): Requested response MIME type.
 			tools (Optional[List[str]]): Server-side tool identifiers.
-			tool_choice (Optional[str]): Tool-selection mode.
+			tool_choice (Optional[str]): Tool-selection behavior.
 			reasoning (str): Thinking-level value.
 			modalities (Optional[List[str]]): Requested output modalities.
 			media_resolution (str): Media-resolution value retained for compatibility.
-			context (Optional[List[Dict[str, Any]]]): Existing Jeni chat history.
+			context (Optional[List[Dict[str, Any]]]): Client-managed conversation history.
 			content (str): Additional application content.
 			urls (Optional[List[str]]): URL-context values.
 			max_urls (int): Maximum number of URLs.
 			response_schema (Any): Optional JSON Schema mapping or JSON string.
 			safety_profile (str): Safety-profile value retained for compatibility.
-			file_search_store_names (Optional[List[str]]): File Search Store resource names.
-			stream (bool): Whether to stream text deltas.
+			file_search_store_names (Optional[List[str]]): File Search Store names.
+			stream (bool): Whether to stream response text.
 			stream_handler (Optional[Callable[[str], None]]): Text-delta callback.
 
 		Returns:
 			str: Generated response text.
 
 		Raises:
-			Error: Raised when validation, request construction, or provider execution fails.
+			Error: Raised when validation, request construction, or execution fails.
+			ValueError: Raised when a required prompt, model, or API key is missing.
 		"""
 		try:
 			throw_if( 'prompt', prompt )
 			throw_if( 'model', model )
-			self.prompt = str( prompt ).strip( )
-			self.model = str( model ).strip( )
-			self.number = max( 1, int( number or 1 ) )
+			self.prompt = prompt
+			self.model = model
+			self.number = number
 			self.candidate_count = self.number
-			self.temperature = float( temperature or 0.0 )
-			self.top_p = float( top_p or 0.0 )
-			self.top_k = int( top_k or 0 )
-			self.frequency_penalty = float( frequency or 0.0 )
-			self.presence_penalty = float( presence or 0.0 )
-			self.max_tokens = int( max_tokens or 0 )
+			self.temperature = temperature
+			self.top_p = top_p
+			self.top_k = top_k
+			self.frequency_penalty = frequency
+			self.presence_penalty = presence
+			self.max_tokens = max_tokens
 			self.stops = stops if isinstance( stops, list ) else [ ]
-			self.instructions = str( instruct or '' ).strip( )
-			self.response_format = str( response_format or '' ).strip( )
+			self.instructions = instruct
+			self.response_format = response_format
 			self.tools = tools if isinstance( tools, list ) else [ ]
-			self.tool_choice = str( tool_choice or '' ).strip( ).lower( ) or None
-			self.reasoning = str( reasoning or '' ).strip( )
+			self.tool_choice = tool_choice
+			self.reasoning = reasoning
 			self.response_modalities = (modalities if isinstance( modalities, list ) else [ ])
-			self.media_resolution = str( media_resolution or '' ).strip( )
+			self.media_resolution = media_resolution
 			self.context = context if isinstance( context, list ) else [ ]
-			self.content_block = str( content or '' ).strip( )
+			self.content_block = content
 			self.urls = urls if isinstance( urls, list ) else [ ]
-			self.max_urls = max( 0, int( max_urls or 0 ) )
-			self.safety_profile = str( safety_profile or '' ).strip( )
+			self.max_urls = max_urls
+			self.response_schema = response_schema
+			self.safety_profile = safety_profile
 			self.file_search_store_names = (
 				file_search_store_names if isinstance( file_search_store_names, list ) else [ ])
-			self.stream = bool( stream )
+			self.stream = stream
 			self.stream_handler = stream_handler
-			self.store = False
-			self.previous_interaction_id = None
-			self.gemini_api_key =cfg.GEMINI_API_KEY or cfg.GOOGLE_API_KEY
-			self.client = genai.Client( api_key=self.gemini_api_key,
-				http_options=types.HttpOptions( api_version=self.api_version ), )
+			self.api_key = (os.getenv( 'GEMINI_API_KEY' ) or os.getenv(
+				'GOOGLE_API_KEY' ) or self.gemini_api_key or self.google_api_key)
+			throw_if( 'api_key', self.api_key )
+			
+			self.client = genai.Client( api_key=self.api_key, http_options=self.http_options )
+			
 			self.input_steps = self.build_input( prompt=self.prompt, content=self.content_block,
-				context=self.context, urls=self.urls, max_urls=self.max_urls, )
+				context=self.context, urls=self.urls, max_urls=self.max_urls )
+			
 			self.generation_config = self.build_generation_config( temperature=self.temperature,
 				top_p=self.top_p, top_k=self.top_k, max_tokens=self.max_tokens, stops=self.stops,
-				reasoning=self.reasoning, )
+				reasoning=self.reasoning, tool_choice=self.tool_choice )
+			
 			self.interaction_response_format = self.build_response_format(
-				response_format=self.response_format, response_schema=response_schema,
-				modalities=self.response_modalities, )
+				response_format=self.response_format, response_schema=self.response_schema,
+				modalities=self.response_modalities )
+			
 			self.tool_objects = self.build_tools( tools=self.tools, urls=self.urls,
-				file_search_store_names=self.file_search_store_names, )
+				file_search_store_names=self.file_search_store_names )
 			
 			if self.stream:
 				return self.generate_text_stream( )
 			
-			self.interaction = self.client.interactions.create( model=self.model,
-				input=self.input_steps, system_instruction=self.instructions or None,
-				tools=self.tool_objects or None, generation_config=self.generation_config or None,
-				response_format=self.interaction_response_format,
-				tool_choice=self.tool_choice or None, stream=False, store=self.store, )
+			self.request = { 'model': self.model, 'input': self.input_steps, 'stream': False,
+				'store': False, }
 			
+			if self.instructions:
+				self.request[ 'system_instruction' ] = self.instructions
+			
+			if self.tool_objects:
+				self.request[ 'tools' ] = self.tool_objects
+			
+			if self.generation_config:
+				self.request[ 'generation_config' ] = self.generation_config
+			
+			if self.interaction_response_format is not None:
+				self.request[ 'response_format' ] = (self.interaction_response_format)
+			
+			self.interaction = self.client.interactions.create( **self.request )
 			self.capture_interaction( self.interaction )
+			
 			if not self.output_text:
 				raise ValueError( 'Gemini returned an empty Interactions response.' )
 			
@@ -1242,272 +1392,281 @@ class Chat( Gemini ):
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Chat'
-			exception.method = 'generate_text( self, **Kwargs ) -> str'
+			exception.method = 'generate_text( self, **kwargs ) -> str'
 			Logger( ).write( exception )
 			raise exception
 
 class Images( Gemini ):
-	"""Images class.
-	
+	"""Gemini image-generation, analysis, and editing wrapper.
+
 	Purpose:
-		Supports Gemini image generation, image analysis, and image editing workflows. The class
-		stores image-specific configuration, constructs multimodal request payloads, manages
-		grounding options when supported, and extracts image or text output from provider
-		responses.
-	
+		Executes image generation, image understanding, and image editing through the Gemini
+		Interactions API. The class converts local images into Interactions image-content
+		blocks, builds image and text response formats, configures supported Google Search
+		grounding, captures generated image or text output, and preserves the application-facing
+		method contracts consumed by the Jeni Images mode.
+
 	Attributes:
-		client (Optional[genai.Client]): Runtime field used by the Images workflow.
-		aspect_ratio (Optional[str]): Runtime field used by the Images workflow.
-		use_vertex (Optional[bool]): Runtime field used by the Images workflow.
-		resolution (Optional[str]): Runtime field used by the Images workflow.
-		size (Optional[str]): Runtime field used by the Images workflow.
+		client (Optional[genai.Client]): Active Gemini client.
+		http_options (HttpOptions): Gemini client HTTP configuration.
+		aspect_ratio (Optional[str]): Requested output-image aspect ratio.
+		size (Optional[str]): Requested output-image size.
+		resolution (Optional[str]): Media-resolution value retained for UI compatibility.
+		max_output_tokens (Optional[int]): Maximum text-output token count.
+		output_mime_type (Optional[str]): Requested output-image MIME type.
+		response_mode (Optional[str]): Requested response-modality selection.
+		response_format_value (Optional[Any]): Interactions response-format configuration.
+		generation_config (Dict[str, Any]): Interactions generation configuration.
+		input_content (List[Dict[str, Any]]): Multimodal Interactions input.
+		tool_objects (List[Dict[str, Any]]): Interactions Google Search tool declarations.
+		interaction (Optional[Any]): Most recent Gemini Interaction.
+		response (Optional[Any]): Raw response used by application token accounting.
+		output_text (str): Text extracted from the latest Interaction.
+		output_image_content (Optional[Any]): Image content from the latest Interaction.
+		grounding_metadata (Optional[Any]): Grounding data retained for UI compatibility.
+		grounding_sources (List[Dict[str, Any]]): Normalized grounding records.
 	"""
 	
 	client: Optional[ genai.Client ]
+	http_options: HttpOptions
 	aspect_ratio: Optional[ str ]
-	use_vertex: Optional[ bool ]
-	resolution: Optional[ str ]
 	size: Optional[ str ]
+	resolution: Optional[ str ]
+	max_output_tokens: Optional[ int ]
+	output_mime_type: Optional[ str ]
+	response_mode: Optional[ str ]
+	response_format_value: Optional[ Any ]
+	generation_config: Dict[ str, Any ]
+	input_content: List[ Dict[ str, Any ] ]
+	tool_objects: List[ Dict[ str, Any ] ]
+	interaction: Optional[ Any ]
+	response: Optional[ Any ]
+	output_text: str
+	output_image_content: Optional[ Any ]
+	grounding_metadata: Optional[ Any ]
+	grounding_sources: List[ Dict[ str, Any ] ]
 	
-	def __init__( self, model: str='gemini-2.5-flash-image' ):
-		"""Initialize instance.
-		
+	def __init__( self, model: str = 'gemini-3.1-flash-image' ) -> None:
+		"""Initialize the Images wrapper.
+
 		Purpose:
-			Initializes the Images instance with default configuration, runtime state, and
-			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
-			assignment.
-		
+			Initializes image-model configuration, Interactions request state, output
+			configuration, and response placeholders. The constructor performs local state
+			assignment only and does not create a client or submit a provider request.
+
 		Args:
-			model (str): model value used by this workflow.
+			model (str): Default Gemini image model.
+
+		Returns:
+			None: This method initializes object state through side effects.
 		"""
 		super( ).__init__( )
-		self.number = None
 		self.model = model
+		self.api_version = 'v1beta'
+		self.http_options = types.HttpOptions( api_version=self.api_version )
 		self.client = None
+		self.number = 1
 		self.instructions = None
-		self.image_config = None
-		self.function_config = None
-		self.thought_config = None
-		self.genimg_config = None
-		self.tool_config = None
-		self.response_modalities = [ ]
-		self.tools = [ ]
-		self.stops = [ ]
-		self.domains = [ ]
-		self.http_options = { }
 		self.temperature = None
-		self.size = None
 		self.top_p = None
 		self.top_k = None
-		self.aspect_ratio = None
 		self.frequency_penalty = None
 		self.presence_penalty = None
 		self.candidate_count = None
+		self.max_tokens = None
 		self.max_output_tokens = None
-		self.use_vertex = None
+		self.aspect_ratio = None
+		self.size = None
+		self.resolution = None
 		self.media_resolution = None
-		self.tool_choice = None
-		self.content_response = None
-		self.response = None
-		self.grounding_metadata = None
 		self.output_mime_type = None
 		self.response_mode = None
+		self.response_modalities = [ ]
+		self.tools = [ ]
+		self.tool_choice = None
+		self.input_content = [ ]
+		self.response_format_value = None
+		self.generation_config = { }
+		self.tool_objects = [ ]
+		self.interaction = None
+		self.response = None
+		self.content_response = None
+		self.image_response = None
+		self.output_text = ''
+		self.output_image_content = None
+		self.grounding_metadata = None
+		self.grounding_sources = [ ]
 	
 	@property
-	def model_options( self ) -> List[ str ] | None:
-		"""Model options.
-		
+	def model_options( self ) -> List[ str ]:
+		"""Return supported Gemini image models.
+
 		Purpose:
-			Returns the model options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Provides image-generation and image-editing model identifiers exposed by the Jeni
+			Images mode.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported Gemini image-model identifiers.
 		"""
-		return [ 'gemini-2.5-flash-image', 'gemini-3.1-flash-image-preview' ]
+		return [ 'gemini-3.1-flash-lite-image', 'gemini-3.1-flash-image', 'gemini-3-pro-image', ]
 	
 	@property
-	def include_options( self ) -> List[ str ] | None:
-		"""Include options.
-		
+	def include_options( self ) -> List[ str ]:
+		"""Return compatibility include options.
+
 		Purpose:
-			Returns the include options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Preserves the option contract consumed by existing Jeni controls.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Existing include-option values.
 		"""
 		return [ 'file_search_call.results', 'message.input_image.image_url',
-			'message.output_text.logprobs', 'reasoning.encrypted_content' ]
+			'message.output_text.logprobs', 'reasoning.encrypted_content', ]
 	
 	@property
-	def aspect_options( self ) -> List[ str ] | None:
-		"""Aspect options.
-		
+	def aspect_options( self ) -> List[ str ]:
+		"""Return supported output-image aspect ratios.
+
 		Purpose:
-			Returns the aspect options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Provides aspect-ratio values accepted by Gemini image response formats.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported aspect ratios.
 		"""
-		return [ '1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9' ]
+		return [ '1:1', '1:4', '1:8', '2:3', '3:2', '3:4', '4:1', '4:3', '4:5', '5:4', '8:1',
+			'9:16', '16:9', '21:9', ]
 	
 	@property
-	def media_options( self ) -> List[ str ] | None:
-		"""Media options.
-		
+	def media_options( self ) -> List[ str ]:
+		"""Return supported media-resolution values.
+
 		Purpose:
-			Returns the media options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
-		"""
-		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
-	
-	@property
-	def modality_options( self ) -> List[ str ] | None:
-		"""Modality options.
-		
-		Purpose:
-			Returns the modality options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Provides media-resolution values retained by the Jeni image controls.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported media-resolution values.
 		"""
-		return [ 'text', 'image', 'text_and_image' ]
+		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low', ]
 	
 	@property
-	def reasoning_options( self ) -> List[ str ] | None:
-		"""Reasoning options.
-		
+	def modality_options( self ) -> List[ str ]:
+		"""Return supported image response modes.
+
 		Purpose:
-			Returns the reasoning options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Provides text-only, image-only, and combined text-and-image output selections.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported response-mode values.
 		"""
-		return [ 'unspecified', 'minimal', 'low', 'medium', 'high' ]
+		return [ 'text', 'image', 'text_and_image', ]
 	
 	@property
-	def size_options( self ) -> List[ str ] | None:
-		"""Size options.
-		
+	def reasoning_options( self ) -> List[ str ]:
+		"""Return supported thinking levels.
+
 		Purpose:
-			Returns the size options exposed by this provider wrapper. This property keeps UI 
-			option
-			rendering centralized and gives documentation a stable location for describing 
-			supported
-			choices.
-		
-		"""
-		return [ '1K', '2K', '4K' ]
-	
-	@property
-	def tool_options( self ) -> List[ str ] | None:
-		"""Tool options.
-		
-		Purpose:
-			Returns the tool options exposed by this provider wrapper. This property keeps UI 
-			option
-			rendering centralized and gives documentation a stable location for describing 
-			supported
-			choices.
-		
+			Provides thinking-level values accepted by supported image models.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported thinking-level values.
 		"""
-		return [ 'google_search', 'image_search' ]
+		return [ 'unspecified', 'minimal', 'low', 'medium', 'high', ]
 	
 	@property
-	def choice_options( self ) -> List[ str ] | None:
-		"""Choice options.
-		
+	def size_options( self ) -> List[ str ]:
+		"""Return supported output-image sizes.
+
 		Purpose:
-			Returns the choice options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Provides output-image sizes accepted through the Interactions response format.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported image-size values.
 		"""
-		return [ 'auto', 'any', 'none', 'validated' ]
+		return [ '512', '1K', '2K', '4K', ]
 	
 	@property
-	def format_options( self ) -> List[ str ] | None:
-		"""Format options.
-		
+	def tool_options( self ) -> List[ str ]:
+		"""Return supported image grounding tools.
+
 		Purpose:
-			Returns the format options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Provides Google Web Search and Google Image Search selections used by the Jeni
+			Images mode.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported image tool identifiers.
 		"""
-		return [ 'text/plain', 'application/json', 'text/x.enum' ]
+		return [ 'google_search', 'image_search', ]
 	
 	@property
-	def mime_options( self ) -> List[ str ] | None:
-		"""Mime options.
-		
+	def choice_options( self ) -> List[ str ]:
+		"""Return supported tool-choice values.
+
 		Purpose:
-			Returns the mime options exposed by this provider wrapper. This property keeps UI 
-			option
-			rendering centralized and gives documentation a stable location for describing 
-			supported
-			choices.
-		
+			Preserves the existing Jeni tool-choice option contract.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported tool-choice values.
 		"""
-		return [ 'image/jpeg', 'image/png', 'image/webp' ]
+		return [ 'auto', 'any', 'none', 'validated', ]
 	
 	@property
-	def resolution_options( self ) -> List[ str ] | None:
-		"""Resolution options.
-		
+	def format_options( self ) -> List[ str ]:
+		"""Return supported text-output MIME types.
+
 		Purpose:
-			Returns the resolution options exposed by this provider wrapper. This property keeps UI
-			option rendering centralized and gives documentation a stable location for describing
-			supported choices.
-		
+			Provides text MIME types retained by the Jeni image controls.
+
 		Returns:
-			Available option values or configured wrapper values.
+			List[str]: Supported text-output MIME types.
 		"""
-		return [ '1K', '2K', '4K' ]
+		return [ 'text/plain', 'application/json', 'text/x.enum', ]
 	
-	def supports_image_size( self, model: str='gemini-2.5-flash-image' ) -> bool:
-		"""Supports image size.
-		
+	@property
+	def mime_options( self ) -> List[ str ]:
+		"""Return supported generated-image MIME types.
+
 		Purpose:
-			Determines whether the selected model supports a specific Images feature. The method
-			centralizes feature gating so the UI and request builders expose only compatible
-			options.
-		
+			Provides image MIME types accepted by the Interactions image response format.
+
+		Returns:
+			List[str]: Supported generated-image MIME types.
+		"""
+		return [ 'image/jpeg', 'image/png', 'image/webp', ]
+	
+	@property
+	def resolution_options( self ) -> List[ str ]:
+		"""Return supported output-image resolution options.
+
+		Purpose:
+			Provides the output-size values exposed by the Jeni Images mode.
+
+		Returns:
+			List[str]: Supported output-image sizes.
+		"""
+		return list( self.size_options )
+	
+	def supports_image_size( self, model: str ) -> bool:
+		"""Return whether the selected model supports explicit image size.
+
+		Purpose:
+			Centralizes output-image-size feature gating for the Jeni image controls.
+
 		Args:
-			model (str): model value used by this workflow.
-		
+			model (str): Gemini image-model identifier.
+
 		Returns:
-			True when the selected model supports the requested feature; otherwise False.
-		
+			bool: True when the model supports explicit image size.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when validation or model comparison fails.
+			ValueError: Raised when ``model`` is missing.
 		"""
 		try:
-			self.model_name = str( model or '' ).strip( ).lower( )
-			self.image_size_models = [ 'gemini-3.1-flash-image-preview',
-				'gemini-3-pro-image-preview' ]
+			throw_if( 'model', model )
+			self.model = model
+			self.model_name = self.model.strip( ).lower( )
+			self.image_size_models = { 'gemini-3.1-flash-lite-image', 'gemini-3.1-flash-image',
+				'gemini-3-pro-image', }
 			return self.model_name in self.image_size_models
 		except Exception as e:
 			exception = Error( e )
@@ -1517,29 +1676,27 @@ class Images( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def supports_search_grounding( self, model: str='gemini-2.5-flash-image' ) -> bool:
-		"""Supports search grounding.
-		
+	def supports_search_grounding( self, model: str ) -> bool:
+		"""Return whether the model supports Google Search grounding.
+
 		Purpose:
-			Determines whether the selected model supports a specific Images feature. The method
-			centralizes feature gating so the UI and request builders expose only compatible
-			options.
-		
+			Centralizes Google Search grounding feature gating for image generation.
+
 		Args:
-			model (str): model value used by this workflow.
-		
+			model (str): Gemini image-model identifier.
+
 		Returns:
-			True when the selected model supports the requested feature; otherwise False.
-		
+			bool: True when the model supports Google Search grounding.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when validation or model comparison fails.
+			ValueError: Raised when ``model`` is missing.
 		"""
 		try:
-			self.model_name = str( model or '' ).strip( ).lower( )
-			self.search_grounding_models = [ 'gemini-3.1-flash-image-preview',
-				'gemini-3-pro-image-preview' ]
+			throw_if( 'model', model )
+			self.model = model
+			self.model_name = self.model.strip( ).lower( )
+			self.search_grounding_models = { 'gemini-3.1-flash-image', 'gemini-3-pro-image', }
 			return self.model_name in self.search_grounding_models
 		except Exception as e:
 			exception = Error( e )
@@ -1549,28 +1706,27 @@ class Images( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def supports_image_search( self, model: str='gemini-2.5-flash-image' ) -> bool:
-		"""Supports image search.
-		
+	def supports_image_search( self, model: str ) -> bool:
+		"""Return whether the model supports Google Image Search grounding.
+
 		Purpose:
-			Determines whether the selected model supports a specific Images feature. The method
-			centralizes feature gating so the UI and request builders expose only compatible
-			options.
-		
+			Restricts Google Image Search grounding to the model documented for that feature.
+
 		Args:
-			model (str): model value used by this workflow.
-		
+			model (str): Gemini image-model identifier.
+
 		Returns:
-			True when the selected model supports the requested feature; otherwise False.
-		
+			bool: True when Google Image Search is supported.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when validation or model comparison fails.
+			ValueError: Raised when ``model`` is missing.
 		"""
 		try:
-			self.model_name = str( model or '' ).strip( ).lower( )
-			return self.model_name == 'gemini-3.1-flash-image-preview'
+			throw_if( 'model', model )
+			self.model = model
+			self.model_name = self.model.strip( ).lower( )
+			return self.model_name == 'gemini-3.1-flash-image'
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
@@ -1580,580 +1736,704 @@ class Images( Gemini ):
 			raise exception
 	
 	def normalize_response_modalities( self, response_modalities: Optional[ str ],
-		image_only: bool=False ) -> List[ str ]:
-		"""Normalize response modalities.
-		
+		image_only: bool = False ) -> List[ str ]:
+		"""Normalize the requested response modes.
+
 		Purpose:
-			Normalizes input values for the Images workflow before they are passed to provider 
-			calls
-			or downstream processing. The method converts UI or caller-supplied values into a 
-			stable
-			shape expected by the wrapper.
-		
+			Converts the Jeni response-mode value into text and image modality identifiers used
+			to build the Interactions response format.
+
 		Args:
-			response_modalities (Optional[str]): response modalities value used by this workflow.
-			image_only (bool): image only value used by this workflow.
-		
+			response_modalities (Optional[str]): Jeni response-mode value.
+			image_only (bool): Whether image output must be included.
+
 		Returns:
-			Normalized value suitable for provider calls or downstream processing.
-		
+			List[str]: Normalized response modes.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when response-mode normalization fails.
 		"""
 		try:
-			self.mode_name = str( response_modalities or '' ).strip( ).upper( )
-			if self.mode_name == 'TEXT_AND_IMAGE':
-				return [ 'TEXT', 'IMAGE' ]
-			
-			if self.mode_name == 'TEXT':
-				return [ 'TEXT' ]
-			
-			if self.mode_name == 'IMAGE':
-				return [ 'IMAGE' ]
-			
-			if self.mode_name == 'TEXT,IMAGE':
-				return [ 'TEXT', 'IMAGE' ]
-			
-			if self.mode_name == 'TEXT, IMAGE':
-				return [ 'TEXT', 'IMAGE' ]
-			
-			return [ 'IMAGE' ] if image_only else [ 'TEXT' ]
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Images'
-			exception.method = 'normalize_response_modalities( self, *args ) -> List[str]'
-			Logger( ).write( exception )
-			raise exception
-	
-	def build_grounding_tool( self, image_search: bool=False ) -> Optional[ Tool ]:
-		"""Build grounding tool.
-		
-		Purpose:
-			Builds the request component used by the Images workflow. The method translates caller
-			options and current object state into provider-compatible configuration or content
-			values.
-		
-		Args:
-			image_search (bool): image search value used by this workflow.
-		
-		Returns:
-			Provider-compatible request component or configuration value.
-		
-		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
-		"""
-		try:
-			if not self.supports_search_grounding( self.model ):
-				return None
-			
-			self.use_image_search = bool( image_search )
-			self.model_name = str( self.model or '' ).strip( ).lower( )
-			if self.use_image_search and self.supports_image_search( self.model_name ):
-				return Tool( google_search=types.GoogleSearch(
-					search_types=types.SearchTypes( web_search=types.WebSearch( ),
-						image_search=types.ImageSearch( ) ) ) )
-			
-			return Tool( google_search=types.GoogleSearch( ) )
-		except Exception as e:
-			exception = Error( e )
-			exception.module = 'gemini'
-			exception.cause = 'Images'
-			exception.method = 'build_grounding_tool( self, *args ) -> Optional[Tool]'
-			Logger( ).write( exception )
-			raise exception
-	
-	def get_content_config( self, response_modalities: Optional[ str ], image_only: bool=False,
-		image_search: bool=False, grounded: bool=False, 
-		output_mime_type: Optional[ str ]=None ) -> GenerateContentConfig:
-		"""Get content config.
-		
-		Purpose:
-			Retrieves a derived value from the current Images runtime state. The method shields
-			callers from provider response-shape differences and returns a stable 
-			application-facing
-			value.
-		
-		Args:
-			response_modalities (Optional[str]): response modalities value used by this workflow.
-			image_only (bool): image only value used by this workflow.
-			image_search (bool): image search value used by this workflow.
-			grounded (bool): grounded value used by this workflow.
-			output_mime_type (Optional[str]): output mime type value used by this workflow.
-		
-		Returns:
-			Derived value extracted from the current runtime state.
-		
-		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
-		"""
-		try:
+			self.response_mode = response_modalities
 			self.image_only = image_only
-			self.image_config = None
-			self.tool_config = None
-			self.grounding_metadata = None
-			self.output_mime_type = str( output_mime_type or '' ).strip( ) or None
-			self.image_kwargs = { }
-			self.aspect_value = str( self.aspect_ratio or '' ).strip( )
-			if self.aspect_value:
-				self.image_kwargs[ 'aspect_ratio' ] = self.aspect_value
+			self.mode_name = str( self.response_mode or '' ).strip( ).lower( )
+			if self.mode_name == 'text_and_image':
+				return [ 'text', 'image', ]
 			
-			self.size_value = str( self.size or '' ).strip( )
-			if self.size_value and self.supports_image_size( self.model ):
-				self.image_kwargs[ 'image_size' ] = self.size_value
+			if self.mode_name == 'text':
+				return [ 'text', ]
 			
-			if len( self.image_kwargs ) > 0:
-				self.image_config = types.ImageConfig( **self.image_kwargs )
+			if self.mode_name == 'image':
+				return [ 'image', ]
 			
-			if grounded:
-				self.grounding_tool = self.build_grounding_tool( image_search=image_search )
-				if self.grounding_tool is not None:
-					self.tool_config = [ self.grounding_tool ]
+			if self.image_only:
+				return [ 'image', ]
 			
-			self.response_modalities = self.normalize_response_modalities(
-				response_modalities=response_modalities, image_only=image_only )
-			
-			self.config_kwargs = { 'response_modalities': self.response_modalities }
-			if self.temperature is not None:
-				self.config_kwargs[ 'temperature' ] = self.temperature
-			
-			if self.top_p is not None:
-				self.config_kwargs[ 'top_p' ] = self.top_p
-			
-			if self.number is not None and int( self.number or 0 ) > 0:
-				self.config_kwargs[ 'candidate_count' ] = int( self.number )
-			
-			if self.max_output_tokens is not None and int( self.max_output_tokens or 0 ) > 0:
-				self.config_kwargs[ 'max_output_tokens' ] = int( self.max_output_tokens )
-			
-			if self.instructions is not None and str( self.instructions ).strip( ):
-				self.config_kwargs[ 'system_instruction' ] = str( self.instructions ).strip( )
-			
-			if self.image_config is not None:
-				self.config_kwargs[ 'image_config' ] = self.image_config
-			
-			if self.tool_config is not None and len( self.tool_config ) > 0:
-				self.config_kwargs[ 'tools' ] = self.tool_config
-			
-			self.content_config = GenerateContentConfig( **self.config_kwargs )
-			return self.content_config
+			return [ 'text', ]
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'get_content_config( self, **kwargs ) -> GenerateContentConfig'
+			exception.method = 'normalize_response_modalities( self, **kwargs ) -> List[ str ]'
 			Logger( ).write( exception )
 			raise exception
 	
-	def open_image( self, path: str ) -> PIL.Image.Image:
-		"""Open image.
-		
+	def get_image_mime_type( self, path: str ) -> str:
+		"""Return the MIME type for a local image.
+
 		Purpose:
-			Opens a local image file and returns an independent image object for multimodal
-			requests. The method validates the path and copies the image so the file handle can
-			close safely.
-		
+			Uses the local file suffix to produce the image MIME type required by an
+			Interactions image-content block.
+
 		Args:
-			path (str): path value used by this workflow.
-		
+			path (str): Local image path.
+
 		Returns:
-			Result produced by the operation.
-		
+			str: Image MIME type.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when validation or MIME-type resolution fails.
+			ValueError: Raised when ``path`` is missing.
 		"""
 		try:
 			throw_if( 'path', path )
-			with PIL.Image.open( path ) as source:
+			self.file_path = path
+			self.file_suffix = Path( self.file_path ).suffix.lower( )
+			if self.file_suffix in ('.jpg', '.jpeg'):
+				return 'image/jpeg'
+			
+			if self.file_suffix == '.webp':
+				return 'image/webp'
+			
+			if self.file_suffix == '.gif':
+				return 'image/gif'
+			
+			return 'image/png'
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'get_image_mime_type( self, path: str ) -> str'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_image_input( self, prompt: str,
+		path: Optional[ str ]=None ) -> List[ Dict[ str, Any ] ]:
+		"""Build Interactions text and image input.
+
+		Purpose:
+			Creates a text content block and, when supplied, a base64-encoded local image
+			content block for image analysis or editing.
+
+		Args:
+			prompt (str): Image-generation, analysis, or editing instruction.
+			path (Optional[str]): Optional local image path.
+
+		Returns:
+			List[Dict[str, Any]]: Interactions-compatible input content.
+
+		Raises:
+			Error: Raised when validation, file reading, or input construction fails.
+			ValueError: Raised when ``prompt`` is missing.
+		"""
+		try:
+			throw_if( 'prompt', prompt )
+			self.prompt = prompt
+			self.file_path = path
+			self.input_content = [ { 'type': 'text', 'text': self.prompt.strip( ), }, ]
+			if self.file_path:
+				self.image_bytes = Path( self.file_path ).read_bytes( )
+				throw_if( 'image_bytes', self.image_bytes )
+				self.image_data = base64.b64encode( self.image_bytes ).decode( 'utf-8' )
+				self.image_mime_type = self.get_image_mime_type( self.file_path )
+				self.input_content.append( { 'type': 'image', 'data': self.image_data,
+					'mime_type': self.image_mime_type, } )
+			
+			return self.input_content
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'build_image_input( self, **kwargs) -> List[ Dict[ str, Any ] ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_generation_config( self, temperature: Optional[ float ] = None,
+		top_p: Optional[ float ] = None, max_tokens: Optional[ int ] = None ) -> Dict[ str, Any ]:
+		"""Build the Interactions image generation configuration.
+
+		Purpose:
+			Converts supported Jeni inference values into the Interactions generation
+			configuration.
+
+		Args:
+			temperature (Optional[float]): Sampling temperature.
+			top_p (Optional[float]): Top-p sampling value.
+			max_tokens (Optional[int]): Maximum output-token count.
+
+		Returns:
+			Dict[str, Any]: Interactions generation configuration.
+
+		Raises:
+			Error: Raised when generation configuration construction fails.
+		"""
+		try:
+			self.temperature = temperature
+			self.top_p = top_p
+			self.max_output_tokens = max_tokens
+			self.generation_config = { }
+			if self.temperature is not None:
+				self.generation_config[ 'temperature' ] = self.temperature
+			
+			if self.top_p is not None:
+				self.generation_config[ 'top_p' ] = self.top_p
+			
+			if self.max_output_tokens is not None and self.max_output_tokens > 0:
+				self.generation_config[ 'max_output_tokens' ] = (self.max_output_tokens)
+			
+			return self.generation_config
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'build_generation_config( self, **kwargs ) -> Dict[ str, Any ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_response_format( self, response_modalities: Optional[ str ], image_only: bool=False,
+		aspect: Optional[ str ] = None, resolution: Optional[ str ] = None,
+		output_mime_type: Optional[ str ] = None ) -> Any:
+		"""Build the Interactions image response format.
+
+		Purpose:
+			Constructs text, image, or combined response formats and applies supported image
+			MIME type, aspect ratio, and output-size settings to the image format.
+
+		Args:
+			response_modalities (Optional[str]): Jeni response-mode value.
+			image_only (bool): Whether image output must be included.
+			aspect (Optional[str]): Requested output-image aspect ratio.
+			resolution (Optional[str]): Requested output-image size.
+			output_mime_type (Optional[str]): Requested generated-image MIME type.
+
+		Returns:
+			Any: Interactions response-format object or list.
+
+		Raises:
+			Error: Raised when response-format construction fails.
+		"""
+		try:
+			self.response_mode = response_modalities
+			self.image_only = image_only
+			self.aspect_ratio = aspect
+			self.size = resolution
+			self.output_mime_type = output_mime_type
+			self.response_modalities = self.normalize_response_modalities(
+				response_modalities=self.response_mode, image_only=self.image_only )
+			self.response_formats: List[ Dict[ str, Any ] ] = [ ]
+			for modality in self.response_modalities:
+				if modality == 'text':
+					self.response_formats.append( { 'type': 'text', } )
+				
+				elif modality == 'image':
+					self.image_format: Dict[ str, Any ] = { 'type': 'image', }
+					if self.output_mime_type:
+						self.image_format[ 'mime_type' ] = (self.output_mime_type)
+					
+					if self.aspect_ratio:
+						self.image_format[ 'aspect_ratio' ] = (self.aspect_ratio)
+					
+					if (self.size and self.supports_image_size( self.model )):
+						self.image_format[ 'image_size' ] = self.size
+					
+					self.response_formats.append( self.image_format )
+			
+			if len( self.response_formats ) == 1:
+				self.response_format_value = self.response_formats[ 0 ]
+			else:
+				self.response_format_value = self.response_formats
+			
+			return self.response_format_value
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'build_response_format( self, **kwargs ) -> Any'
+			Logger( ).write( exception )
+			raise exception
+	
+	def build_grounding_tools( self, grounded: bool=False,
+		image_search: bool=False ) -> List[ Dict[ str, Any ] ]:
+		"""Build image grounding tool declarations.
+
+		Purpose:
+			Creates the Interactions Google Search tool declaration for web grounding and
+			optionally enables Google Image Search when supported by the selected model.
+
+		Args:
+			grounded (bool): Whether Google Web Search grounding is enabled.
+			image_search (bool): Whether Google Image Search grounding is enabled.
+
+		Returns:
+			List[Dict[str, Any]]: Interactions tool declarations.
+
+		Raises:
+			Error: Raised when grounding-tool construction fails.
+		"""
+		try:
+			self.grounded = grounded
+			self.image_search = image_search
+			self.tool_objects = [ ]
+			if not self.grounded and not self.image_search:
+				return self.tool_objects
+			
+			if not self.supports_search_grounding( self.model ):
+				return self.tool_objects
+			
+			self.search_types: List[ str ] = [ ]
+			if self.grounded:
+				self.search_types.append( 'web_search' )
+			
+			if (self.image_search and self.supports_image_search( self.model )):
+				self.search_types.append( 'image_search' )
+			
+			self.search_tool: Dict[ str, Any ] = { 'type': 'google_search', }
+			
+			if self.search_types:
+				self.search_tool[ 'search_types' ] = self.search_types
+			
+			self.tool_objects.append( self.search_tool )
+			return self.tool_objects
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'build_grounding_tools( self, **kwargs ) -> List[Dict[str, Any]]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def extract_image( self, interaction: Any ) -> Optional[ PIL.Image.Image ]:
+		"""Extract a generated image from an Interaction.
+
+		Purpose:
+			Reads the SDK ``output_image`` convenience property, decodes its base64 content,
+			and returns an independent Pillow image object.
+
+		Args:
+			interaction (Any): Completed Gemini Interaction.
+
+		Returns:
+			Optional[PIL.Image.Image]: Generated image, or None when no image was returned.
+
+		Raises:
+			Error: Raised when validation or image extraction fails.
+			ValueError: Raised when ``interaction`` is missing.
+		"""
+		try:
+			throw_if( 'interaction', interaction )
+			self.interaction = interaction
+			self.output_image_content = getattr( self.interaction, 'output_image', None )
+			if self.output_image_content is None:
+				return None
+			
+			self.output_image_data = getattr( self.output_image_content, 'data', None )
+			if not self.output_image_data:
+				return None
+			
+			self.decoded_image = base64.b64decode( self.output_image_data )
+			with PIL.Image.open( io.BytesIO( self.decoded_image ) ) as source:
 				return source.copy( )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'open_image( self, path ) -> PIL.Image.Image'
+			exception.method = 'extract_image( self, interaction: Any ) -> Optional[ Image ]'
+			Logger( ).write( exception )
+			raise exception
+	
+	def extract_text( self, interaction: Any ) -> Optional[ str ]:
+		"""Extract generated text from an Interaction.
+
+		Purpose:
+			Reads the Interactions SDK ``output_text`` convenience property and returns the
+			normalized text expected by the Jeni image-analysis workflow.
+
+		Args:
+			interaction (Any): Completed Gemini Interaction.
+
+		Returns:
+			Optional[str]: Generated text, or None when no text was returned.
+
+		Raises:
+			Error: Raised when validation or text extraction fails.
+			ValueError: Raised when ``interaction`` is missing.
+		"""
+		try:
+			throw_if( 'interaction', interaction )
+			self.interaction = interaction
+			self.output_text = str( getattr( self.interaction, 'output_text', '' ) or '' ).strip( )
+			return self.output_text or None
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = ('extract_text( self, interaction: Any ) -> Optional[ str ]')
 			Logger( ).write( exception )
 			raise exception
 	
 	def capture_metadata( self ) -> None:
-		"""Capture metadata.
-		
+		"""Capture grounding information from the latest Interaction.
+
 		Purpose:
-			Captures response metadata from the most recent Images provider response. The method
-			stores provider metadata on the instance for later display, citation, grounding, or
-			diagnostic use.
-		
+			Retains the latest Interaction steps and Google Search result metadata for
+			application display and diagnostics.
+
+		Returns:
+			None: This method updates response state through side effects.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when grounding metadata cannot be captured.
 		"""
 		try:
 			self.grounding_metadata = None
-			if self.content_response is None:
+			self.grounding_sources = [ ]
+			
+			if self.interaction is None:
 				return
 			
-			self.candidates = getattr( self.content_response, 'candidates', None )
-			if self.candidates:
-				for candidate in self.candidates:
-					self.metadata = getattr( candidate, 'grounding_metadata', None )
-					if self.metadata is None:
-						self.metadata = getattr( candidate, 'groundingMetadata', None )
-					
-					if self.metadata is not None:
-						self.grounding_metadata = self.metadata
-						return
+			self.steps = getattr( self.interaction, 'steps', None ) or [ ]
+			for step in self.steps:
+				self.step_type = str( getattr( step, 'type', '' ) or '' ).strip( )
+				if self.step_type != 'google_search_result':
+					continue
+				
+				self.result = getattr( step, 'result', None )
+				self.grounding_sources.append( { 'type': self.step_type, 'result': self.result, } )
+			
+			if self.grounding_sources:
+				self.grounding_metadata = self.grounding_sources
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'capture_metadata( self )'
+			exception.method = 'capture_metadata( self ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def execute_interaction( self, prompt: str, model: str, path: Optional[ str ] = None,
+		aspect: Optional[ str ] = None, number: Optional[ int ] = None,
+		temperature: Optional[ float ] = None, top_p: Optional[ float ] = None,
+		frequency: Optional[ float ] = None, presence: Optional[ float ] = None,
+		max_tokens: Optional[ int ] = None, resolution: Optional[ str ] = None,
+		instruct: Optional[ str ] = None, output_mime_type: Optional[ str ] = None,
+		response_modalities: Optional[ str ] = None, image_only: bool = False,
+		grounded: bool = False, image_search: bool = False ) -> Any:
+		"""Execute an image Interaction.
+
+		Purpose:
+			Validates required inputs, creates the Gemini client, builds multimodal input,
+			generation settings, output formats, and grounding tools, submits the request, and
+			captures the response state shared by generation, analysis, and editing workflows.
+
+		Args:
+			prompt (str): Image-generation, analysis, or editing instruction.
+			model (str): Gemini image-model identifier.
+			path (Optional[str]): Optional local image path.
+			aspect (Optional[str]): Requested output-image aspect ratio.
+			number (Optional[int]): Requested result count retained for compatibility.
+			temperature (Optional[float]): Sampling temperature.
+			top_p (Optional[float]): Top-p sampling value.
+			frequency (Optional[float]): Frequency penalty retained for compatibility.
+			presence (Optional[float]): Presence penalty retained for compatibility.
+			max_tokens (Optional[int]): Maximum output-token count.
+			resolution (Optional[str]): Requested generated-image size.
+			instruct (Optional[str]): System instruction text.
+			output_mime_type (Optional[str]): Requested generated-image MIME type.
+			response_modalities (Optional[str]): Requested response-mode value.
+			image_only (bool): Whether image output must be included.
+			grounded (bool): Whether Google Search grounding is enabled.
+			image_search (bool): Whether Google Image Search grounding is enabled.
+
+		Returns:
+			Any: Completed Gemini Interaction.
+
+		Raises:
+			Error: Raised when validation, request construction, or provider execution fails.
+			ValueError: Raised when ``prompt``, ``model``, or the API key is missing.
+		"""
+		try:
+			throw_if( 'prompt', prompt )
+			throw_if( 'model', model )
+			self.prompt = prompt
+			self.model = model
+			self.file_path = path
+			self.aspect_ratio = aspect
+			self.number = number
+			self.temperature = temperature
+			self.top_p = top_p
+			self.frequency_penalty = frequency
+			self.presence_penalty = presence
+			self.max_output_tokens = max_tokens
+			self.size = resolution
+			self.instructions = instruct
+			self.output_mime_type = output_mime_type
+			self.response_mode = response_modalities
+			self.image_only = image_only
+			self.grounded = grounded
+			self.image_search = image_search
+			self.api_key = self.gemini_api_key or self.google_api_key
+			self.client = genai.Client( api_key=self.api_key, http_options=self.http_options )
+			self.input_content = self.build_image_input( prompt=self.prompt, path=self.file_path )
+			self.generation_config = self.build_generation_config( temperature=self.temperature,
+				top_p=self.top_p, max_tokens=self.max_output_tokens )
+			
+			self.response_format_value = self.build_response_format(
+				response_modalities=self.response_mode, image_only=self.image_only,
+				aspect=self.aspect_ratio, resolution=self.size,
+				output_mime_type=self.output_mime_type )
+			
+			self.tool_objects = self.build_grounding_tools( grounded=self.grounded,
+				image_search=self.image_search )
+			
+			self.request: Dict[ str, Any ] = { 'model': self.model, 'input': self.input_content,
+				'response_format': self.response_format_value, 'store': False, }
+			
+			if self.instructions:
+				self.request[ 'system_instruction' ] = self.instructions
+			
+			if self.generation_config:
+				self.request[ 'generation_config' ] = (self.generation_config)
+			
+			if self.tool_objects:
+				self.request[ 'tools' ] = self.tool_objects
+			
+			self.interaction = self.client.interactions.create( **self.request )
+			self.response = self.interaction
+			self.content_response = self.interaction
+			self.image_response = self.interaction
+			self.capture_metadata( )
+			return self.interaction
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'gemini'
+			exception.cause = 'Images'
+			exception.method = 'execute_interaction( self, **kwargs ) -> Any'
 			Logger( ).write( exception )
 			raise exception
 	
 	def get_first_image( self ) -> Optional[ PIL.Image.Image ]:
-		"""Get first image.
-		
+		"""Return the image from the most recent Interaction.
+
 		Purpose:
-			Retrieves a derived value from the current Images runtime state. The method shields
-			callers from provider response-shape differences and returns a stable 
-			application-facing
-			value.
-		
+			Preserves the existing Jeni helper contract by extracting the generated image from
+			the latest Interaction.
+
 		Returns:
-			Derived value extracted from the current runtime state.
-		
+			Optional[PIL.Image.Image]: Generated image, or None when unavailable.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when image extraction fails.
 		"""
 		try:
-			if self.content_response is None:
+			if self.interaction is None:
 				return None
 			
-			parts = getattr( self.content_response, 'parts', None )
-			if parts:
-				for part in parts:
-					try:
-						if getattr( part, 'inline_data', None ) is not None:
-							return part.as_image( )
-					except Exception as e:
-						exception = Error( e )
-						exception.module = 'gemini'
-						exception.cause = 'Images'
-						exception.method = 'get_first_image( self ) -> Optional[ PIL.Image.Image ]'
-						Logger( ).write( exception )
-						continue
-			
-			candidates = getattr( self.content_response, 'candidates', None )
-			if candidates:
-				for candidate in candidates:
-					content = getattr( candidate, 'content', None )
-					if content is None:
-						continue
-					
-					candidate_parts = getattr( content, 'parts', None ) or [ ]
-					for part in candidate_parts:
-						try:
-							if getattr( part, 'inline_data', None ) is not None:
-								return part.as_image( )
-						except Exception as e:
-							exception = Error( e )
-							exception.module = 'gemini'
-							exception.cause = 'Images'
-							exception.method = ('get_first_image( self ) -> Optional[ Image ]')
-							Logger( ).write( exception )
-							continue
-			
-			return None
+			return self.extract_image( self.interaction )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'get_first_image( self ) -> Optional[ PIL.Image.Image ]'
+			exception.method = ('get_first_image( self ) -> Optional[ PIL.Image.Image ]')
 			Logger( ).write( exception )
 			raise exception
 	
 	def get_output_text( self ) -> Optional[ str ]:
-		"""Get output text.
-		
+		"""Return text from the most recent Interaction.
+
 		Purpose:
-			Retrieves a derived value from the current Images runtime state. The method shields
-			callers from provider response-shape differences and returns a stable 
-			application-facing
-			value.
-		
+			Preserves the existing Jeni helper contract by extracting generated text from the
+			latest Interaction.
+
 		Returns:
-			Derived value extracted from the current runtime state.
-		
+			Optional[str]: Generated text, or None when unavailable.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when text extraction fails.
 		"""
 		try:
-			if self.content_response is None:
+			if self.interaction is None:
 				return None
 			
-			text = getattr( self.content_response, 'text', None )
-			if isinstance( text, str ) and text.strip( ):
-				return text
-			
-			parts = getattr( self.content_response, 'parts', None )
-			if parts:
-				output = [ ]
-				for part in parts:
-					part_text = getattr( part, 'text', None )
-					if isinstance( part_text, str ) and part_text.strip( ):
-						output.append( part_text.strip( ) )
-				
-				if output:
-					return '\n'.join( output )
-			
-			candidates = getattr( self.content_response, 'candidates', None )
-			if candidates:
-				for candidate in candidates:
-					content = getattr( candidate, 'content', None )
-					if content is None:
-						continue
-					
-					output = [ ]
-					for part in getattr( content, 'parts', None ) or [ ]:
-						part_text = getattr( part, 'text', None )
-						if isinstance( part_text, str ) and part_text.strip( ):
-							output.append( part_text.strip( ) )
-					
-					if output:
-						return '\n'.join( output )
-			
-			return None
+			return self.extract_text( self.interaction )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'get_output_text( self ) -> Optional[ str ]'
+			exception.method = ('get_output_text( self ) -> Optional[ str ]')
 			Logger( ).write( exception )
 			raise exception
 	
-	def generate( self, prompt: str, model: str='gemini-2.5-flash-image', aspect: str=None,
-		number: int=None, temperature: float=None, top_p: float=None, frequency: float= None,
-		presence: float=None, max_tokens: int=None, resolution: str=None,
-		instruct: str=None, output_mime_type: str=None, response_modalities: str=None,
-		grounded: bool=False, image_search: bool=False ) -> Optional[ PIL.Image.Image ]:
-		"""Generate.
-		
+	def generate( self, prompt: str, model: str = 'gemini-3.1-flash-image', aspect: str = None,
+		number: int=None, temperature: float=None, top_p: float=None, frequency: float=None,
+		presence: float = None, max_tokens: int = None, resolution: str = None,
+		instruct: str = None, output_mime_type: str = None, response_modalities: str = None,
+		grounded: bool = False, image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+		"""Generate an image through the Gemini Interactions API.
+
 		Purpose:
-			Executes the generate workflow for the Images wrapper. The method validates required
-			inputs, prepares provider configuration, performs the requested provider or storage
-			operation, captures response state, and returns the result expected by the application.
-		
+			Submits a text-to-image Interaction and returns the generated Pillow image expected
+			by the Jeni Image Generation workflow.
+
 		Args:
-			prompt (str): prompt value used by this workflow.
-			model (str): model value used by this workflow.
-			aspect (str): aspect value used by this workflow.
-			number (int): number value used by this workflow.
-			temperature (float): temperature value used by this workflow.
-			top_p (float): top p value used by this workflow.
-			frequency (float): frequency value used by this workflow.
-			presence (float): presence value used by this workflow.
-			max_tokens (int): max tokens value used by this workflow.
-			resolution (str): resolution value used by this workflow.
-			instruct (str): instruct value used by this workflow.
-			output_mime_type (str): output mime type value used by this workflow.
-			response_modalities (str): response modalities value used by this workflow.
-			grounded (bool): grounded value used by this workflow.
-			image_search (bool): image search value used by this workflow.
-		
+			prompt (str): Image-generation instruction.
+			model (str): Gemini image-model identifier.
+			aspect (str): Requested output-image aspect ratio.
+			number (int): Requested result count retained for compatibility.
+			temperature (float): Sampling temperature.
+			top_p (float): Top-p sampling value.
+			frequency (float): Frequency penalty retained for compatibility.
+			presence (float): Presence penalty retained for compatibility.
+			max_tokens (int): Maximum output-token count.
+			resolution (str): Requested generated-image size.
+			instruct (str): System instruction text.
+			output_mime_type (str): Requested generated-image MIME type.
+			response_modalities (str): Requested response-mode value.
+			grounded (bool): Whether Google Search grounding is enabled.
+			image_search (bool): Whether Google Image Search grounding is enabled.
+
 		Returns:
-			Result produced by the requested provider, file, audio, image, or storage workflow.
-		
+			Optional[PIL.Image.Image]: Generated image, or None when no image is returned.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when request execution or image extraction fails.
+			ValueError: Raised when a required argument is missing.
 		"""
 		try:
-			throw_if( 'prompt', prompt )
-			self.prompt = prompt
-			self.model = model
-			self.number = number
-			self.aspect_ratio = aspect
-			self.size = resolution
-			self.top_p = top_p
-			self.temperature = temperature
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_output_tokens = max_tokens
-			self.instructions = instruct
-			self.output_mime_type = output_mime_type
-			self.response_mode = response_modalities
-			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self.get_content_config( image_only=True, grounded=grounded,
-				image_search=image_search, response_modalities=self.response_mode,
-				output_mime_type=self.output_mime_type )
-			self.content_response = self.client.models.generate_content( model=self.model,
-				contents=[ self.prompt ], config=self.content_config )
-			self.response = self.content_response
-			self.capture_metadata( )
-			return self.get_first_image( )
+			self.interaction = self.execute_interaction( prompt=prompt, model=model, path=None,
+				aspect=aspect, number=number, temperature=temperature, top_p=top_p,
+				frequency=frequency, presence=presence, max_tokens=max_tokens,
+				resolution=resolution, instruct=instruct, output_mime_type=output_mime_type,
+				response_modalities=response_modalities, image_only=True, grounded=grounded,
+				image_search=image_search )
+			
+			return self.extract_image( self.interaction )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'generate( self, prompt, aspect ) -> Optional[ PIL.Image.Image ]'
+			exception.method = 'generate( self, **kwargs ) -> Optional[ PIL.Image.Image ]'
 			Logger( ).write( exception )
 			raise exception
 	
-	def analyze( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
-		aspect: str=None, number: int=None, temperature: float=None, top_p: float=None,
-		frequency: float=None, presence: float=None, max_tokens: int=None,
-		resolution: str=None, instruct: str=None, output_mime_type: str=None,
+	def analyze( self, prompt: str, path: str, model: str = 'gemini-3.1-flash-image',
+		aspect: str = None, number: int = None, temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None, max_tokens: int = None,
+		resolution: str = None, instruct: str = None, output_mime_type: str = None,
 		response_modalities: str=None, grounded: bool=False,
-		image_search: bool=False ) -> Optional[ str ]:
-		"""Analyze.
-		
+		image_search: bool=False ) ->  Optional[ str ]:
+		"""Analyze an image through the Gemini Interactions API.
+
 		Purpose:
-			Executes the analyze workflow for the Images wrapper. The method validates required
-			inputs, prepares provider configuration, performs the requested provider or storage
-			operation, captures response state, and returns the result expected by the application.
-		
+			Submits text and a local image as multimodal Interaction input and returns the
+			generated text expected by the Jeni Image Analysis workflow.
+
 		Args:
-			prompt (str): prompt value used by this workflow.
-			path (str): path value used by this workflow.
-			model (str): model value used by this workflow.
-			aspect (str): aspect value used by this workflow.
-			number (int): number value used by this workflow.
-			temperature (float): temperature value used by this workflow.
-			top_p (float): top p value used by this workflow.
-			frequency (float): frequency value used by this workflow.
-			presence (float): presence value used by this workflow.
-			max_tokens (int): max tokens value used by this workflow.
-			resolution (str): resolution value used by this workflow.
-			instruct (str): instruct value used by this workflow.
-			output_mime_type (str): output mime type value used by this workflow.
-			response_modalities (str): response modalities value used by this workflow.
-			grounded (bool): grounded value used by this workflow.
-			image_search (bool): image search value used by this workflow.
-		
+			prompt (str): Image-analysis instruction.
+			path (str): Local image path.
+			model (str): Gemini image-model identifier.
+			aspect (str): Aspect-ratio value retained for compatibility.
+			number (int): Requested result count retained for compatibility.
+			temperature (float): Sampling temperature.
+			top_p (float): Top-p sampling value.
+			frequency (float): Frequency penalty retained for compatibility.
+			presence (float): Presence penalty retained for compatibility.
+			max_tokens (int): Maximum output-token count.
+			resolution (str): Media-resolution value retained for compatibility.
+			instruct (str): System instruction text.
+			output_mime_type (str): Output MIME type retained for compatibility.
+			response_modalities (str): Requested response-mode value.
+			grounded (bool): Whether Google Search grounding is enabled.
+			image_search (bool): Whether Google Image Search grounding is enabled.
+
 		Returns:
-			Result produced by the requested provider, file, audio, image, or storage workflow.
-		
+			Optional[str]: Generated image analysis, or None when no text is returned.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when request execution or text extraction fails.
+			ValueError: Raised when a required argument is missing.
 		"""
 		try:
-			throw_if( 'prompt', prompt )
 			throw_if( 'path', path )
-			self.prompt = prompt
-			self.model = model
-			self.number = number
-			self.aspect_ratio = aspect
-			self.media_resolution = resolution
-			self.top_p = top_p
-			self.temperature = temperature
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_output_tokens = max_tokens
-			self.instructions = instruct
-			self.output_mime_type = output_mime_type
-			self.response_mode = response_modalities or 'text'
-			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self.get_content_config( image_only=False, grounded=grounded,
-				image_search=image_search, response_modalities=self.response_mode,
-				output_mime_type=self.output_mime_type )
-			self.content_response = self.client.models.generate_content( model=self.model,
-				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
-			self.response = self.content_response
-			self.capture_metadata( )
-			return self.get_output_text( )
+			self.file_path = path
+			self.interaction = self.execute_interaction( prompt=prompt, model=model,
+				path=self.file_path, aspect=aspect, number=number, temperature=temperature,
+				top_p=top_p, frequency=frequency, presence=presence, max_tokens=max_tokens,
+				resolution=resolution, instruct=instruct, output_mime_type=output_mime_type,
+				response_modalities=response_modalities or 'text', image_only=False,
+				grounded=grounded, image_search=image_search )
+			
+			return self.extract_text( self.interaction )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'analyze( self, prompt, path, model ) -> Optional[ str ]'
+			exception.method = 'analyze( self, **kwargs ) -> Optional[ str ]'
 			Logger( ).write( exception )
 			raise exception
 	
-	def edit( self, prompt: str, path: str, model: str='gemini-2.5-flash-image',
-		aspect: str=None, number: int=None, temperature: float=None, top_p: float=None,
-		frequency: float=None, presence: float=None, max_tokens: int=None,
-		resolution: str=None, instruct: str=None, output_mime_type: str=None,
-		response_modalities: str=None, grounded: bool=False,
-		image_search: bool=False ) ->  Optional[ PIL.Image.Image ]:
-		"""Edit.
-		
+	def edit( self, prompt: str, path: str, model: str = 'gemini-3.1-flash-image',
+		aspect: str = None, number: int = None, temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None, max_tokens: int = None,
+		resolution: str = None, instruct: str = None, output_mime_type: str = None,
+		response_modalities: str = None, grounded: bool = False,
+		image_search: bool = False ) -> Optional[ PIL.Image.Image ]:
+		"""Edit an image through the Gemini Interactions API.
+
 		Purpose:
-			Executes the edit workflow for the Images wrapper. The method validates required 
-			inputs,
-			prepares provider configuration, performs the requested provider or storage operation,
-			captures response state, and returns the result expected by the application.
-		
+			Submits an editing instruction and local image as multimodal Interaction input and
+			returns the generated Pillow image expected by the Jeni Image Editing workflow.
+
 		Args:
-			prompt (str): prompt value used by this workflow.
-			path (str): path value used by this workflow.
-			model (str): model value used by this workflow.
-			aspect (str): aspect value used by this workflow.
-			number (int): number value used by this workflow.
-			temperature (float): temperature value used by this workflow.
-			top_p (float): top p value used by this workflow.
-			frequency (float): frequency value used by this workflow.
-			presence (float): presence value used by this workflow.
-			max_tokens (int): max tokens value used by this workflow.
-			resolution (str): resolution value used by this workflow.
-			instruct (str): instruct value used by this workflow.
-			output_mime_type (str): output mime type value used by this workflow.
-			response_modalities (str): response modalities value used by this workflow.
-			grounded (bool): grounded value used by this workflow.
-			image_search (bool): image search value used by this workflow.
-		
+			prompt (str): Image-editing instruction.
+			path (str): Local source-image path.
+			model (str): Gemini image-model identifier.
+			aspect (str): Requested output-image aspect ratio.
+			number (int): Requested result count retained for compatibility.
+			temperature (float): Sampling temperature.
+			top_p (float): Top-p sampling value.
+			frequency (float): Frequency penalty retained for compatibility.
+			presence (float): Presence penalty retained for compatibility.
+			max_tokens (int): Maximum output-token count.
+			resolution (str): Requested generated-image size.
+			instruct (str): System instruction text.
+			output_mime_type (str): Requested generated-image MIME type.
+			response_modalities (str): Requested response-mode value.
+			grounded (bool): Whether Google Search grounding is enabled.
+			image_search (bool): Whether Google Image Search grounding is enabled.
+
 		Returns:
-			Result produced by the requested provider, file, audio, image, or storage workflow.
-		
+			Optional[PIL.Image.Image]: Edited image, or None when no image is returned.
+
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
-			logged.
-			ValueError: Raised when local validation detects an invalid required value.
+			Error: Raised when request execution or image extraction fails.
+			ValueError: Raised when a required argument is missing.
 		"""
 		try:
-			throw_if( 'prompt', prompt )
 			throw_if( 'path', path )
-			self.prompt = prompt
-			self.model = model
-			self.number = number
-			self.aspect_ratio = aspect
-			self.size = resolution
-			self.top_p = top_p
-			self.temperature = temperature
-			self.frequency_penalty = frequency
-			self.presence_penalty = presence
-			self.max_output_tokens = max_tokens
-			self.instructions = instruct
-			self.output_mime_type = output_mime_type
-			self.response_mode = response_modalities or 'image'
-			self.client = genai.Client( api_key=self.gemini_api_key )
-			self.content_config = self.get_content_config( image_only=True, grounded=grounded,
-				image_search=image_search, response_modalities=self.response_mode,
-				output_mime_type=self.output_mime_type )
-			self.content_response = self.client.models.generate_content( model=self.model,
-				contents=[ self.prompt, self.open_image( path ) ], config=self.content_config )
-			self.response = self.content_response
-			self.capture_metadata( )
-			return self.get_first_image( )
+			self.file_path = path
+			self.interaction = self.execute_interaction( prompt=prompt, model=model,
+				path=self.file_path, aspect=aspect, number=number, temperature=temperature,
+				top_p=top_p, frequency=frequency, presence=presence, max_tokens=max_tokens,
+				resolution=resolution, instruct=instruct, output_mime_type=output_mime_type,
+				response_modalities=response_modalities or 'image', image_only=True,
+				grounded=grounded, image_search=image_search )
+			
+			return self.extract_image( self.interaction )
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'gemini'
 			exception.cause = 'Images'
-			exception.method = 'edit( self, prompt, path, model ) -> Optional[ PIL.Image.Image ]'
+			exception.method = 'edit( self, **kwargs ) -> Optional[ PIL.Image.Image ]'
 			Logger( ).write( exception )
 			raise exception
 
@@ -2168,13 +2448,13 @@ class Embeddings( Gemini ):
 	Attributes:
 		client (Optional[genai.Client]): Runtime field used by the Embeddings workflow.
 		response (Optional[Any]): Runtime field used by the Embeddings workflow.
-		embedding (Optional[List[float] | List[List[float]]]): Runtime field used by the 
+		embedding (Optional[List[float] | List[List[float]]]): Runtime field used by the
 		Embeddings workflow.
 		encoding_format (Optional[str]): Runtime field used by the Embeddings workflow.
 		dimensions (Optional[int]): Runtime field used by the Embeddings workflow.
 		task_type (Optional[str]): Runtime field used by the Embeddings workflow.
 		title (Optional[str]): Runtime field used by the Embeddings workflow.
-		embedding_config (Optional[types.EmbedContentConfig]): Runtime field used by the 
+		embedding_config (Optional[types.EmbedContentConfig]): Runtime field used by the
 		Embeddings workflow.
 		contents (Optional[str | List[str]]): Runtime field used by the Embeddings workflow.
 		input_text (Optional[str | List[str]]): Runtime field used by the Embeddings workflow.
@@ -2194,13 +2474,13 @@ class Embeddings( Gemini ):
 	file_path: Optional[ str ]
 	response_modalities: Optional[ str ]
 	
-	def __init__( self, model: str='gemini-embedding-001' ):
+	def __init__( self, model: str = 'gemini-embedding-001' ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Embeddings instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
+			settings and placeholders without performing request work beyond local state
 			assignment.
 		
 		Args:
@@ -2258,9 +2538,9 @@ class Embeddings( Gemini ):
 		"""Task options.
 		
 		Purpose:
-			Returns the task options exposed by this provider wrapper. This property keeps UI 
+			Returns the task options exposed by this provider wrapper. This property keeps UI
 			option
-			rendering centralized and gives documentation a stable location for describing 
+			rendering centralized and gives documentation a stable location for describing
 			supported
 			choices.
 		
@@ -2315,7 +2595,7 @@ class Embeddings( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -2346,8 +2626,8 @@ class Embeddings( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_embedding_config( self, model: str='gemini-embedding-001', dimensions: int=None,
-		task_type: str=None, title: str=None ) -> EmbedContentConfig:
+	def build_embedding_config( self, model: str = 'gemini-embedding-001', dimensions: int = None,
+		task_type: str = None, title: str = None ) -> EmbedContentConfig:
 		"""Build embedding config.
 		
 		Purpose:
@@ -2365,7 +2645,7 @@ class Embeddings( Gemini ):
 			Provider-compatible request component or configuration value.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -2382,8 +2662,9 @@ class Embeddings( Gemini ):
 			if self.task_type and 'gemini-embedding-2' not in self.model:
 				self.config_kwargs[ 'task_type' ] = self.task_type
 			
-			if (self.title and self.task_type == 'RETRIEVAL_DOCUMENT' and 'gemini-embedding-2' not 
-					in self.model):
+			if (
+					self.title and self.task_type == 'RETRIEVAL_DOCUMENT' and 'gemini-embedding-2'
+					not in self.model):
 				self.config_kwargs[ 'title' ] = self.title
 			
 			self.embedding_config = EmbedContentConfig( **self.config_kwargs )
@@ -2409,7 +2690,7 @@ class Embeddings( Gemini ):
 			Result produced by the operation.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -2445,9 +2726,9 @@ class Embeddings( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def create( self, text: str | List[ str ], model: str='gemini-embedding-001',
-		dimensions: int=None, task_type: str=None, title: str=None,
-		encoding_format: str='float' ) -> List[ float ] | List[ List[ float ] ] | None:
+	def create( self, text: str | List[ str ], model: str = 'gemini-embedding-001',
+		dimensions: int = None, task_type: str = None, title: str = None,
+		encoding_format: str = 'float' ) -> List[ float ] | List[ List[ float ] ] | None:
 		"""Create.
 		
 		Purpose:
@@ -2467,7 +2748,7 @@ class Embeddings( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -2528,13 +2809,13 @@ class TTS( Gemini ):
 	input_text: Optional[ str ]
 	audio_bytes: Optional[ bytes ]
 	
-	def __init__( self, model: str='gemini-2.5-flash-preview-tts' ):
+	def __init__( self, model: str = 'gemini-2.5-flash-preview-tts' ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the TTS instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
+			settings and placeholders without performing request work beyond local state
 			assignment.
 		
 		Args:
@@ -2591,12 +2872,12 @@ class TTS( Gemini ):
 		"""
 		return [ 'audio/wav' ]
 	
-	def to_wave_bytes( self, pcm_data: bytes, rate: int=24000, channels: int=1,
-		sample_width: int=2 ) -> bytes:
+	def to_wave_bytes( self, pcm_data: bytes, rate: int = 24000, channels: int = 1,
+		sample_width: int = 2 ) -> bytes:
 		"""To wave bytes.
 		
 		Purpose:
-			Performs the to wave bytes operation for the TTS wrapper. The method preserves 
+			Performs the to wave bytes operation for the TTS wrapper. The method preserves
 			provider-
 			specific handling behind the application-facing class interface.
 		
@@ -2610,13 +2891,14 @@ class TTS( Gemini ):
 			Result produced by the operation.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			import io
 			import wave
+			
 			throw_if( 'pcm_data', pcm_data )
 			with io.BytesIO( ) as buffer:
 				with wave.open( buffer, 'wb' ) as wf:
@@ -2638,7 +2920,7 @@ class TTS( Gemini ):
 		"""Normalize voice.
 		
 		Purpose:
-			Normalizes input values for the TTS workflow before they are passed to provider 
+			Normalizes input values for the TTS workflow before they are passed to provider
 			calls or
 			downstream processing. The method converts UI or caller-supplied values into a stable
 			shape expected by the wrapper.
@@ -2650,7 +2932,7 @@ class TTS( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -2674,7 +2956,7 @@ class TTS( Gemini ):
 		"""Normalize tts prompt.
 		
 		Purpose:
-			Normalizes input values for the TTS workflow before they are passed to provider 
+			Normalizes input values for the TTS workflow before they are passed to provider
 			calls or
 			downstream processing. The method converts UI or caller-supplied values into a stable
 			shape expected by the wrapper.
@@ -2688,7 +2970,7 @@ class TTS( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -2703,7 +2985,8 @@ class TTS( Gemini ):
 				if self.speed_value < 0.85:
 					self.prompt_parts.append( 'Read the following text at a slow, clear pace.' )
 				elif self.speed_value > 1.15:
-					self.prompt_parts.append( 'Read the following text at a faster, energetic pace.' )
+					self.prompt_parts.append(
+						'Read the following text at a faster, energetic pace.' )
 			
 			self.prompt_parts.append( str( text ).strip( ) )
 			return '\n\n'.join( self.prompt_parts )
@@ -2715,11 +2998,12 @@ class TTS( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def create_speech( self, text: str, filepath: str=None,
-		model: str='gemini-3.1-flash-tts-preview', format: str='audio/wav', speed: float=None,
-		voice: str=None, frequency: float=None, presense: float=None, max_tokens: int=None,
-		instruct: str=None, temperature: float=None,
-		top_p: float=None ) -> bytes | str | None:
+	def create_speech( self, text: str, filepath: str = None,
+		model: str = 'gemini-3.1-flash-tts-preview', format: str = 'audio/wav', speed: float =
+		None,
+		voice: str = None, frequency: float = None, presense: float = None, max_tokens: int = None,
+		instruct: str = None, temperature: float = None,
+		top_p: float = None ) -> bytes | str | None:
 		"""Create speech.
 		
 		Purpose:
@@ -2745,13 +3029,13 @@ class TTS( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
 		try:
 			throw_if( 'text', text )
-			self.input_text = self.normalize_tts_prompt( text=text, speed=speed, 
+			self.input_text = self.normalize_tts_prompt( text=text, speed=speed,
 				instruct=instruct )
 			self.audio_path = filepath
 			self.response_format = str( format or 'audio/wav' ).strip( )
@@ -2833,7 +3117,7 @@ class Transcription( Gemini ):
 		client (Optional[genai.Client]): Runtime field used by the Transcription workflow.
 		transcript (Optional[str]): Runtime field used by the Transcription workflow.
 		file_path (Optional[str]): Runtime field used by the Transcription workflow.
-		response (Optional[GenerateContentResponse]): Runtime field used by the Transcription 
+		response (Optional[GenerateContentResponse]): Runtime field used by the Transcription
 		workflow.
 	"""
 	client: Optional[ genai.Client ]
@@ -2841,15 +3125,16 @@ class Transcription( Gemini ):
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
-		top_p: float=0.9, frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
-		instruct: str=None ):
+	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float =
+	0.8,
+		top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0, max_tokens: int = 10000,
+		instruct: str = None ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Transcription instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
+			settings and placeholders without performing request work beyond local state
 			assignment.
 		
 		Args:
@@ -2919,7 +3204,7 @@ class Transcription( Gemini ):
 		"""
 		return [ 'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac' ]
 	
-	def normalize_mime_type( self, path: str, mime_type: str=None ) -> str:
+	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
 		"""Normalize mime type.
 		
 		Purpose:
@@ -2935,7 +3220,7 @@ class Transcription( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -2957,7 +3242,7 @@ class Transcription( Gemini ):
 			
 			self.suffix = str( Path( path ).suffix or '' ).strip( ).lower( )
 			self.extension_map = { '.wav': 'audio/wav', '.mp3': 'audio/mp3', '.aiff': 'audio/aiff',
-				'.aif': 'audio/aiff', '.aac': 'audio/aac', '.m4a': 'audio/aac', '.ogg': 
+				'.aif': 'audio/aiff', '.aac': 'audio/aac', '.m4a': 'audio/aac', '.ogg':
 					'audio/ogg',
 				'.flac': 'audio/flac' }
 			
@@ -2973,8 +3258,8 @@ class Transcription( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def build_prompt( self, language: str=None, start_time: float=None,
-		end_time: float=None ) -> str:
+	def build_prompt( self, language: str = None, start_time: float = None,
+		end_time: float = None ) -> str:
 		"""Build prompt.
 		
 		Purpose:
@@ -2992,8 +3277,8 @@ class Transcription( Gemini ):
 		"""
 		self.prompt_parts = [ 'Generate a verbatim transcript of the speech.' ]
 		
-		if (language is not None and str( language ).strip( ) and str( language ).strip( ) != 
-				'Auto'):
+		if (language is not None and str( language ).strip( ) and str(
+				language ).strip( ) != 'Auto'):
 			self.prompt_parts.append(
 				f'The expected spoken language is {str( language ).strip( )}.' )
 		
@@ -3005,10 +3290,11 @@ class Transcription( Gemini ):
 		self.prompt_parts.append( 'Return only the transcript text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def transcribe( self, path: str, model: str='gemini-3-flash-preview', language: str=None,
-		mime_type: str=None, temperature: float=None, top_p: float=None,
-		frequency: float=None, presence: float=None, max_tokens: int=None,
-		start_time: float=None, end_time: float=None, instruct: str=None ) -> Optional[ str ]:
+	def transcribe( self, path: str, model: str = 'gemini-3-flash-preview', language: str = None,
+		mime_type: str = None, temperature: float = None, top_p: float = None,
+		frequency: float = None, presence: float = None, max_tokens: int = None,
+		start_time: float = None, end_time: float = None, instruct: str = None ) -> Optional[
+		str ]:
 		"""Transcribe.
 		
 		Purpose:
@@ -3036,6 +3322,7 @@ class Transcription( Gemini ):
 		"""
 		try:
 			import mimetypes
+			
 			throw_if( 'path', path )
 			self.file_path = path
 			self.model = str( model or self.model or 'gemini-3-flash-preview' ).strip( )
@@ -3089,7 +3376,7 @@ class Translation( Gemini ):
 		target_language (Optional[str]): Runtime field used by the Translation workflow.
 		source_language (Optional[str]): Runtime field used by the Translation workflow.
 		file_path (Optional[str]): Runtime field used by the Translation workflow.
-		response (Optional[GenerateContentResponse]): Runtime field used by the Translation 
+		response (Optional[GenerateContentResponse]): Runtime field used by the Translation
 		workflow.
 	"""
 	client: Optional[ genai.Client ]
@@ -3098,15 +3385,16 @@ class Translation( Gemini ):
 	file_path: Optional[ str ]
 	response: Optional[ GenerateContentResponse ]
 	
-	def __init__( self, n: int=1, model: str='gemini-3-flash-preview', temperature: float=0.8,
-		top_p: float=0.9, frequency: float=0.0, presence: float=0.0, max_tokens: int=10000,
-		instruct: str=None ):
+	def __init__( self, n: int = 1, model: str = 'gemini-3-flash-preview', temperature: float =
+	0.8,
+		top_p: float = 0.9, frequency: float = 0.0, presence: float = 0.0, max_tokens: int = 10000,
+		instruct: str = None ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Translation instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
+			settings and placeholders without performing request work beyond local state
 			assignment.
 		
 		Args:
@@ -3163,7 +3451,7 @@ class Translation( Gemini ):
 		"""
 		return [ 'audio/wav', 'audio/mp3', 'audio/aiff', 'audio/aac', 'audio/ogg', 'audio/flac' ]
 	
-	def normalize_mime_type( self, path: str, mime_type: str=None ) -> str:
+	def normalize_mime_type( self, path: str, mime_type: str = None ) -> str:
 		"""Normalize mime type.
 		
 		Purpose:
@@ -3179,7 +3467,7 @@ class Translation( Gemini ):
 			Normalized value suitable for provider calls or downstream processing.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -3201,7 +3489,7 @@ class Translation( Gemini ):
 			
 			self.suffix = str( Path( path ).suffix or '' ).strip( ).lower( )
 			self.extension_map = { '.wav': 'audio/wav', '.mp3': 'audio/mp3', '.aiff': 'audio/aiff',
-				'.aif': 'audio/aiff', '.aac': 'audio/aac', '.m4a': 'audio/aac', '.ogg': 
+				'.aif': 'audio/aiff', '.aac': 'audio/aac', '.m4a': 'audio/aac', '.ogg':
 					'audio/ogg',
 				'.flac': 'audio/flac' }
 			
@@ -3231,8 +3519,8 @@ class Translation( Gemini ):
 		"""
 		return [ 'English', 'Spanish', 'French', 'Japanese', 'German', 'Chinese' ]
 	
-	def build_prompt( self, target: str, source: str='Auto', start_time: float=None,
-		end_time: float=None ) -> str:
+	def build_prompt( self, target: str, source: str = 'Auto', start_time: float = None,
+		end_time: float = None ) -> str:
 		"""Build prompt.
 		
 		Purpose:
@@ -3262,11 +3550,11 @@ class Translation( Gemini ):
 		self.prompt_parts.append( 'Return only the translated text.' )
 		return ' '.join( self.prompt_parts )
 	
-	def translate( self, path: str, model: str='gemini-3-flash-preview',
-		language: str='English', source: str='Auto', mime_type: str=None,
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, start_time: float=None,
-		end_time: float=None, instruct: str=None ) -> Optional[ str ]:
+	def translate( self, path: str, model: str = 'gemini-3-flash-preview',
+		language: str = 'English', source: str = 'Auto', mime_type: str = None,
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, start_time: float = None,
+		end_time: float = None, instruct: str = None ) -> Optional[ str ]:
 		"""Translate.
 		
 		Purpose:
@@ -3383,13 +3671,13 @@ class Files( Gemini ):
 	collections: Optional[ Dict[ str, str ] ]
 	documents: Optional[ Dict[ str, str ] ]
 	
-	def __init__( self, model: str='gemini-2.0-flash' ):
+	def __init__( self, model: str = 'gemini-2.0-flash' ):
 		"""Initialize instance.
 		
 		Purpose:
 			Initializes the Files instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
+			settings and placeholders without performing request work beyond local state
 			assignment.
 		
 		Args:
@@ -3430,9 +3718,9 @@ class Files( Gemini ):
 		"""File options.
 		
 		Purpose:
-			Returns the file options exposed by this provider wrapper. This property keeps UI 
+			Returns the file options exposed by this provider wrapper. This property keeps UI
 			option
-			rendering centralized and gives documentation a stable location for describing 
+			rendering centralized and gives documentation a stable location for describing
 			supported
 			choices.
 		
@@ -3518,9 +3806,9 @@ class Files( Gemini ):
 		"""Tool options.
 		
 		Purpose:
-			Returns the tool options exposed by this provider wrapper. This property keeps UI 
+			Returns the tool options exposed by this provider wrapper. This property keeps UI
 			option
-			rendering centralized and gives documentation a stable location for describing 
+			rendering centralized and gives documentation a stable location for describing
 			supported
 			choices.
 		
@@ -3556,7 +3844,7 @@ class Files( Gemini ):
 		"""
 		return [ 'media_resolution_high', 'media_resolution_medium', 'media_resolution_low' ]
 	
-	def upload( self, filepath: str, name: str=None ) -> File | None:
+	def upload( self, filepath: str, name: str = None ) -> File | None:
 		"""Upload.
 		
 		Purpose:
@@ -3572,7 +3860,7 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -3593,11 +3881,11 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def list( self, model: str='gemini-3.0-flash', top_p: float=0.8, top_k: int=50,
-		temperature: float=0.5, frequency: float=0.0, presence: float=0.0,
-		max_tokens: int=8192, tool_choice: str='auto', stops: List[ str ]=None,
-		tools: List[ str ]=None, domains: List[ str ]=None, modalities: List[ str ]=None,
-		media_resolution: str='media_resolution_medium' ) -> Any | None:
+	def list( self, model: str = 'gemini-3.0-flash', top_p: float = 0.8, top_k: int = 50,
+		temperature: float = 0.5, frequency: float = 0.0, presence: float = 0.0,
+		max_tokens: int = 8192, tool_choice: str = 'auto', stops: List[ str ] = None,
+		tools: List[ str ] = None, domains: List[ str ] = None, modalities: List[ str ] = None,
+		media_resolution: str = 'media_resolution_medium' ) -> Any | None:
 		"""List.
 		
 		Purpose:
@@ -3624,7 +3912,7 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -3675,7 +3963,7 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -3692,10 +3980,10 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def summarize( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
-		instruct: str=None ) -> str | None:
+	def summarize( self, prompt: str, filepath: str, model: str = 'gemini-2.0-flash',
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str | None:
 		"""Summarize.
 		
 		Purpose:
@@ -3719,7 +4007,7 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -3756,10 +4044,10 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def search( self, prompt: str, filepath: str, model: str='gemini-2.0-flash',
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
-		instruct: str=None ) -> str | None:
+	def search( self, prompt: str, filepath: str, model: str = 'gemini-2.0-flash',
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str | None:
 		"""Search.
 		
 		Purpose:
@@ -3783,7 +4071,7 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -3820,9 +4108,9 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def survey( self, prompt: str, filepaths: List[ str ], model: str='gemini-2.0-flash',
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ]=None ) -> str | None:
+	def survey( self, prompt: str, filepaths: List[ str ], model: str = 'gemini-2.0-flash',
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, stops: List[ str ] = None ) -> str | None:
 		"""Survey.
 		
 		Purpose:
@@ -3845,7 +4133,7 @@ class Files( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -3881,10 +4169,10 @@ class Files( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
-		instruct: str=None ) -> str | None:
+	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str | None:
 		"""Web search.
 		
 		Purpose:
@@ -3918,7 +4206,8 @@ class Files( Gemini ):
 			self.max_tokens = max_tokens
 			self.stops = stops
 			self.instructions = instruct
-			self.tool_config = [ types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
+			self.tool_config = [
+				types.Tool( google_search_retrieval=types.GoogleSearchRetrieval( ) ) ]
 			self.content_config = GenerateContentConfig( temperature=self.temperature,
 				tools=self.tool_config, system_instruction=self.instructions )
 			self.client = genai.Client( api_key=self.gemini_api_key )
@@ -3933,10 +4222,10 @@ class Files( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
-		instruct: str=None ) -> str | None:
+	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str | None:
 		"""Search maps.
 		
 		Purpose:
@@ -3998,7 +4287,7 @@ class Files( Gemini ):
 			file_id (str): file id value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4044,7 +4333,7 @@ class FileSearch( Gemini ):
 		Purpose:
 			Initializes the FileSearch instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
+			settings and placeholders without performing request work beyond local state
 			assignment.
 		"""
 		super( ).__init__( )
@@ -4108,7 +4397,7 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4132,7 +4421,7 @@ class FileSearch( Gemini ):
 		"""Retrieve.
 		
 		Purpose:
-			Executes the retrieve workflow for the FileSearch wrapper. The method validates 
+			Executes the retrieve workflow for the FileSearch wrapper. The method validates
 			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
@@ -4144,7 +4433,7 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4174,7 +4463,7 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4189,7 +4478,7 @@ class FileSearch( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def delete( self, store_id: str, force: bool=True ) -> bool | Any:
+	def delete( self, store_id: str, force: bool = True ) -> bool | Any:
 		"""Delete.
 		
 		Purpose:
@@ -4205,7 +4494,7 @@ class FileSearch( Gemini ):
 			Result produced by the requested provider, file, audio, image, or storage workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4264,7 +4553,7 @@ class CloudBuckets( Gemini ):
 		Purpose:
 			Initializes the CloudBuckets instance with default configuration, runtime state, and
 			compatibility fields required by later method calls. The constructor prepares provider
-			settings and placeholders without performing request work beyond local state 
+			settings and placeholders without performing request work beyond local state
 			assignment.
 		"""
 		self.project_id = cfg.GOOGLE_CLOUD_PROJECT_ID
@@ -4323,7 +4612,7 @@ class CloudBuckets( Gemini ):
 		"""Create.
 		
 		Purpose:
-			Executes the create workflow for the CloudBuckets wrapper. The method validates 
+			Executes the create workflow for the CloudBuckets wrapper. The method validates
 			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
@@ -4333,7 +4622,7 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4354,11 +4643,11 @@ class CloudBuckets( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def upload( self, path: str, bucket: str, name: str=None ) -> Blob | None:
+	def upload( self, path: str, bucket: str, name: str = None ) -> Blob | None:
 		"""Upload.
 		
 		Purpose:
-			Executes the upload workflow for the CloudBuckets wrapper. The method validates 
+			Executes the upload workflow for the CloudBuckets wrapper. The method validates
 			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
@@ -4369,7 +4658,7 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4406,7 +4695,7 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4438,7 +4727,7 @@ class CloudBuckets( Gemini ):
 			bucket (str): bucket value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""
@@ -4457,10 +4746,10 @@ class CloudBuckets( Gemini ):
 			Logger( ).write( ex )
 			raise ex
 	
-	def web_search( self, prompt: str, model: str='gemini-2.5-flash-lite',
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
-		instruct: str=None ) -> str | None:
+	def web_search( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str | None:
 		"""Web search.
 		
 		Purpose:
@@ -4511,10 +4800,10 @@ class CloudBuckets( Gemini ):
 			Logger( ).write( exception )
 			raise exception
 	
-	def search_maps( self, prompt: str, model: str='gemini-2.5-flash-lite',
-		temperature: float=None, top_p: float=None, frequency: float=None,
-		presence: float=None, max_tokens: int=None, stops: List[ str ] = None,
-		instruct: str=None ) -> str | None:
+	def search_maps( self, prompt: str, model: str = 'gemini-2.5-flash-lite',
+		temperature: float = None, top_p: float = None, frequency: float = None,
+		presence: float = None, max_tokens: int = None, stops: List[ str ] = None,
+		instruct: str = None ) -> str | None:
 		"""Search maps.
 		
 		Purpose:
@@ -4569,7 +4858,7 @@ class CloudBuckets( Gemini ):
 		"""Delete.
 		
 		Purpose:
-			Executes the delete workflow for the CloudBuckets wrapper. The method validates 
+			Executes the delete workflow for the CloudBuckets wrapper. The method validates
 			required
 			inputs, prepares provider configuration, performs the requested provider or storage
 			operation, captures response state, and returns the result expected by the application.
@@ -4579,7 +4868,7 @@ class CloudBuckets( Gemini ):
 			name (str): name value used by this workflow.
 		
 		Raises:
-			Error: Re-raised after provider, validation, or storage exceptions are wrapped and 
+			Error: Re-raised after provider, validation, or storage exceptions are wrapped and
 			logged.
 			ValueError: Raised when local validation detects an invalid required value.
 		"""

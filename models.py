@@ -102,7 +102,6 @@ class System( Message ):
 	def __dir__( self ) -> List[ str ]:
 		return [ 'role', 'content' ]
 	
-
 class User( Message ):
 	'''
 
@@ -126,8 +125,31 @@ class User( Message ):
 
 	def __dir__( self ) -> List[ str ]:
 		return [ 'role', 'content' ]
-	
 
+class Assistant( Message ):
+	'''
+
+		Purpose:
+		--------
+		Represents a structured “system prompt” or instruction bundle used to steer an LLM call.
+		This model is intended to capture the canonical components you pass into Jeni when you
+		want to track prompts as first-class objects (versioning, variables, and provenance).
+
+		Attributes:
+		----------
+		content: Optional[ str ]
+			Optional background context provided to the model (policies, references, etc.).
+
+		role: Optional[ str ]
+			Optional role associated with the message.
+	'''
+	
+	def __init__(self, content: str, role: str='assistant' ):
+		super( ).__init__( content, role )
+
+	def __dir__( self ) -> List[ str ]:
+		return [ 'role', 'content' ]
+	
 class Prompt(  ):
 	'''
 
@@ -147,6 +169,7 @@ class Prompt(  ):
 	'''
 	system: Optional[ System ] = None
 	user: Optional[ User ] = None
+	model: Optional[ str ] = None
 	
 	def __init__( self, sys: System, user: User ):
 		self.system = sys
@@ -191,7 +214,6 @@ class Error( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class JsonSchema( BaseModel ):
 	'''
 
@@ -228,7 +250,6 @@ class JsonSchema( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class JsonObject( BaseModel ):
 	'''
 
@@ -248,7 +269,6 @@ class JsonObject( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class Reasoning( BaseModel ):
 	'''
@@ -274,7 +294,6 @@ class Reasoning( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class Math( BaseModel ):
 	'''
@@ -322,7 +341,6 @@ class Math( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class Document( BaseModel ):
 	'''
@@ -384,7 +402,6 @@ class Document( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class ResponseFormat( BaseModel ):
 	'''
 
@@ -413,7 +430,6 @@ class ResponseFormat( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class Function( BaseModel ):
 	'''
@@ -451,44 +467,6 @@ class Function( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
-class Message( BaseModel ):
-	'''
-
-		Purpose:
-		--------
-		Represents a chat message-like object used by Jeni to normalize conversational state.
-		This is intentionally general to support both “input messages” and “output messages”.
-
-		Attributes:
-		----------
-		content: str
-			Message content payload. Jeni treats this as required for operational messages.
-
-		role: str
-			Message role (e.g., "system", "user", "assistant", "tool").
-
-		type: Optional[ str ]
-			Optional discriminator if an upstream system emits typed message objects.
-
-		instructions: Optional[ str ]
-			Optional per-message instruction string (used in some orchestration patterns).
-
-		data: Optional[ Dict ]
-			Optional message metadata or additional structured payload.
-
-	'''
-	content: str
-	role: str
-	type: Optional[ str ] = None
-	instructions: Optional[ str ] = None
-	data: Optional[ Dict ] = None
-
-	class Config:
-		arbitrary_types_allowed = True
-		extra = 'ignore'
-
-
 class Location( BaseModel ):
 	'''
 
@@ -524,7 +502,6 @@ class Location( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class GeoCoordinates( BaseModel ):
 	'''
 
@@ -556,7 +533,6 @@ class GeoCoordinates( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class FileSearch( BaseModel ):
 	'''
@@ -590,7 +566,6 @@ class FileSearch( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class WebSearch( BaseModel ):
 	'''
 
@@ -618,7 +593,6 @@ class WebSearch( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class ComputerUse( BaseModel ):
 	'''
@@ -652,7 +626,6 @@ class ComputerUse( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class WxForecast( BaseModel ):
 	'''
 
@@ -684,7 +657,6 @@ class WxForecast( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class Directions( BaseModel ):
 	'''
 
@@ -709,7 +681,6 @@ class Directions( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class ValidationStatus( BaseModel ):
 	'''
 
@@ -733,7 +704,6 @@ class ValidationStatus( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class SqlStatement( BaseModel ):
 	'''
@@ -775,7 +745,6 @@ class SqlStatement( BaseModel ):
 		arbitrary_types_allowed = True
 		extra = 'ignore'
 
-
 class SQLQueryGeneration( BaseModel ):
 	'''
 
@@ -815,7 +784,6 @@ class SQLQueryGeneration( BaseModel ):
 	class Config:
 		arbitrary_types_allowed = True
 		extra = 'ignore'
-
 
 class SkyCoordinates( BaseModel ):
 	'''

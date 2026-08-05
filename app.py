@@ -865,7 +865,12 @@ if 'bucket_include' not in st.session_state:
 
 if 'bucket_id' not in st.session_state:
 	st.session_state[ 'bucket_id' ] = ''
+	
+# -------- INTERACTIONS API CONVERSATION STATE --------
 
+if 'interaction_ids' not in st.session_state:
+	st.session_state[ 'interaction_ids' ] = { 'text': '', 'docqna': '', 'stores': '', 'bucket': '' }
+	
 # ------ System Instruction Category Policies ------
 
 TEXT_PROMPT_CATEGORIES: Tuple[ str, ... ] = ('Research / Academic', 'Prompt Engineering',
@@ -921,106 +926,190 @@ def throw_if( name: str, value: object ):
 		raise ValueError( f'Argument "{name}" cannot be empty!' )
 
 def extract_usage( resp: Any ) -> Dict[ str, int ]:
-	"""Extract usage.
-    
-    Purpose:
-        Extracts usage for downstream application use. The function normalizes provider or
-        file-system data into a stable shape that the Streamlit interface and helper workflows
-        can consume safely.
-    
-    Args:
-        resp (Any): Resp value used by this workflow.
-    
-    Returns:
-        Value produced by the operation for display or downstream processing.
-    """
-	usage = { 'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0 }
-	if not resp:
-		return usage
-	
-	raw = None
+	"""Extract token usage from a provider response.
+
+	Purpose:
+		Reads usage data from Gemini Interactions responses, Gemini Generate Content responses,
+		dictionary responses, and compatible provider response objects. The function normalizes
+		each supported provider schema into the token-counter structure consumed by Jeni.
+
+	Args:
+		resp (Any): Provider response containing optional usage information.
+
+	Returns:
+		Dict[str, int]: Prompt, completion, and total token counts.
+
+	Raises:
+		Error: Raised when defined usage information cannot be normalized.
+	"""
 	try:
-		raw = getattr( resp, 'usage', None )
-	except Exception as _logged_exception:
-		try:
-			error = Error( _logged_exception )
-			error.module = 'app'
-			error.cause = 'extract_usage'
-			error.method = 'extract_usage( resp: Any )'
-			Logger( ).write( error )
-		except Exception:
-			pass
-		raw = None
-	
-	if not raw and isinstance( resp, dict ):
-		raw = resp.get( 'usage' )
-	
-	# Gemini SDK commonly uses 'usage_metadata'
-	if not raw and isinstance( resp, dict ):
-		raw = resp.get( 'usage_metadata' )
-	
-	if not raw:
-		try:
-			raw = getattr( resp, 'usage_metadata', None )
-		except Exception as _logged_exception:
-			try:
-				error = Error( _logged_exception )
-				error.module = 'app'
-				error.cause = 'extract_usage'
-				error.method = 'extract_usage( resp: Any )'
-				Logger( ).write( error )
-			except Exception:
-				pass
-			raw = None
-	
-	if not raw:
-		return usage
-	
-	try:
-		if isinstance( raw, dict ):
-			usage[ 'prompt_tokens' ] = int(
-				raw.get( 'prompt_tokens', raw.get( 'input_tokens', 0 ) ) )
-			usage[ 'completion_tokens' ] = int(
-				raw.get( 'completion_tokens', raw.get( 'output_tokens', 0 ) ) )
-			usage[ 'total_tokens' ] = int(
-				raw.get( 'total_tokens', usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ]
-				) )
+		usage: Dict[ str, int ] = { 'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0, }
+		if resp is None:
+			return usage
+		
+		if isinstance( resp, dict ):
+			raw = (resp.get( 'usage' ) or resp.get( 'usage_metadata' ) or resp.get(
+				'usageMetadata' ))
 		else:
-			usage[ 'prompt_tokens' ] = int(
-				getattr( raw, 'prompt_tokens', getattr( raw, 'input_tokens', 0 ) ) )
-			usage[ 'completion_tokens' ] = int(
-				getattr( raw, 'completion_tokens', getattr( raw, 'output_tokens', 0 ) ) )
-			usage[ 'total_tokens' ] = int( getattr( raw, 'total_tokens',
-				usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ] ) )
-	except Exception as _logged_exception:
-		try:
-			error = Error( _logged_exception )
-			error.module = 'app'
-			error.cause = 'extract_usage'
-			error.method = 'extract_usage( resp: Any )'
-			Logger( ).write( error )
-		except Exception:
-			pass
-		usage[ 'total_tokens' ] = usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ]
-	
-	return usage
+			raw = getattr( resp, 'usage', None )
+			if raw is None:
+				raw = getattr( resp, 'usage_metadata', None )
+			
+			if raw is None:
+				raw = getattr( resp, 'usageMetadata', None )
+		
+		if raw is None:
+			return usage
+		
+		if isinstance( raw, dict ):
+			usage_data: Dict[ str, Any ] = raw
+		
+		elif hasattr( raw, 'model_dump' ):
+			usage_data = raw.model_dump( exclude_none=True )
+		
+		elif hasattr( raw, 'to_dict' ):
+			usage_data = raw.to_dict( )
+		
+		else:
+			usage_data = { 'total_input_tokens': getattr( raw, 'total_input_tokens', None, ),
+				'total_output_tokens': getattr( raw, 'total_output_tokens', None, ),
+				'total_tokens': getattr( raw, 'total_tokens', None, ),
+				'prompt_token_count': getattr( raw, 'prompt_token_count', None, ),
+				'candidates_token_count': getattr( raw, 'candidates_token_count', None, ),
+				'total_token_count': getattr( raw, 'total_token_count', None, ),
+				'prompt_tokens': getattr( raw, 'prompt_tokens', None, ),
+				'completion_tokens': getattr( raw, 'completion_tokens', None, ),
+				'input_tokens': getattr( raw, 'input_tokens', None, ),
+				'output_tokens': getattr( raw, 'output_tokens', None, ), }
+		
+		prompt_tokens = usage_data.get( 'total_input_tokens' )
+		if prompt_tokens is None:
+			prompt_tokens = usage_data.get( 'prompt_token_count' )
+		
+		if prompt_tokens is None:
+			prompt_tokens = usage_data.get( 'prompt_tokens' )
+		
+		if prompt_tokens is None:
+			prompt_tokens = usage_data.get( 'input_tokens' )
+		
+		completion_tokens = usage_data.get( 'total_output_tokens' )
+		if completion_tokens is None:
+			completion_tokens = usage_data.get( 'candidates_token_count' )
+		
+		if completion_tokens is None:
+			completion_tokens = usage_data.get( 'completion_tokens' )
+		
+		if completion_tokens is None:
+			completion_tokens = usage_data.get( 'output_tokens' )
+		
+		total_tokens = usage_data.get( 'total_tokens' )
+		if total_tokens is None:
+			total_tokens = usage_data.get( 'total_token_count' )
+		
+		usage[ 'prompt_tokens' ] = int( prompt_tokens or 0 )
+		usage[ 'completion_tokens' ] = int( completion_tokens or 0 )
+		if total_tokens is None:
+			usage[ 'total_tokens' ] = (usage[ 'prompt_tokens' ] + usage[ 'completion_tokens' ])
+		else:
+			usage[ 'total_tokens' ] = int( total_tokens or 0 )
+		
+		return usage
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'extract_usage'
+		exception.method = 'extract_usage( resp: Any ) -> Dict[ str, int ]'
+		Logger( ).write( exception )
+		raise exception
 
 def update_counters( resp: Any ) -> None:
-	"""Update counters.
-    
-    Purpose:
-        Updates application state or persistent storage for the update counters operation. The
-        function performs the requested mutation while keeping database and session-state
-        handling centralized.
-    
-    Args:
-        resp (Any): Resp value used by this workflow.
-    """
-	usage = extract_usage( resp )
-	st.session_state.last_call_usage = usage
-	st.session_state.token_usage[ 'prompt_tokens' ] += usage.get( 'prompt_tokens', 0 )
-	st.session_state.token_usage[ 'completion_tokens' ] += usage.get( 'completion_tokens', 0 )
-	st.session_state.token_usage[ 'total_tokens' ] += usage.get( 'total_tokens', 0 )
+	"""Update the Jeni token counters.
+
+	Purpose:
+		Extracts normalized usage from the latest provider response, records the current-call
+		counts, and adds those values to the cumulative Streamlit session counters.
+
+	Args:
+		resp (Any): Provider response containing optional usage information.
+
+	Returns:
+		None: This function updates Streamlit session state through side effects.
+
+	Raises:
+		Error: Raised when usage extraction or counter mutation fails.
+	"""
+	try:
+		usage = extract_usage( resp )
+		st.session_state.last_call_usage = usage
+		st.session_state.token_usage[ 'prompt_tokens' ] += usage[ 'prompt_tokens' ]
+		st.session_state.token_usage[ 'completion_tokens' ] += usage[ 'completion_tokens' ]
+		st.session_state.token_usage[ 'total_tokens' ] += usage[ 'total_tokens' ]
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'update_counters'
+		exception.method = 'update_counters( resp: Any ) -> None'
+		Logger( ).write( exception )
+		raise exception
+
+INTERACTION_MODES: Tuple[ str, ... ] = ( 'text', 'docqna', 'stores', 'bucket' )
+
+def get_previous_interaction_id( mode: str ) -> str:
+	try:
+		throw_if( 'mode', mode )
+		interaction_mode = str( mode ).strip( ).lower( )
+		if interaction_mode not in INTERACTION_MODES:
+			raise ValueError( f'Unsupported Interaction mode: {interaction_mode}' )
+		interaction_ids = st.session_state.get( 'interaction_ids', { } )
+		if not isinstance( interaction_ids, dict ):
+			interaction_ids = { }
+		return str( interaction_ids.get( interaction_mode, '' ) or '' ).strip( )
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'get_previous_interaction_id'
+		exception.method = 'get_previous_interaction_id( mode: str ) -> str'
+		Logger( ).write( exception )
+		raise exception
+
+def commit_interaction( mode: str, chat: Chat ) -> None:
+	try:
+		throw_if( 'mode', mode )
+		throw_if( 'chat', chat )
+		interaction_mode = str( mode ).strip( ).lower( )
+		if interaction_mode not in INTERACTION_MODES:
+			raise ValueError( f'Unsupported Interaction mode: {interaction_mode}' )
+		interaction_ids = st.session_state.get( 'interaction_ids', { } )
+		if not isinstance( interaction_ids, dict ):
+			interaction_ids = { }
+		interaction_ids[ interaction_mode ] = str( chat.interaction_id or '' ).strip( )
+		st.session_state[ 'interaction_ids' ] = interaction_ids
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'commit_interaction'
+		exception.method = 'commit_interaction( mode: str, chat: Chat ) -> None'
+		Logger( ).write( exception )
+		raise exception
+
+def clear_interaction( mode: str ) -> None:
+	try:
+		throw_if( 'mode', mode )
+		interaction_mode = str( mode ).strip( ).lower( )
+		if interaction_mode not in INTERACTION_MODES:
+			raise ValueError( f'Unsupported Interaction mode: {interaction_mode}' )
+		interaction_ids = st.session_state.get( 'interaction_ids', { } )
+		if not isinstance( interaction_ids, dict ):
+			interaction_ids = { }
+		interaction_ids[ interaction_mode ] = ''
+		st.session_state[ 'interaction_ids' ] = interaction_ids
+	except Exception as e:
+		exception = Error( e )
+		exception.module = 'app'
+		exception.cause = 'clear_interaction'
+		exception.method = 'clear_interaction( mode: str ) -> None'
+		Logger( ).write( exception )
+		raise exception
 
 def display_value( val: Any ) -> str:
 	"""Display value.
@@ -1873,72 +1962,63 @@ def extract_text_from_bytes( file_bytes: bytes ) -> str:
 			return ""
 
 def route_document_query( prompt: str ) -> str:
-	"""Route a Document Q&A query through Gemini.
-	
+	"""Route a Document Q&A request through Gemini.
+
 	Purpose:
-	    Builds a retrieval-augmented prompt from the active document, applies the current
-	    Document Q&A model and inference settings, submits the request through the Gemini
-	    text-generation wrapper, and returns the normalized response text.
-	
+		Builds a retrieval-augmented prompt from the active document, resolves the current
+		Document Q&A model and inference settings, submits the request through the Gemini
+		Interactions wrapper, updates token usage, and returns normalized response text.
+
 	Args:
-	    prompt (str): User question or document-summary instruction submitted for execution.
-	
+		prompt (str): User question or document-summary instruction.
+
 	Returns:
-	    str: Generated answer based on the retrieved document context.
-	
+		str: Generated answer grounded in the active document context.
+
 	Raises:
-	    Error: Raised when validation, document retrieval, or Gemini execution fails.
+		Error: Raised when validation, document retrieval, Gemini execution, response
+			normalization, or token accounting fails.
+		ValueError: Raised when ``prompt``, the retrieval-augmented input, or the selected model
+			is missing.
 	"""
 	try:
 		throw_if( 'prompt', prompt )
-		
-		# ------------------------------------------------------------------
-		# Build Retrieval-Augmented Input
-		# ------------------------------------------------------------------
 		user_input = build_document_user_input( prompt )
 		if not user_input:
-			user_input = str( prompt ).strip( )
+			user_input = prompt.strip( )
 		
-		if not user_input:
-			raise ValueError( 'A document question is required.' )
-		
-		# ------------------------------------------------------------------
-		# Resolve Document Q&A Configuration
-		# ------------------------------------------------------------------
+		throw_if( 'user_input', user_input )
 		model = str( st.session_state.get( 'docqna_model', '' ) or '' ).strip( )
-		if not model:
-			raise ValueError( 'Select a Document Q&A model before submitting a question.' )
-		
-		temperature = float( st.session_state.get( 'docqna_temperature', 0.0 ) or 0.0 )
-		top_p = float( st.session_state.get( 'docqna_top_percent', 0.95 ) or 0.95 )
-		top_k = int( st.session_state.get( 'docqna_top_k', 0 ) or 0 )
-		max_tokens = int( st.session_state.get( 'docqna_max_tokens', 1024 ) or 1024 )
-		frequency_penalty = float( st.session_state.get( 'docqna_frequency_penalty', 0.0 ) or 0.0 )
-		presence_penalty = float( st.session_state.get( 'docqna_presence_penalty', 0.0 ) or 0.0 )
+		throw_if( 'model', model )
+		temperature = float( st.session_state.get( 'docqna_temperature', 0.0 ) )
+		top_p = float( st.session_state.get( 'docqna_top_percent', 0.0 ) )
+		top_k = int( st.session_state.get( 'docqna_top_k', 0 ) )
+		max_tokens = int( st.session_state.get( 'docqna_max_tokens', 0 ) )
+		frequency_penalty = float( st.session_state.get( 'docqna_frequency_penalty', 0.0 ) )
+		presence_penalty = float( st.session_state.get( 'docqna_presence_penalty', 0.0 ) )
 		system_instructions = str(
-			st.session_state.get( 'docqna_system_instructions', '' ) or '' ).strip( )
+			st.session_state.get( 'docqna_system_instructions', '', ) or '' ).strip( )
+		reasoning = str( st.session_state.get( 'docqna_reasoning', '' ) or '' ).strip( )
+		response_format = str(
+			st.session_state.get( 'docqna_response_format', '', ) or '' ).strip( )
+		media_resolution = str(
+			st.session_state.get( 'docqna_media_resolution', '', ) or '' ).strip( )
 		
-		reasoning = st.session_state.get( 'docqna_reasoning', '' )
-		response_format = st.session_state.get( 'docqna_response_format', '' )
-		media_resolution = st.session_state.get( 'docqna_media_resolution', '' )
 		stops = st.session_state.get( 'docqna_stops', [ ] )
 		if not isinstance( stops, list ):
 			stops = [ ]
 		
-		modalities = st.session_state.get( 'docqna_modalities', [ ] )
+		modalities = st.session_state.get( 'docqna_modalities', [ ], )
 		if not isinstance( modalities, list ):
 			modalities = [ ]
 		
-		context = st.session_state.get( 'docqna_messages', [ ] )
+		context = st.session_state.get( 'docqna_messages', [ ], )
 		if not isinstance( context, list ):
 			context = [ ]
 		
 		if context:
 			context = context[ :-1 ]
 		
-		# ------------------------------------------------------------------
-		# Execute Gemini Query
-		# ------------------------------------------------------------------
 		apply_gemini_runtime_config( )
 		chat = Chat( )
 		response = chat.generate_text( prompt=user_input, model=model, number=1,
@@ -1948,11 +2028,9 @@ def route_document_query( prompt: str ) -> str:
 			tool_choice=None, reasoning=reasoning, modalities=modalities,
 			media_resolution=media_resolution, context=context, content='', urls=[ ], max_urls=0,
 			response_schema='', safety_profile='', file_search_store_names=[ ], stream=False,
-			stream_handler=None )
+			stream_handler=None, previous_interaction_id=get_previous_interaction_id( 'docqna' ),
+			store=True, )
 		
-		# ------------------------------------------------------------------
-		# Normalize Response
-		# ------------------------------------------------------------------
 		if response is None:
 			raise ValueError( 'Gemini returned no Document Q&A response.' )
 		
@@ -1960,11 +2038,8 @@ def route_document_query( prompt: str ) -> str:
 		if not answer:
 			raise ValueError( 'Gemini returned an empty Document Q&A response.' )
 		
-		try:
-			update_counters( getattr( chat, 'response', None ) )
-		except Exception:
-			pass
-		
+		commit_interaction( 'docqna', chat )
+		update_counters( getattr( chat, 'response', None ) )
 		return answer
 	
 	except Exception as e:
@@ -4790,9 +4865,6 @@ if mode == 'Text':
 		
 		st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 		
-		# ---------------------------------------------------
-		#                   MESSAGES
-		# ---------------------------------------------------
 		if st.session_state.get( 'text_messages' ) is not None:
 			for msg in st.session_state.text_messages:
 				self_avatar = cfg.JENI if msg.get( 'role' ) == 'assistant' else ''
@@ -4804,6 +4876,7 @@ if mode == 'Text':
 			prompt = str( prompt ).strip( )
 			apply_gemini_runtime_config( )
 			st.session_state.text_messages.append( { 'role': 'user', 'content': prompt, } )
+			
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Thinking…' ):
 					response = None
@@ -4822,23 +4895,28 @@ if mode == 'Text':
 						if structured_context is None or len( structured_context ) == 0:
 							structured_context = st.session_state.get( 'text_messages', [ ] )[
 								:-1 ]
-							selected_text_model = st.session_state.get( 'text_model' )
 						
+						selected_text_model = st.session_state.get( 'text_model' )
 						if not selected_text_model:
 							selected_text_model = text.model
 						
 						grounding_enabled = bool(
 							st.session_state.get( 'text_google_grounding', False ) )
+						
 						derived_text_tools = [ 'google_search' ] if grounding_enabled else [ ]
+						
 						raw_text_urls = str( st.session_state.get( 'text_urls_input', '' ) or '' )
+						
 						derived_text_urls = [ url.strip( ) for url in raw_text_urls.split( ';' ) if
 							url.strip( ) ]
 						
 						raw_text_stops = str( st.session_state.get( 'text_stops_input', '' ) or
 						                      '' )
+						
 						derived_text_stops = [ stop.strip( ) for stop in raw_text_stops.split(
 							',' )
 							if stop.strip( ) ]
+						
 						derived_text_modalities = [ str( modality ).strip( ) for modality in
 							st.session_state.get( 'text_modalities', [ ] ) if
 							str( modality ).strip( ) ]
@@ -4867,39 +4945,53 @@ if mode == 'Text':
 							stream=st.session_state.get( 'text_stream', False ),
 							stream_handler=_on_stream_chunk if st.session_state.get( 'text_stream',
 								False ) else None )
+					
 					except Exception as exc:
 						err = Error( exc )
 						st.error( f'Generation Failed: {err.info}' )
 						response = None
 					
 					if response is not None and str( response ).strip( ):
+						response_text = str( response ).strip( )
+						
 						if st.session_state.get( 'text_stream', False ):
-							stream_placeholder.markdown( str( response ).strip( ) )
+							stream_placeholder.markdown( response_text )
 						else:
-							st.markdown( response )
-							grounding_sources = text.get_grounding_sources( )
+							st.markdown( response_text )
+						
+						grounding_sources = text.get_grounding_sources( )
 						
 						if grounding_sources:
 							st.session_state.last_sources = grounding_sources
+							
 							with st.expander( label='Grounding Sources', icon='🔎', expanded=False,
 									width='stretch' ):
 								for source in grounding_sources:
-									title = source.get( 'title', '' ) or source.get( 'url', '' )
+									title = (source.get( 'title', '' ) or source.get( 'url',
+										'' ) or source.get( 'files_id', '' ))
+									
 									url = source.get( 'url', '' )
+									snippet = source.get( 'snippet', '' )
 									
 									if url:
 										st.markdown( f'- [{title}]({url})' )
+									elif title:
+										st.markdown( f'- {title}' )
+									
+									if snippet:
+										st.caption( snippet )
+						else:
+							st.session_state.last_sources = [ ]
 						
 						st.session_state.text_messages.append(
-							{ 'role': 'assistant', 'content': str( response ).strip( ), } )
-						if st.session_state.get( 'text_stream', False ):
-							st.session_state[ 'text_gemini_history' ] = [ ]
-						else:
-							structured_history = text.get_structured_history( )
-							if structured_history is not None and len( structured_history ) > 0:
-								st.session_state[ 'text_gemini_history' ] = structured_history
+							{ 'role': 'assistant', 'content': response_text, } )
 						
-						st.session_state.last_answer = str( response ).strip( )
+						st.session_state[ 'text_gemini_history' ] = (
+							text.get_structured_history( ))
+						
+						update_counters( text.response )
+						st.session_state.last_answer = response_text
+					
 					else:
 						st.error( 'Generation Failed!.' )
 		
@@ -4914,7 +5006,7 @@ if mode == 'Text':
 # ======================================================================================
 # IMAGES MODE
 # ======================================================================================
-elif mode == "Images":
+elif mode == 'Images':
 	image_model = st.session_state.get( 'image_model', '' )
 	image_number = st.session_state.get( 'image_number', 1 )
 	image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
@@ -4937,23 +5029,38 @@ elif mode == "Images":
 	model_options = [ ]
 	image = Images( )
 	
-	def _clear_image_messages( ) -> None:
+	def clear_image_messages( ) -> None:
+		"""Clear Images Mode messages.
+		
+		Purpose:
+			Removes the shared Images Mode message history used by the Generation, Analysis,
+			and Editing tabs.
+		
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		"""
 		try:
 			st.session_state[ 'image_input' ] = [ ]
-		except Exception as _logged_exception:
-			try:
-				error = Error( _logged_exception )
-				error.module = 'app'
-				error.cause = '_clear_image_messages'
-				error.method = '_clear_image_messages(  )'
-				Logger( ).write( error )
-			except Exception:
-				pass
-			pass
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'clear_image_messages'
+			exception.method = 'clear_image_messages( ) -> None'
+			Logger( ).write( exception )
+			raise exception
 	
-	def _sync_image_tools( ) -> None:
+	def sync_image_tools( ) -> None:
+		"""Synchronize Images Mode grounding tools.
+		
+		Purpose:
+			Builds the Images Mode tool-selection list from the Google Search and Google Image
+			Search controls.
+		
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		"""
 		try:
-			tools = [ ]
+			tools: List[ str ] = [ ]
 			if st.session_state.get( 'image_grounded', False ):
 				tools.append( 'google_search' )
 			
@@ -4961,16 +5068,90 @@ elif mode == "Images":
 				tools.append( 'image_search' )
 			
 			st.session_state[ 'image_tools' ] = tools
-		except Exception as _logged_exception:
-			try:
-				error = Error( _logged_exception )
-				error.module = 'app'
-				error.cause = '_sync_image_tools'
-				error.method = '_sync_image_tools(  )'
-				Logger( ).write( error )
-			except Exception:
-				pass
-			pass
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'sync_image_tools'
+			exception.method = 'sync_image_tools( ) -> None'
+			Logger( ).write( exception )
+			raise exception
+	
+	def append_image_message( role: str, content: str ) -> None:
+		"""Append an Images Mode message.
+		
+		Purpose:
+			Adds a user or assistant message to the shared Images Mode display history.
+		
+		Args:
+			role (str): Message role.
+			content (str): Message content.
+		
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		
+		Raises:
+			Error: Raised when validation or message-state mutation fails.
+			ValueError: Raised when ``role`` or ``content`` is missing.
+		"""
+		try:
+			throw_if( 'role', role )
+			throw_if( 'content', content )
+			message_role = role
+			message_content = content
+			
+			if 'image_input' not in st.session_state or not isinstance(
+					st.session_state[ 'image_input' ], list ):
+				st.session_state[ 'image_input' ] = [ ]
+			
+			st.session_state[ 'image_input' ].append(
+				{ 'role': message_role, 'content': message_content } )
+		except Exception as e:
+			exception = Error( e )
+			exception.module = 'app'
+			exception.cause = 'append_image_message'
+			exception.method = ('append_image_message( role: str, content: str ) -> None')
+			Logger( ).write( exception )
+			raise exception
+	
+	def reset_image_model_settings( ) -> None:
+		"""Reset Images Mode model settings.
+		
+		Purpose:
+			Removes the workflow, model, and inference widget values so their initial values
+			are restored during the subsequent application rerun.
+		
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		"""
+		for key in [ 'image_mode', 'image_model', 'image_top_percent', 'image_temperature' ]:
+			st.session_state.pop( key, None )
+	
+	def reset_image_response_settings( ) -> None:
+		"""Reset Images Mode response settings.
+		
+		Purpose:
+			Removes the output-token, candidate-count, modality, and MIME-type widget values
+			so their initial values are restored during the subsequent application rerun.
+		
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		"""
+		for key in [ 'image_max_tokens', 'image_number', 'image_modality', 'image_mime_type' ]:
+			st.session_state.pop( key, None )
+	
+	def reset_image_visual_settings( ) -> None:
+		"""Reset Images Mode visual settings.
+		
+		Purpose:
+			Removes the image-size, aspect-ratio, and grounding widget values so their initial
+			values are restored during the subsequent application rerun.
+		
+		Returns:
+			None: This function updates Streamlit session state through side effects.
+		"""
+		for key in [ 'image_size', 'image_aspect_ratio', 'image_grounded', 'image_image_search',
+			'image_tools' ]:
+			st.session_state.pop( key, None )
 	
 	if st.session_state.get( 'clear_instructions' ):
 		st.session_state[ 'image_system_instructions' ] = ''
@@ -4995,10 +5176,11 @@ elif mode == "Images":
 					border=True, gap='xxsmall' )
 				
 				with llm_c1:
-					_modes = [ 'Generation', 'Analysis', 'Editing' ]
-					st.selectbox( label='Image Mode', options=_modes, key='image_mode',
+					modes = [ 'Generation', 'Analysis', 'Editing' ]
+					st.selectbox( label='Image Mode', options=modes, key='image_mode',
 						help='Available Gemini image workflows.', index=None,
 						placeholder='Options' )
+					
 					image_mode = st.session_state.get( 'image_mode', '' )
 				
 				with llm_c2:
@@ -5014,25 +5196,25 @@ elif mode == "Images":
 					st.selectbox( label='Select Model', options=models,
 						help='REQUIRED. Gemini model used by the selected image workflow.',
 						key='image_model', placeholder='Options', index=None )
+					
 					image_model = st.session_state.get( 'image_model', '' )
 				
 				with llm_c3:
 					st.slider( label='Top-P', key='image_top_percent',
 						value=float( st.session_state.get( 'image_top_percent', 0.0 ) ),
 						min_value=0.0, max_value=1.0, step=0.01, help=cfg.TOP_P )
+					
 					image_top_percent = st.session_state.get( 'image_top_percent', 0.0 )
 				
 				with llm_c4:
 					st.slider( label='Temperature', key='image_temperature',
 						value=float( st.session_state.get( 'image_temperature', 0.0 ) ),
 						min_value=0.0, max_value=1.0, step=0.01, help=cfg.TEMPERATURE )
+					
 					image_temperature = st.session_state.get( 'image_temperature', 0.0 )
 				
 				if st.button( label='Reset', key='image_model_reset', width='stretch', icon='🔄' ):
-					for key in [ 'image_mode', 'image_model', 'image_top_percent',
-						'image_temperature' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
+					reset_image_model_settings( )
 					st.rerun( )
 			
 			# ------- Response Settings ------------
@@ -5045,6 +5227,7 @@ elif mode == "Images":
 					st.slider( label='Max Output Tokens', min_value=0, max_value=100000,
 						value=int( st.session_state.get( 'image_max_tokens', 0 ) ), step=1000,
 						help=cfg.MAX_OUTPUT_TOKENS, key='image_max_tokens' )
+					
 					image_max_tokens = st.session_state.get( 'image_max_tokens', 0 )
 				
 				with resp_c2:
@@ -5052,11 +5235,13 @@ elif mode == "Images":
 						value=int( st.session_state.get( 'image_number', 1 ) ), step=1,
 						help='Optional. Upper bound on generated image candidates.',
 						key='image_number' )
+					
 					image_number = st.session_state.get( 'image_number', 1 )
 				
 				with resp_c3:
 					if image_mode == 'Analysis':
 						modality_options = [ 'TEXT' ]
+						
 						if st.session_state.get( 'image_modality', '' ) != 'TEXT':
 							st.session_state[ 'image_modality' ] = 'TEXT'
 					else:
@@ -5066,28 +5251,28 @@ elif mode == "Images":
 						key='image_modality',
 						help='Gemini response modalities used by the Image wrapper.', index=None,
 						placeholder='Select Modality' )
+					
 					image_modality = st.session_state.get( 'image_modality', '' )
 				
 				with resp_c4:
 					mime_enabled = image_mode in [ 'Generation', 'Editing' ]
+					
 					if mime_enabled:
 						st.selectbox( label='Output MIME Type', options=image.mime_options,
 							key='image_mime_type',
-							help='Optional. Output image MIME type when the model returns an '
-							     'image.', index=None, placeholder='Options' )
+							help='Optional. Output image MIME type when the model '
+							     'returns an image.', index=None, placeholder='Options' )
 					else:
 						st.text_input( label='Output MIME Type', value='Not used for Analysis',
 							disabled=True )
+						
 						st.session_state[ 'image_mime_type' ] = ''
 					
 					image_mime_type = st.session_state.get( 'image_mime_type', '' )
 				
 				if st.button( label='Reset', key='image_response_reset', width='stretch',
 						icon='🔄' ):
-					for key in [ 'image_max_tokens', 'image_number', 'image_modality',
-						'image_mime_type' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
+					reset_image_response_settings( )
 					st.rerun( )
 			
 			# ------- Visual Settings ------------
@@ -5096,25 +5281,29 @@ elif mode == "Images":
 				img_c1, img_c2, img_c3, img_c4 = st.columns( [ 0.25, 0.25, 0.25, 0.25 ],
 					border=True, gap='xxsmall' )
 				
-				supports_image_size = image.supports_image_size( image_model )
-				supports_grounding = image.supports_search_grounding( image_model )
-				supports_image_search = image.supports_image_search( image_model )
+				selected_image_model = str( image_model or image.model ).strip( )
+				supports_image_size = image.supports_image_size( selected_image_model )
+				supports_grounding = image.supports_search_grounding( selected_image_model )
+				supports_image_search = image.supports_image_search( selected_image_model )
 				visual_enabled = image_mode in [ 'Generation', 'Editing' ]
-				if not supports_grounding and st.session_state.get( 'image_grounded', False ):
+				
+				if (not supports_grounding and st.session_state.get( 'image_grounded', False )):
 					st.session_state[ 'image_grounded' ] = False
 				
 				if (not supports_image_search or not st.session_state.get( 'image_grounded',
-						False )) and st.session_state.get( 'image_image_search', False ):
+					False )) and st.session_state.get( 'image_image_search', False ):
 					st.session_state[ 'image_image_search' ] = False
 				
 				with img_c1:
 					if visual_enabled:
 						st.selectbox( label='Aspect Ratio', options=list( image.aspect_options ),
-							help='Optional. Output aspect ratio for Gemini image generation',
-							key='image_aspect_ratio', placeholder='Options', index=None )
+							help='Optional. Output aspect ratio for Gemini image '
+							     'generation', key='image_aspect_ratio', placeholder='Options',
+							index=None )
 					else:
 						st.text_input( label='Aspect Ratio', value='Not used for Analysis',
 							disabled=True )
+						
 						st.session_state[ 'image_aspect_ratio' ] = ''
 					
 					image_aspect_ratio = st.session_state.get( 'image_aspect_ratio', '' )
@@ -5122,22 +5311,25 @@ elif mode == "Images":
 				with img_c2:
 					if visual_enabled and supports_image_size:
 						st.selectbox( label='Image Size', options=list( image.size_options ),
-							help='Optional. Supported by Gemini 3 image-preview llm.',
-							key='image_size', placeholder='Options', index=None )
+							help='Optional. Output image size supported by the '
+							     'selected Gemini image model.', key='image_size',
+							placeholder='Options', index=None )
 					else:
 						message = 'Not supported by selected model'
+						
 						if not visual_enabled:
 							message = 'Not used for Analysis'
 						
 						st.text_input( label='Image Size', value=message, disabled=True )
+						
 						st.session_state[ 'image_size' ] = ''
 					
 					image_size = st.session_state.get( 'image_size', '' )
 				
 				with img_c3:
 					st.checkbox( label='Ground with Google Search', key='image_grounded',
-						help='Enables Gemini Search grounding when supported by the selected '
-						     'model.', disabled=not supports_grounding )
+						help='Enables Gemini Search grounding when supported by '
+						     'the selected model.', disabled=not supports_grounding )
 					
 					if not supports_grounding:
 						st.caption( 'Not supported by selected model.' )
@@ -5146,20 +5338,18 @@ elif mode == "Images":
 				
 				with img_c4:
 					st.checkbox( label='Include Google Image Search', key='image_image_search',
-						help=('Available only for gemini-3.1-flash-image-preview when grounding '
-						      'is enabled.'), disabled=(
+						help='Available only when Google Image Search is supported '
+						     'and grounding is enabled.', disabled=(
 								not supports_image_search or not st.session_state.get(
 							'image_grounded', False )) )
 					
 					image_image_search = st.session_state.get( 'image_image_search', False )
 				
-				_sync_image_tools( )
+				sync_image_tools( )
+				
 				if st.button( label='Reset', key='image_visual_reset', width='stretch',
 						icon='🔄' ):
-					for key in [ 'image_size', 'image_aspect_ratio', 'image_grounded',
-						'image_image_search', 'image_tools' ]:
-						if key in st.session_state:
-							del st.session_state[ key ]
+					reset_image_visual_settings( )
 					st.rerun( )
 		
 		# ------------------------------------------------------------------
@@ -5170,165 +5360,189 @@ elif mode == "Images":
 			allowed_categories=IMAGE_PROMPT_CATEGORIES,
 			label='System Instructions', height=135 )
 		
-		def _append_image_message( role: str, content: str ) -> None:
-			try:
-				if 'image_input' not in st.session_state or not isinstance(
-						st.session_state[ 'image_input' ], list ):
-					st.session_state[ 'image_input' ] = [ ]
-				
-				st.session_state[ 'image_input' ].append( { 'role': role, 'content': content } )
-			except Exception as _logged_exception:
-				try:
-					error = Error( _logged_exception )
-					error.module = 'app'
-					error.cause = '_append_image_message'
-					error.method = '_append_image_message( role: str, content: str )'
-					Logger( ).write( error )
-				except Exception:
-					pass
-				pass
+		# ------------------------------------------------------------------
+		# Image Workflows
+		# ------------------------------------------------------------------
+		tab_gen, tab_analyze, tab_edit = st.tabs( [ 'Generate', 'Analyze', 'Edit' ] )
 		
 		# ------- Image Generation ------------
-		tab_gen, tab_analyze, tab_edit = st.tabs( [ 'Generate', 'Analyze', 'Edit' ] )
 		with tab_gen:
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
-					with st.chat_message( msg[ 'role' ], avatar='' ):
-						st.markdown( msg[ 'content' ] )
+					with st.chat_message( msg.get( 'role', 'assistant' ), avatar='' ):
+						st.markdown( msg.get( 'content', '' ) )
 			
-			prompt = st.chat_input( 'Enter image generation prompt...' )
+			generation_prompt = st.chat_input( 'Enter image generation prompt...',
+				key='image_generation_prompt' )
+			
 			gen_c1, gen_c2, gen_c3 = st.columns( [ 0.2, 0.2, 0.8 ] )
+			
 			with gen_c1:
 				if st.button( 'Generate Image', icon='🎨' ):
 					with st.spinner( 'Generating…' ):
 						try:
-							if not prompt or not str( prompt ).strip( ):
+							if (not generation_prompt or not str( generation_prompt ).strip( )):
 								st.warning( 'Enter a prompt before generating an image.' )
+							
 							elif not image_model:
 								st.warning( 'Select a model before generating an image.' )
+							
 							else:
-								_append_image_message( 'user', prompt )
-								result = image.generate( prompt=prompt, model=image_model,
-									aspect=image_aspect_ratio, number=image_number,
-									temperature=image_temperature, top_p=image_top_percent,
-									max_tokens=image_max_tokens, resolution=image_size,
+								generation_prompt = str( generation_prompt ).strip( )
+								
+								append_image_message( 'user', generation_prompt )
+								
+								result = image.generate( prompt=generation_prompt,
+									model=image_model, aspect=image_aspect_ratio,
+									number=image_number, temperature=image_temperature,
+									top_p=image_top_percent, max_tokens=image_max_tokens,
+									resolution=image_size,
 									instruct=st.session_state.get( 'image_system_instructions',
 										'' ), output_mime_type=image_mime_type,
 									response_modalities=image_modality, grounded=image_grounded,
 									image_search=image_image_search )
 								
 								if result is not None:
-									st.image( result, use_column_width=True )
-									_append_image_message( 'assistant',
+									st.image( result, use_container_width=True )
+									
+									append_image_message( 'assistant',
 										'Generated image returned successfully.' )
 								else:
 									st.warning( 'No image was returned by the model.' )
 								
-								try:
-									update_counters( getattr( image, 'response', None ) )
-								except Exception:
-									pass
-						except Exception as exc:
-							st.error( f'Image generation failed: {exc}' )
+								update_counters( image.response )
+						
+						except Exception as e:
+							exception = Error( e )
+							exception.module = 'app'
+							exception.cause = 'Images Mode'
+							exception.method = ('Image Generation workflow')
+							Logger( ).write( exception )
+							st.error( f'Image generation failed: {exception.info}' )
 			
 			with gen_c2:
 				if st.button( label='Clear Messages', key='clear_image_generation', icon='🧹' ):
-					_clear_image_messages( )
+					clear_image_messages( )
 					st.rerun( )
 		
 		# ------- Image Analysis ------------
 		with tab_analyze:
-			uploaded_img = st.file_uploader( 'Upload an image for analysis',
+			uploaded_analysis_image = st.file_uploader( 'Upload an image for analysis',
 				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
 				key='images_analyze_uploader' )
 			
-			tmp_path = None
-			if uploaded_img:
-				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
+			analysis_path = None
+			
+			if uploaded_analysis_image:
+				analysis_path = save_temp( uploaded_analysis_image )
+				st.image( uploaded_analysis_image, caption='Uploaded image preview', width=250 )
 			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
-					with st.chat_message( msg[ 'role' ], avatar='' ):
-						st.markdown( msg[ 'content' ] )
+					with st.chat_message( msg.get( 'role', 'assistant' ), avatar='' ):
+						st.markdown( msg.get( 'content', '' ) )
 			
 			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 			
-			prompt = st.chat_input( 'Enter image analysis prompt …' )
+			analysis_prompt = st.chat_input( 'Enter image analysis prompt …',
+				key='image_analysis_prompt' )
+			
 			ana_c1, ana_c2 = st.columns( [ 0.2, 0.8 ] )
+			
 			with ana_c1:
 				if st.button( 'Analyze Image', icon='🔬' ):
 					with st.spinner( 'Analyzing image…' ):
 						try:
-							if not tmp_path:
+							if not analysis_path:
 								st.warning( 'Upload an image before analyzing.' )
-							elif not prompt or not str( prompt ).strip( ):
-								st.warning( 'Enter an analysis prompt before analyzing the '
-								            'image.' )
+							
+							elif (not analysis_prompt or not str( analysis_prompt ).strip( )):
+								st.warning( 'Enter an analysis prompt before analyzing '
+								            'the image.' )
+							
 							elif not image_model:
 								st.warning( 'Select a model before analyzing an image.' )
+							
 							else:
-								_append_image_message( 'user', prompt )
-								analysis_result = image.analyze( prompt=prompt, path=tmp_path,
-									model=image_model, number=image_number,
+								analysis_prompt = str( analysis_prompt ).strip( )
+								
+								append_image_message( 'user', analysis_prompt )
+								
+								analysis_result = image.analyze( prompt=analysis_prompt,
+									path=analysis_path, model=image_model, number=image_number,
 									temperature=image_temperature, top_p=image_top_percent,
 									max_tokens=image_max_tokens,
 									instruct=st.session_state.get( 'image_system_instructions',
-										'' ), response_modalities=image_modality,
-									grounded=image_grounded, image_search=image_image_search )
+										'' ), response_modalities='TEXT', grounded=image_grounded,
+									image_search=image_image_search )
 								
 								if analysis_result is None:
 									st.warning( 'No analysis output returned by the model.' )
 								else:
 									st.markdown( '**Analysis result:**' )
 									st.write( analysis_result )
-									_append_image_message( 'assistant', str( analysis_result ) )
+									
+									append_image_message( 'assistant', str( analysis_result ) )
 								
-								try:
-									update_counters( getattr( image, 'response', None ) )
-								except Exception:
-									pass
-						except Exception as exc:
-							st.error( f'Analysis Failed: {exc}' )
+								update_counters( image.response )
+						
+						except Exception as e:
+							exception = Error( e )
+							exception.module = 'app'
+							exception.cause = 'Images Mode'
+							exception.method = 'Image Analysis workflow'
+							Logger( ).write( exception )
+							st.error( f'Analysis failed: {exception.info}' )
 			
 			with ana_c2:
 				if st.button( label='Clear Messages', key='clear_image_analysis', icon='🧹' ):
-					_clear_image_messages( )
+					clear_image_messages( )
 					st.rerun( )
 		
 		# ------- Image Editing ------------
 		with tab_edit:
-			uploaded_img = st.file_uploader( 'Upload Image for Edit',
+			uploaded_edit_image = st.file_uploader( 'Upload Image for Edit',
 				type=[ 'png', 'jpg', 'jpeg', 'webp' ], accept_multiple_files=False,
 				key='images_edit_uploader' )
 			
-			tmp_path = None
-			if uploaded_img:
-				tmp_path = save_temp( uploaded_img )
-				st.image( uploaded_img, caption='Uploaded image preview', width=250 )
+			edit_path = None
+			
+			if uploaded_edit_image:
+				edit_path = save_temp( uploaded_edit_image )
+				st.image( uploaded_edit_image, caption='Uploaded image preview', width=250 )
 			
 			if st.session_state.get( 'image_input' ) is not None:
 				for msg in st.session_state.get( 'image_input', [ ] ):
-					with st.chat_message( msg[ 'role' ], avatar='' ):
-						st.markdown( msg[ 'content' ] )
+					with st.chat_message( msg.get( 'role', 'assistant' ), avatar='' ):
+						st.markdown( msg.get( 'content', '' ) )
 			
 			st.markdown( cfg.BLUE_DIVIDER, unsafe_allow_html=True )
 			
-			prompt = st.chat_input( 'Enter image editing prompt …' )
+			edit_prompt = st.chat_input( 'Enter image editing prompt …',
+				key='image_editing_prompt' )
+			
 			edit_c1, edit_c2 = st.columns( [ 0.2, 0.8 ] )
+			
 			with edit_c1:
 				if st.button( 'Edit Image', icon='✏️' ):
 					with st.spinner( 'Editing image…' ):
 						try:
-							if not tmp_path:
+							if not edit_path:
 								st.warning( 'Upload an image before editing.' )
-							elif not prompt or not str( prompt ).strip( ):
-								st.warning( 'Enter an editing prompt before editing the image.' )
+							
+							elif (not edit_prompt or not str( edit_prompt ).strip( )):
+								st.warning( 'Enter an editing prompt before editing '
+								            'the image.' )
+							
 							elif not image_model:
 								st.warning( 'Select a model before editing an image.' )
+							
 							else:
-								_append_image_message( 'user', prompt )
-								edit_result = image.edit( prompt=prompt, path=tmp_path,
+								edit_prompt = str( edit_prompt ).strip( )
+								
+								append_image_message( 'user', edit_prompt )
+								
+								edit_result = image.edit( prompt=edit_prompt, path=edit_path,
 									model=image_model, aspect=image_aspect_ratio,
 									number=image_number, temperature=image_temperature,
 									top_p=image_top_percent, max_tokens=image_max_tokens,
@@ -5339,22 +5553,26 @@ elif mode == "Images":
 									image_search=image_image_search )
 								
 								if edit_result is not None:
-									st.image( edit_result, use_column_width=True )
-									_append_image_message( 'assistant',
+									st.image( edit_result, use_container_width=True )
+									
+									append_image_message( 'assistant',
 										'Edited image returned successfully.' )
 								else:
 									st.warning( 'No edited image was returned by the model.' )
 								
-								try:
-									update_counters( getattr( image, 'response', None ) )
-								except Exception:
-									pass
-						except Exception as exc:
-							st.error( f'Image editing failed: {exc}' )
+								update_counters( image.response )
+						
+						except Exception as e:
+							exception = Error( e )
+							exception.module = 'app'
+							exception.cause = 'Images Mode'
+							exception.method = 'Image Editing workflow'
+							Logger( ).write( exception )
+							st.error( f'Image editing failed: {exception.info}' )
 			
 			with edit_c2:
-				if st.button( 'Clear Messages', key='clear_image_editing', icon='🧹' ):
-					_clear_image_messages( )
+				if st.button( label='Clear Messages', key='clear_image_editing', icon='🧹' ):
+					clear_image_messages( )
 					st.rerun( )
 
 # ======================================================================================
@@ -6676,6 +6894,7 @@ elif mode == 'Document Q&A':
 		if st.button( label='Clear Messages', key='docqna_clear_messages', width='content',
 				icon='🧹' ):
 			st.session_state[ 'docqna_messages' ] = [ ]
+			clear_interaction( 'docqna' )
 			st.session_state[ 'docqna_context' ] = [ ]
 			st.session_state[ 'last_answer' ] = ''
 			st.session_state[ 'last_sources' ] = [ ]
@@ -7155,6 +7374,7 @@ elif mode == 'File Search Stores':
 		try:
 			st.session_state[ 'stores_messages' ] = [ ]
 			st.session_state[ 'stores_input' ] = [ ]
+			clear_interaction( 'stores' )
 			st.session_state[ 'last_answer' ] = ''
 			st.session_state[ 'last_sources' ] = [ ]
 		
@@ -7233,81 +7453,86 @@ elif mode == 'File Search Stores':
 	
 	def run_file_search_store_query( prompt: str, store_name: str ) -> str:
 		"""Run a File Search Stores query.
-		
+	
 		Purpose:
-		    Sends a user prompt to the configured Gemini text-generation model and enables
-		    Gemini file-search grounding against the selected File Search Store.
-		
+			Sends a user prompt through the Gemini Interactions API and enables File Search
+			grounding against the selected File Search Store. The function resolves the active
+			model and inference settings, excludes the current user message from prior history,
+			updates token counters, and returns normalized response text.
+	
 		Args:
-		    prompt (str): User question submitted through the chat input.
-		    store_name (str): Selected File Search Store resource identifier.
-		
+			prompt (str): User question submitted through the File Search Stores chat input.
+			store_name (str): Selected File Search Store resource name.
+	
 		Returns:
-		    str: Generated answer grounded in the selected File Search Store.
-		
+			str: Generated answer grounded in the selected File Search Store.
+	
 		Raises:
-		    Error: Raised when validation or Gemini execution fails.
+			Error: Raised when validation, Gemini execution, response normalization, or usage
+				accounting fails.
+			ValueError: Raised when ``prompt``, ``store_name``, or the selected model is missing.
 		"""
 		try:
-			prompt_text = str( prompt or '' ).strip( )
-			selected_store = str( store_name or '' ).strip( )
+			throw_if( 'prompt', prompt )
+			throw_if( 'store_name', store_name )
+			prompt_text = str( prompt ).strip( )
+			selected_store = str( store_name ).strip( )
 			selected_model = str( st.session_state.get( 'stores_model', '' ) or '' ).strip( )
-			if not prompt_text:
-				raise ValueError( 'Enter a question before running File Search.' )
-			
-			if not selected_store:
-				raise ValueError( 'Select a File Search Store before submitting a question.' )
-			
-			if not selected_model:
-				raise ValueError( 'Select a model before submitting a File Search question.' )
-			
-			context = st.session_state.get( 'stores_messages', [ ] )
-			
+			throw_if( 'prompt_text', prompt_text )
+			throw_if( 'selected_store', selected_store )
+			throw_if( 'selected_model', selected_model )
+			context = st.session_state.get( 'stores_input', [ ] )
 			if not isinstance( context, list ):
 				context = [ ]
 			
-			if context:
-				context = context[ :-1 ]
+			if not context:
+				context = st.session_state.get( 'stores_messages', [ ] )
+				if not isinstance( context, list ):
+					context = [ ]
+				
+				if context:
+					context = context[ :-1 ]
 			
+			number = int( st.session_state.get( 'stores_number', 1 ) )
+			temperature = float( st.session_state.get( 'stores_temperature', 0.0 ) )
+			top_p = float( st.session_state.get( 'stores_top_percent', 0.0 ) )
+			frequency_penalty = float( st.session_state.get( 'stores_frequency_penalty', 0.0, ) )
+			presence_penalty = float( st.session_state.get( 'stores_presence_penalty', 0.0, ) )
+			max_tokens = int( st.session_state.get( 'stores_max_tokens', 0 ) )
+			system_instructions = str(
+				st.session_state.get( 'stores_system_instructions', '', ) or '' ).strip( )
+			response_format = str(
+				st.session_state.get( 'stores_response_format', '', ) or '' ).strip( )
+			reasoning = str( st.session_state.get( 'stores_reasoning', '', ) or '' ).strip( )
+			tool_choice = str( st.session_state.get( 'stores_tool_choice', '', ) or '' ).strip( )
+			
+			stream = bool( st.session_state.get( 'stores_stream', False ) )
 			apply_gemini_runtime_config( )
-			
-			response = chat.generate_text( prompt=prompt_text, model=selected_model,
-				number=int( st.session_state.get( 'stores_number', 1 ) or 1 ),
-				temperature=float( st.session_state.get( 'stores_temperature', 0.0 ) or 0.0 ),
-				top_p=float( st.session_state.get( 'stores_top_percent', 0.0 ) or 0.0 ), top_k=0,
-				frequency=float( st.session_state.get( 'stores_frequency_penalty', 0.0 ) or 0.0 ),
-				presence=float( st.session_state.get( 'stores_presence_penalty', 0.0 ) or 0.0 ),
-				max_tokens=int( st.session_state.get( 'stores_max_tokens', 0 ) or 0 ), stops=[ ],
-				instruct=str( st.session_state.get( 'stores_system_instructions', '' ) or '' ),
-				response_format=st.session_state.get( 'stores_response_format', '' ), tools=[ ],
-				tool_choice=None, reasoning=st.session_state.get( 'stores_reasoning', '' ),
-				modalities=[ ], media_resolution='', context=context, content='', urls=[ ],
+			response = chat.generate_text( prompt=prompt_text, model=selected_model, number=number,
+				temperature=temperature, top_p=top_p, top_k=0, frequency=frequency_penalty,
+				presence=presence_penalty, max_tokens=max_tokens, stops=[ ],
+				instruct=system_instructions, response_format=response_format,
+				tools=[ 'file_search' ], tool_choice=tool_choice or None, reasoning=reasoning,
+				modalities=[ 'text' ], media_resolution='', context=context, content='', urls=[ ],
 				max_urls=0, response_schema='', safety_profile='',
-				file_search_store_names=[ selected_store ],
-				stream=bool( st.session_state.get( 'stores_stream', False ) ),
-				stream_handler=None )
+				file_search_store_names=[ selected_store ], stream=stream, stream_handler=None, previous_interaction_id=get_previous_interaction_id( 'stores' ),
+				store=True, )
 			
 			if response is None:
 				raise ValueError( 'Gemini returned no File Search response.' )
 			
 			response_text = str( response ).strip( )
-			
 			if not response_text:
 				raise ValueError( 'Gemini returned an empty File Search response.' )
 			
-			try:
-				update_counters( getattr( chat, 'response', None ) )
-			except Exception:
-				pass
-			
+			commit_interaction( 'stores', chat )
+			update_counters( getattr( chat, 'response', None ) )
 			return response_text
-		
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'app'
 			exception.cause = 'run_file_search_store_query'
-			exception.method = ('run_file_search_store_query( '
-			                    'prompt: str, store_name: str ) -> str')
+			exception.method = 'run_file_search_store_query( prompt: str, store_name: str ) -> str'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -7595,21 +7820,49 @@ elif mode == 'File Search Stores':
 		if (stores_prompt is not None and str( stores_prompt ).strip( )):
 			stores_prompt = str( stores_prompt ).strip( )
 			active_store_id = str( st.session_state.get( 'stores_id', '' ) or '' ).strip( )
-			st.session_state[ 'stores_messages' ].append(
-				{ 'role': 'user', 'content': stores_prompt, } )
+			st.session_state[ 'stores_messages' ].append( { 'role': 'user',
+				'content': stores_prompt, } )
 			
 			with st.chat_message( 'assistant', avatar=cfg.JENI ):
 				with st.spinner( 'Searching the selected File Search Store…' ):
 					try:
 						response_text = run_file_search_store_query( prompt=stores_prompt,
-							store_name=active_store_id )
+							store_name=active_store_id, )
 						
 						st.markdown( response_text )
-						st.session_state[ 'stores_messages' ].append(
-							{ 'role': 'assistant', 'content': response_text, } )
+						grounding_sources = chat.get_grounding_sources( )
+						if grounding_sources:
+							st.session_state[ 'last_sources' ] = grounding_sources
+							with st.expander( label='File Search Sources', icon='🔎',
+									expanded=False,
+									width='stretch', ):
+								for source in grounding_sources:
+									source_title = str( source.get( 'title' ) or source.get(
+										'files_id' ) or source.get(
+										'url' ) or 'File Search Result' ).strip( )
+									source_url = str( source.get( 'url' ) or '' ).strip( )
+									source_snippet = str( source.get( 'snippet' ) or '' ).strip( )
+									if source_url:
+										st.markdown( f'- [{source_title}]({source_url})' )
+									else:
+										st.markdown( f'- {source_title}' )
+									
+									if source_snippet:
+										st.caption( source_snippet )
+						else:
+							st.session_state[ 'last_sources' ] = [ ]
 						
-						st.session_state[ 'stores_input' ] = [
-							{ 'role': 'user', 'content': stores_prompt, } ]
+						st.session_state[ 'stores_messages' ].append( { 'role': 'assistant',
+							'content': response_text, } )
+						
+						if st.session_state.get( 'stores_stream', False ):
+							st.session_state[ 'stores_input' ] = [ ]
+						else:
+							structured_history = chat.get_structured_history( )
+							if structured_history:
+								st.session_state[ 'stores_input' ] = structured_history
+							else:
+								st.session_state[ 'stores_input' ] = [ ]
 						
 						st.session_state[ 'last_answer' ] = response_text
 					except Exception as e:
@@ -7738,6 +7991,7 @@ elif mode == 'Google Cloud Buckets':
 		try:
 			st.session_state[ 'bucket_messages' ] = [ ]
 			st.session_state[ 'bucket_input' ] = [ ]
+			clear_interaction( 'bucket' )
 			st.session_state[ 'last_answer' ] = ''
 			st.session_state[ 'last_sources' ] = [ ]
 		
@@ -7817,70 +8071,85 @@ elif mode == 'Google Cloud Buckets':
 	def run_bucket_chat_query( prompt: str, selected_bucket_id: str,
 		selected_bucket_label: str ) -> str:
 		"""Run a Google Cloud Buckets chat query.
-		
+	
 		Purpose:
-		    Sends a conversational request through the existing Gemini text-generation
-		    wrapper while supplying the selected bucket identifier as operational context.
-		    This function does not claim that Gemini has retrieved or searched bucket-object
-		    content.
-		
+			Builds an operational context describing the selected Google Cloud Storage bucket,
+			submits the user request through the Gemini Interactions wrapper, updates token usage,
+			and returns normalized response text. The bucket identifier and label provide contextual
+			metadata only; this function does not retrieve or inspect bucket objects.
+	
 		Args:
-		    prompt (str): User request submitted through the chat input.
-		    selected_bucket_id (str): Selected Google Cloud bucket identifier.
-		    selected_bucket_label (str): User-facing selected bucket name.
-		
+			prompt (str): User request submitted through the Google Cloud Buckets chat input.
+			selected_bucket_id (str): Selected Google Cloud Storage bucket identifier.
+			selected_bucket_label (str): Display label associated with the selected bucket.
+	
 		Returns:
-		    str: Generated conversational response.
-		
+			str: Generated response based on the user request and bucket metadata.
+	
 		Raises:
-		    Error: Raised when validation or Gemini execution fails.
+			Error: Raised when validation, Gemini execution, response normalization, or usage
+				accounting fails.
+			ValueError: Raised when ``prompt`` or the selected model is missing.
 		"""
 		try:
-			prompt_text = str( prompt or '' ).strip( )
+			throw_if( 'prompt', prompt )
+			
+			prompt_text = str( prompt ).strip( )
 			active_bucket_id = str( selected_bucket_id or '' ).strip( )
 			active_bucket_label = str( selected_bucket_label or '' ).strip( )
 			selected_model = str( st.session_state.get( 'bucket_model', '' ) or '' ).strip( )
-			
-			if not prompt_text:
-				raise ValueError( 'Enter a Google Cloud Buckets request.' )
-			
-			if not selected_model:
-				raise ValueError( 'Select a model before submitting a bucket request.' )
-			
-			context = st.session_state.get( 'bucket_messages', [ ] )
+			throw_if( 'prompt_text', prompt_text )
+			throw_if( 'selected_model', selected_model )
+			context = st.session_state.get( 'bucket_input', [ ] )
 			if not isinstance( context, list ):
 				context = [ ]
 			
-			if context:
-				context = context[ :-1 ]
+			if not context:
+				context = st.session_state.get( 'bucket_messages', [ ], )
+				
+				if not isinstance( context, list ):
+					context = [ ]
+				
+				if context:
+					context = context[ :-1 ]
 			
 			bucket_context = ('Google Cloud Storage operational context:\n'
-			                  f'Bucket Name: {active_bucket_label or "Not selected"}\n'
-			                  f'Bucket ID: {active_bucket_id or "Not selected"}\n\n'
-			                  'Do not claim to have inspected bucket-object contents unless those '
-			                  'contents are explicitly included in the user request.')
+			                  f'Bucket Name: '
+			                  f'{active_bucket_label or "Not selected"}\n'
+			                  f'Bucket ID: '
+			                  f'{active_bucket_id or "Not selected"}\n\n'
+			                  'The bucket name and identifier are contextual metadata only. '
+			                  'Do not state or imply that bucket objects, object contents, '
+			                  'metadata, permissions, or storage configuration were inspected '
+			                  'unless those values are explicitly supplied in the user request.')
 			
 			system_instructions = str(
-				st.session_state.get( 'bucket_system_instructions', '' ) or '' ).strip( )
+				st.session_state.get( 'bucket_system_instructions', '', ) or '' ).strip( )
 			
 			combined_instructions = '\n\n'.join(
 				part for part in [ system_instructions, bucket_context, ] if part )
 			
+			number = int( st.session_state.get( 'bucket_number', 1 ) )
+			temperature = float( st.session_state.get( 'bucket_temperature', 0.0, ) )
+			top_p = float( st.session_state.get( 'bucket_top_percent', 0.0, ) )
+			frequency_penalty = float( st.session_state.get( 'bucket_frequency_penalty', 0.0, ) )
+			presence_penalty = float( st.session_state.get( 'bucket_presence_penalty', 0.0, ) )
+			max_tokens = int( st.session_state.get( 'bucket_max_tokens', 0, ) )
+			response_format = str(
+				st.session_state.get( 'bucket_response_format', '', ) or '' ).strip( )
+			reasoning = str( st.session_state.get( 'bucket_reasoning', '', ) or '' ).strip( )
+			tool_choice = str( st.session_state.get( 'bucket_tool_choice', '', ) or '' ).strip( )
+			stream = bool( st.session_state.get( 'bucket_stream', False, ) )
 			apply_gemini_runtime_config( )
-			response = chat.generate_text( prompt=prompt_text, model=selected_model,
-				number=max( 1, int( st.session_state.get( 'bucket_number', 1 ) or 1 ) ),
-				temperature=float( st.session_state.get( 'bucket_temperature', 0.0 ) or 0.0 ),
-				top_p=float( st.session_state.get( 'bucket_top_percent', 0.0 ) or 0.0 ), top_k=0,
-				frequency=float( st.session_state.get( 'bucket_frequency_penalty', 0.0 ) or 0.0 ),
-				presence=float( st.session_state.get( 'bucket_presence_penalty', 0.0 ) or 0.0 ),
-				max_tokens=int( st.session_state.get( 'bucket_max_tokens', 0 ) or 0 ), stops=[ ],
-				instruct=combined_instructions,
-				response_format=st.session_state.get( 'bucket_response_format', '' ), tools=[ ],
-				tool_choice=None, reasoning=st.session_state.get( 'bucket_reasoning', '' ),
-				modalities=[ ], media_resolution='', context=context, content='', urls=[ ],
-				max_urls=0, response_schema='', safety_profile='', file_search_store_names=[ ],
-				stream=bool( st.session_state.get( 'bucket_stream', False ) ),
-				stream_handler=None )
+			response = chat.generate_text( prompt=prompt_text, model=selected_model, number=number,
+				temperature=temperature, top_p=top_p, top_k=0, frequency=frequency_penalty,
+				presence=presence_penalty, max_tokens=max_tokens, stops=[ ],
+				instruct=combined_instructions, response_format=response_format, tools=[ ],
+				tool_choice=tool_choice or None, reasoning=reasoning, modalities=[ 'text' ],
+				media_resolution='', context=context, content='', urls=[ ], max_urls=0,
+				response_schema='', safety_profile='', file_search_store_names=[ ], stream=stream,
+				stream_handler=None, previous_interaction_id=get_previous_interaction_id( 'bucket' ),
+				store=True, )
 			
 			if response is None:
 				raise ValueError( 'Gemini returned no Google Cloud Buckets response.' )
@@ -7888,21 +8157,15 @@ elif mode == 'Google Cloud Buckets':
 			response_text = str( response ).strip( )
 			if not response_text:
 				raise ValueError( 'Gemini returned an empty Google Cloud Buckets response.' )
-			
-			try:
-				update_counters( getattr( chat, 'response', None ) )
-			except Exception:
-				pass
-			
+	
+			commit_interaction( 'bucket', chat )
+			update_counters( getattr( chat, 'response', None ) )
 			return response_text
-		
 		except Exception as e:
 			exception = Error( e )
 			exception.module = 'app'
 			exception.cause = 'run_bucket_chat_query'
-			exception.method = ('run_bucket_chat_query( prompt: str, '
-			                    'selected_bucket_id: str, '
-			                    'selected_bucket_label: str ) -> str')
+			exception.method = 'run_bucket_chat_query( prompt: str, **kwargs ) -> str'
 			Logger( ).write( exception )
 			raise exception
 	
@@ -8210,15 +8473,23 @@ elif mode == 'Google Cloud Buckets':
 					try:
 						response_text = run_bucket_chat_query( prompt=bucket_prompt,
 							selected_bucket_id=active_bucket_id,
-							selected_bucket_label=active_bucket_label )
+							selected_bucket_label=active_bucket_label, )
 						
 						st.markdown( response_text )
 						st.session_state[ 'bucket_messages' ].append(
 							{ 'role': 'assistant', 'content': response_text, } )
 						
-						st.session_state[ 'bucket_input' ] = [
-							{ 'role': 'user', 'content': bucket_prompt, } ]
+						if st.session_state.get( 'bucket_stream', False ):
+							st.session_state[ 'bucket_input' ] = [ ]
+						else:
+							structured_history = chat.get_structured_history( )
+							
+							if structured_history:
+								st.session_state[ 'bucket_input' ] = (structured_history)
+							else:
+								st.session_state[ 'bucket_input' ] = [ ]
 						
+						st.session_state[ 'last_sources' ] = [ ]
 						st.session_state[ 'last_answer' ] = response_text
 					
 					except Exception as e:
