@@ -9,7 +9,7 @@
   &bull;
   <a href="#-application-modes">Modes</a>
   &bull;
-  <a href="#-requirements">Requirements</a> 
+  <a href="https://github.com/is-leeroy-jenkins/Jeni/blob/main/requirements.txt">Requirements</a> 
   &bull;
   <a href="#-api-key-setup">Setup</a> 
   &bull;
