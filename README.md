@@ -17,7 +17,7 @@
   &bull;
   <a href="#-running-the-streamlit-application">Run</a> 
   &bull;
-  <a href="#-configuration">Configuration</a> 
+  <a href="#%EF%B8%8F-configuration">Configuration</a> 
   &bull;
   <a href="#-design-and-architecture">Architecture</a>
   &bull;
