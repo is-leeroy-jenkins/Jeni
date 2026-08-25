@@ -41,6 +41,10 @@ Jeni is designed for federal data analysis, budget execution support, document r
 knowledge retrieval, prompt management, and multimodal artificial intelligence experimentation.
 
 ## 🎥 Demo
+
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Launch%20App-blue?style=for-the-badge&logo=googlechrome&logoColor=white)](https://ai.studio/apps/a7689b0b-14c1-4e94-be58-8b256814b2d9?fullscreenApplet=true)
+
 ![](https://github.com/is-leeroy-jenkins/Jeni/blob/main/resources/images/jeni-demo.gif)
 
 ___
