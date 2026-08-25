@@ -9,7 +9,7 @@
   &bull;
   <a href="#-application-modes">Modes</a>
   &bull;
-  <a href="#-requirements">Requirements</a> 
+  <a href="https://github.com/is-leeroy-jenkins/Jeni/blob/main/requirements.txt">Requirements</a> 
   &bull;
   <a href="#-api-key-setup">Setup</a> 
   &bull;
@@ -17,7 +17,7 @@
   &bull;
   <a href="#-running-the-streamlit-application">Run</a> 
   &bull;
-  <a href="#-configuration">Configuration</a> 
+  <a href="#%EF%B8%8F-configuration">Configuration</a> 
   &bull;
   <a href="#-design-and-architecture">Architecture</a>
   &bull;
