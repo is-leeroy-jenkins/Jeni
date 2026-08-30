@@ -49,25 +49,53 @@ knowledge retrieval, prompt management, and multimodal artificial intelligence e
 
 ___
 
-## 🧊 Azure
 
-[![Containerized](https://img.shields.io/badge/Docker-App-2496ED?logo=docker&logoColor=white)](https://jeni.grayrock-3f318ce3.eastus.azurecontainerapps.io)
+## ☁️ Cloud
 
-- Containerized app
+<table>
+<tr>
 
-## 🔥 Streamlit
+<!-- AZURE -->
+<td align="center">
+<img width="190" height="1" alt=""><br>
+<a href="https://jeni.grayrock-3f318ce3.eastus.azurecontainerapps.io">
+<img src="https://img.shields.io/badge/Docker-App-2496ED?logo=docker&logoColor=white" alt="Docker App">
+</a>
+</td>
 
-[![Streamlit App](https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white)](https://jeni-py.streamlit.app/)
+<!-- STREAMLIT -->
+<td align="center">
+<img width="190" height="1" alt=""><br>
+<a href="https://jeni-py.streamlit.app/">
+<img src="https://img.shields.io/badge/Streamlit-App-FF4B4B?logo=streamlit&logoColor=white" alt="Streamlit App">
+</a>
+</td>
 
-- Web app
+<!-- GEMINI -->
+<td align="center">
+<img width="190" height="1" alt=""><br>
+<a href="https://jeni-py.ai.studio/">
+<img src="https://img.shields.io/badge/Gemini-App-4285F4?logo=googlegemini&logoColor=white" alt="Gemini App">
+</a>
+</td>
 
-## 🧱 Databricks
+<!-- DATABRICKS -->
+<td align="center">
+<img width="190" height="1" alt=""><br>
+<a href="https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351">
+<img src="https://img.shields.io/badge/Databricks%20Repo-Jeni--Py-FF3621?logo=databricks&logoColor=white" alt="Databricks Notebook">
+</a>
+</td>
 
-[![Jeni](https://img.shields.io/badge/Databricks-Jeni-FF3621?logo=databricks\&logoColor=white)](https://dbc-a0c21f80-7bb3.cloud.databricks.com/browse/folders/3169291152438615?o=7474645703081351)
-
-* Databricks workspace repository for the Jeni codebase.
-* Supports collaborative development, analytics, notebook execution, and application deployment.
-
+<!-- PALANTIR -->
+<td align="center">
+<img width="190" height="1" alt=""><br>
+<a href="https://leeroy.usw-16.palantirfoundry.com/shares/links/poh64yw2dw6fe">
+<img src="https://img.shields.io/badge/Palantir%20Foundry-Repository-101113?logo=palantir&logoColor=white" alt="Palantir Repo">
+</a>
+</td>
+</tr>
+</table>
 
 ## 🧰 Overview
 
