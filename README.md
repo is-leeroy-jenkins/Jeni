@@ -28,7 +28,7 @@
 ___
 
 
-[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-0078FC?style=for-the-badge&logo=githubpages&logoColor=white)](https://is-leeroy-jenkins.github.io/Jeni/)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-0078FC?style=for-the-badge&logo=githubpages&logoColor=white)](https://is-leeroy-jenkins.github.io/jeni/)
 
 
 Jeni is a Python and Streamlit application for building, running, and managing
